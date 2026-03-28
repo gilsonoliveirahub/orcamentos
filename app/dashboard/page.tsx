@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const COLUMNS = [
@@ -317,6 +317,8 @@ export default function Dashboard() {
   const [quotes, setQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [professional, setProfessional] = useState<any>(null)
+  const [copied, setCopied] = useState(false)
   const router = useRouter()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -329,13 +331,24 @@ export default function Dashboard() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [{ data: leadsData }, { data: quotesData }] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+    const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
+      user ? supabase.from('professionals').select('slug, name').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setLeads(leadsData || [])
     setQuotes(quotesData || [])
+    setProfessional(profData)
     setLoading(false)
+  }
+
+  function copyLink() {
+    if (!professional?.slug) return
+    const url = `${window.location.origin}/p/${professional.slug}`
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -396,6 +409,13 @@ export default function Dashboard() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            {professional?.slug && (
+              <button onClick={copyLink}
+                className="flex items-center gap-1.5 text-sm font-bold px-3 py-2.5 rounded-xl transition-all"
+                style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818cf8', border: `1px solid ${copied ? '#34d39930' : '#6366f130'}` }}>
+                <Link2 size={14} /> {copied ? 'Copiado!' : 'Meu Link'}
+              </button>
+            )}
             <button onClick={() => setShowModal(true)}
               className="flex items-center gap-2 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all"
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}>
