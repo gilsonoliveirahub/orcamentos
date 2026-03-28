@@ -154,8 +154,10 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
         ref={setNodeRef}
         className="flex flex-col gap-3 flex-1 rounded-2xl p-3 min-h-[200px] transition-all"
         style={{
-          background: isOver ? bg : bg,
-          border: `2px solid ${color}50`,
+          background: 'rgba(255,255,255,0.06)',
+          outline: `3px solid ${color}60`,
+          border: `3px solid ${color}25`,
+          outlineOffset: '-1px',
         }}
       >
         {colLeads.map((lead: any) => (
