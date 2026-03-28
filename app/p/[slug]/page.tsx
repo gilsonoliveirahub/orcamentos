@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase } from 'lucide-react'
+import { calculateQuote, generateProposalText } from '@/lib/calculator'
 
 const SERVICES: Record<string, { questions: string[]; keys: string[] }> = {
   Pintura: {
@@ -102,18 +103,48 @@ export default function ProfessionalPublicPage() {
     const { data: lead } = await supabase.from('leads').insert(leadData).select().single()
 
     if (lead) {
-      await Promise.all([
-        fetch('/api/quote/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead_id: lead.id }),
-        }),
-        fetch('/api/notifications/lead', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lead_id: lead.id }),
-        }),
-      ])
+      // Calcular orçamento directamente no cliente sem precisar de API
+      const quoteInput = {
+        area_m2: leadData.q3_area_m2 || 50,
+        tipo: (leadData.q1_tipo_trabalho?.toLowerCase() || 'interior') as 'interior' | 'exterior' | 'ambos',
+        cor_escura: !!leadData.q4_cor_escura,
+        fissuras: !!leadData.q5_fissuras,
+        mobilias: !!leadData.q6_mobilias,
+        primer: !!leadData.q7_primer,
+        teto: !!leadData.q8_teto,
+        prices: {
+          price_m2_walls: professional.price_m2_walls || 4,
+          price_m2_ceiling: professional.price_m2_ceiling || 5,
+          price_m2_exterior: professional.price_m2_exterior || 6,
+          extra_dark_color: professional.extra_dark_color || 1.25,
+          extra_cracks: professional.extra_cracks || 6,
+          extra_furniture_move: professional.extra_furniture_move || 50,
+          extra_primer: professional.extra_primer || 2,
+          min_quote: professional.min_quote || 150,
+        },
+      }
+      const quoteResult = calculateQuote(quoteInput)
+      const proposalText = generateProposalText({ ...leadData, name }, quoteResult, professional)
+
+      await supabase.from('quotes').insert({
+        lead_id: lead.id,
+        professional_id: professional.id,
+        area_m2: quoteInput.area_m2,
+        valor_base: quoteResult.valor_base,
+        extras_total: quoteResult.extras_total,
+        valor_final: quoteResult.valor_final,
+        valor_min: quoteResult.valor_min,
+        valor_max: quoteResult.valor_max,
+        proposal_text: proposalText,
+        status: 'rascunho',
+      })
+
+      // Notificação email em background (não bloqueia)
+      fetch('/api/notifications/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id }),
+      }).catch(() => {})
     }
 
     setSubmitted(true)
