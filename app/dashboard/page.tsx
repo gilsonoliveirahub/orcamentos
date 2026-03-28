@@ -8,6 +8,9 @@ import {
   DragEndEvent,
   useDroppable,
   useDraggable,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core'
 import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -286,6 +289,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const router = useRouter()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -380,7 +384,7 @@ export default function Dashboard() {
         {loading ? (
           <div className="text-center text-gray-500 py-20">A carregar...</div>
         ) : (
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="flex gap-4 overflow-x-auto pb-4">
               {COLUMNS.map(col => (
                 <Column
