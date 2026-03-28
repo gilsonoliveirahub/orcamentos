@@ -171,6 +171,10 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
         ))}
         {colLeads.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-1"
+              style={{ background: `${color}20`, border: `2px dashed ${color}60` }}>
+              <Plus size={16} style={{ color }} />
+            </div>
             <span className="text-sm font-bold" style={{ color: '#9b1c1c' }}>Arrasta aqui</span>
           </div>
         )}
