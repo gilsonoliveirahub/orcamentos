@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
@@ -6,15 +7,18 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const supabase = await createClient()
+    // Usar session do utilizador para obter o seu professional_id
+    const userClient = await createClient()
+    const { data: { user } } = await userClient.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-    const { data: professional } = await supabase
+    const { data: professional } = await supabaseAdmin
       .from('professionals')
       .select('id')
-      .limit(1)
+      .eq('user_id', user.id)
       .single()
 
-    const { data: lead, error } = await supabase
+    const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .insert({
         professional_id: professional?.id,

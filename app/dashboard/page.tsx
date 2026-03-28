@@ -421,6 +421,11 @@ export default function Dashboard() {
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}>
               <Plus size={15} /> Novo Lead
             </button>
+            <a href="/acordos"
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              📋 Acordos
+            </a>
             <a href="/stats"
               className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
               style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>

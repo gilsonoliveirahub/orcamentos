@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 
 export async function POST(req: NextRequest) {
   try {
     const { lead_id } = await req.json()
-    const supabase = await createClient()
+    const supabase = supabaseAdmin
 
     const { data: lead } = await supabase
       .from('leads')
