@@ -441,6 +441,11 @@ export default function Dashboard() {
               style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
               ↻
             </button>
+            <a href="/perfil"
+              className="px-3 py-2.5 rounded-xl transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              👤
+            </a>
             <button onClick={handleLogout}
               className="px-3 py-2.5 rounded-xl transition-colors"
               style={{ color: '#475569' }}>
