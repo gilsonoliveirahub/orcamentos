@@ -154,8 +154,8 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
         ref={setNodeRef}
         className="flex flex-col gap-3 flex-1 rounded-2xl p-3 min-h-[200px] transition-all"
         style={{
-          background: isOver ? bg : 'rgba(255,255,255,0.03)',
-          border: isOver ? `1px solid ${color}40` : '1px solid rgba(255,255,255,0.05)',
+          background: isOver ? bg : bg,
+          border: `2px solid ${color}50`,
         }}
       >
         {colLeads.map((lead: any) => (
@@ -169,10 +169,10 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
         {colLeads.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: bg }}>
+              style={{ background: `${color}25` }}>
               <Plus size={14} style={{ color }} />
             </div>
-            <span className="text-xs text-gray-600">Arrasta aqui</span>
+            <span className="text-xs" style={{ color: `${color}99` }}>Arrasta aqui</span>
           </div>
         )}
       </div>
