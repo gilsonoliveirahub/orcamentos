@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink } from 'lucide-react'
+import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings } from 'lucide-react'
+import Link from 'next/link'
 
 const SPECIALTIES = ['Pintura', 'Limpeza', 'Electricidade', 'Canalização', 'Carpintaria', 'Jardinagem', 'Mudanças', 'Outro']
 
@@ -172,6 +173,11 @@ export default function PerfilPage() {
               </span>
             </div>
           </div>
+          <Link href="/conta"
+            className="flex items-center gap-2 text-sm font-semibold mt-4 px-4 py-3 rounded-xl transition-all"
+            style={{ background: 'rgba(255,255,255,0.04)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <Settings size={14} /> Mudar password / Definições de conta
+          </Link>
         </div>
 
       </div>

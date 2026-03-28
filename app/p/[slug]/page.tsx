@@ -102,11 +102,18 @@ export default function ProfessionalPublicPage() {
     const { data: lead } = await supabase.from('leads').insert(leadData).select().single()
 
     if (lead) {
-      await fetch('/api/quote/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id }),
-      })
+      await Promise.all([
+        fetch('/api/quote/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: lead.id }),
+        }),
+        fetch('/api/notifications/lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: lead.id }),
+        }),
+      ])
     }
 
     setSubmitted(true)

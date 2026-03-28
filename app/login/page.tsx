@@ -53,6 +53,13 @@ export default function LoginPage() {
       body: JSON.stringify({ user_id: data.user.id, role, name, email, phone, specialty, zone }),
     })
 
+    if (role === 'professional') {
+      // Login imediato e vai para onboarding completar perfil
+      await supabase.auth.signInWithPassword({ email, password })
+      router.push('/onboarding')
+      return
+    }
+
     setSuccess('Conta criada! Já pode entrar.')
     setTab('login')
     setLoading(false)
@@ -188,6 +195,11 @@ export default function LoginPage() {
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.35)', opacity: loading ? 0.7 : 1 }}>
               {loading ? 'A processar...' : tab === 'login' ? 'Entrar' : 'Criar Conta'}
             </button>
+            {tab === 'login' && (
+              <a href="/recuperar-password" className="block text-center text-xs text-gray-600 hover:text-gray-400 mt-2 transition-colors">
+                Esqueci a password
+              </a>
+            )}
           </form>
         </div>
 
