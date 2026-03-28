@@ -47,29 +47,14 @@ export default function LoginPage() {
     if (error) { setError(error.message); setLoading(false); return }
     if (!data.user) { setError('Erro ao criar conta.'); setLoading(false); return }
 
-    if (role === 'professional') {
-      const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      await supabase.from('professionals').insert({
-        user_id: data.user.id,
-        name,
-        email,
-        phone,
-        specialty,
-        zone,
-        slug: `${slug}-${Math.random().toString(36).slice(2, 6)}`,
-      })
-      setSuccess('Conta criada! Já pode entrar.')
-      setTab('login')
-    } else {
-      await supabase.from('clients').insert({
-        user_id: data.user.id,
-        name,
-        email,
-        phone,
-      })
-      setSuccess('Conta criada! Já pode entrar.')
-      setTab('login')
-    }
+    await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: data.user.id, role, name, email, phone, specialty, zone }),
+    })
+
+    setSuccess('Conta criada! Já pode entrar.')
+    setTab('login')
     setLoading(false)
   }
 
