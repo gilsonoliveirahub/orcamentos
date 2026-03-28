@@ -152,12 +152,13 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
       {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className="flex flex-col gap-3 flex-1 rounded-2xl p-3 min-h-[200px] transition-all"
+        className="flex flex-col gap-3 flex-1 rounded-xl p-3 min-h-[200px] transition-all"
         style={{
-          background: 'rgba(255,255,255,0.06)',
-          outline: `3px solid ${color}60`,
-          border: `3px solid ${color}25`,
-          outlineOffset: '-1px',
+          background: '#ffffff',
+          border: `3px solid ${color}`,
+          outline: `3px solid ${color}40`,
+          outlineOffset: '3px',
+          borderRadius: '14px',
         }}
       >
         {colLeads.map((lead: any) => (
@@ -170,11 +171,7 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
         ))}
         {colLeads.length === 0 && (
           <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: `${color}25` }}>
-              <Plus size={14} style={{ color }} />
-            </div>
-            <span className="text-xs" style={{ color: `${color}99` }}>Arrasta aqui</span>
+            <span className="text-sm font-bold" style={{ color: '#9b1c1c' }}>Arrasta aqui</span>
           </div>
         )}
       </div>
