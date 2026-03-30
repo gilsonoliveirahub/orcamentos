@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings } from 'lucide-react'
 import Link from 'next/link'
 
-const SPECIALTIES = ['Pintura', 'Limpeza', 'Electricidade', 'Canalização', 'Carpintaria', 'Jardinagem', 'Mudanças', 'Outro']
+const SPECIALTIES = ['Pintura', 'Electricidade', 'Canalização', 'Carpintaria', 'Jardinagem', 'Mudanças', 'Limpeza', 'Remodelação', 'Outro']
 
 export default function PerfilPage() {
   const router = useRouter()
@@ -15,7 +15,7 @@ export default function PerfilPage() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
-  const [form, setForm] = useState({ name: '', phone: '', specialty: 'Pintura', zone: '', description: '' })
+  const [form, setForm] = useState({ name: '', phone: '', specialty: 'Pintura', zone: '', bio: '' })
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -28,7 +28,7 @@ export default function PerfilPage() {
         phone: prof.phone || '',
         specialty: prof.specialty || 'Pintura',
         zone: prof.zone || '',
-        description: prof.description || '',
+        bio: prof.bio || '',
       })
       setLoading(false)
     })
@@ -42,7 +42,7 @@ export default function PerfilPage() {
       phone: form.phone,
       specialty: form.specialty,
       zone: form.zone,
-      description: form.description,
+      bio: form.bio,
     }).eq('id', professional.id)
     setSaving(false)
     setSaved(true)
@@ -140,7 +140,7 @@ export default function PerfilPage() {
 
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Sobre mim</label>
-            <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+            <textarea value={form.bio} onChange={e => setForm(p => ({ ...p, bio: e.target.value }))}
               placeholder="Descreve o teu trabalho, experiência, especialidades..."
               rows={3} className={inp} style={ist} />
           </div>

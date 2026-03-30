@@ -1,21 +1,24 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta']
+
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
+  const isProtected = PROTECTED.some(p => pathname.startsWith(p))
+  if (!isProtected) return NextResponse.next()
+
+  const res = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll() },
+        getAll() { return req.cookies.getAll() },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options))
         },
       },
     }
@@ -23,20 +26,13 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isProtected = request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/config')
-
-  if (isProtected && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!user) {
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  if (request.nextUrl.pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
-  return supabaseResponse
+  return res
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api|p/).*)'],
 }

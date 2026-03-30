@@ -8,7 +8,16 @@ export async function POST(req: NextRequest) {
     const { user_id, role, name, email, phone, specialty, zone } = await req.json()
 
     if (role === 'professional') {
-      const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      const slug = name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+
+      const trialEndsAt = new Date()
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7)
+
       const { error } = await supabaseAdmin.from('professionals').insert({
         user_id,
         name,
@@ -17,6 +26,9 @@ export async function POST(req: NextRequest) {
         specialty: specialty || 'Pintura',
         zone: zone || null,
         slug: `${slug}-${Math.random().toString(36).slice(2, 6)}`,
+        plan: 'free',
+        trial_ends_at: trialEndsAt.toISOString(),
+        active: true,
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     } else {

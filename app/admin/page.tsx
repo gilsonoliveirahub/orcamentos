@@ -141,7 +141,7 @@ export default function AdminPage() {
                 style={{ borderBottom: i < Math.min(leads.length, 20) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-white text-sm">{lead.name || 'Sem nome'}</div>
-                  <div className="text-xs text-gray-500">{lead.professionals?.name} · {lead.q1_tipo_trabalho || '—'} {lead.q3_area_m2 ? `· ${lead.q3_area_m2}m²` : ''}</div>
+                  <div className="text-xs text-gray-500">{lead.professionals?.name} · {lead.metadata?.tipo_trabalho || lead.q1_tipo_trabalho || '—'} {(lead.metadata?.area_m2 || lead.q3_area_m2) ? `· ${lead.metadata?.area_m2 || lead.q3_area_m2}m²` : ''}</div>
                 </div>
                 <div className="text-xs text-gray-600">
                   {new Date(lead.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}

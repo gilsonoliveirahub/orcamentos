@@ -34,7 +34,12 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        ...style,
+        background: 'linear-gradient(135deg, #1e2035 0%, #191b2e 100%)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+      }}
       {...attributes}
       {...listeners}
       onClick={onClick}
@@ -43,12 +48,6 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
           ? 'shadow-2xl scale-105'
           : 'hover:translate-y-[-2px] hover:shadow-xl'
       }`}
-      style={{
-        ...style,
-        background: 'linear-gradient(135deg, #1e2035 0%, #191b2e 100%)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
-      }}
     >
       {/* Avatar + nome */}
       <div className="flex items-center justify-between mb-3">
@@ -106,23 +105,23 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
             >
               <MessageCircle size={11} /> WhatsApp
             </a>
-            {lead.q3_area_m2 && (
-              <button
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  await fetch('/api/quote/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lead_id: lead.id }),
-                  })
-                  window.location.reload()
-                }}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
-                style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
-              >
-                + Orçamento
-              </button>
-            )}
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                // Pintura usa calculadora exata; outras profissões usam estimativa
+                const endpoint = lead.q3_area_m2 ? '/api/quote/generate' : '/api/quote/estimate'
+                await fetch(endpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ lead_id: lead.id }),
+                })
+                window.location.reload()
+              }}
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
+            >
+              + Orçamento
+            </button>
             <span className="text-xs text-gray-600">
               {new Date(lead.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}
             </span>
@@ -454,6 +453,24 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Banner trial */}
+      {professional?.trial_ends_at && (() => {
+        const days = Math.max(0, Math.ceil((new Date(professional.trial_ends_at).getTime() - Date.now()) / 86400000))
+        if (days > 3 || professional?.plan === 'pro') return null
+        return (
+          <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-xl"
+            style={{ background: days === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(201,168,76,0.08)', border: `1px solid ${days === 0 ? 'rgba(239,68,68,0.2)' : 'rgba(201,168,76,0.2)'}` }}>
+            <span className="text-sm font-semibold" style={{ color: days === 0 ? '#f87171' : '#c9a84c' }}>
+              {days === 0 ? '⚠️ Trial expirado — limitado a 10 leads' : `⚡ Trial: ${days} dia${days !== 1 ? 's' : ''} restante${days !== 1 ? 's' : ''}`}
+            </span>
+            <a href="/upgrade" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: days === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(201,168,76,0.15)', color: days === 0 ? '#f87171' : '#c9a84c' }}>
+              Upgrade →
+            </a>
+          </div>
+        )
+      })()}
 
       {/* Pipeline */}
       <div className="p-6">
