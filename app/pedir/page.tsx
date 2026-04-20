@@ -226,6 +226,7 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
   const [text, setText] = useState(answer || '')
   const [selected, setSelected] = useState<string[]>(Array.isArray(answer) ? answer : [])
   const [outroVal, setOutroVal] = useState('')
+  const [outroMode, setOutroMode] = useState(false)
 
   function toggleMulti(opt: string) {
     setSelected(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt])
@@ -277,7 +278,7 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
 
   if (question.type === 'choice' && question.options) {
     const hasOutro = question.options.includes('Outro')
-    const outroSelected = hasOutro && answer === 'Outro'
+    const showOutroInput = hasOutro && (outroMode || (answer && !question.options.includes(answer)))
 
     return (
       <div>
@@ -285,17 +286,17 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
         <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
         <div className="space-y-3">
           {question.options.map((opt: string) => (
-            <button key={opt} onClick={() => onAnswer(opt)}
+            <button key={opt} onClick={() => opt === 'Outro' ? setOutroMode(true) : onAnswer(opt)}
               className="w-full text-left px-5 py-4 rounded-2xl font-semibold text-white transition-all"
               style={{
-                background: answer === opt ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
-                border: answer === opt ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                background: (opt === 'Outro' ? showOutroInput : answer === opt) ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                border: (opt === 'Outro' ? showOutroInput : answer === opt) ? 'none' : '1px solid rgba(255,255,255,0.08)',
               }}>
               {opt}
             </button>
           ))}
         </div>
-        {outroSelected && (
+        {showOutroInput && (
           <div className="mt-4">
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">
               Altura em metros
