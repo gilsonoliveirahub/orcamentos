@@ -432,6 +432,7 @@ function QuestionStep({
 }) {
   const [text, setText] = useState(answer || '')
   const [selected, setSelected] = useState<string[]>(Array.isArray(answer) ? answer : [])
+  const [outroVal, setOutroVal] = useState('')
 
   function toggleMulti(opt: string) {
     setSelected(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt])
@@ -484,7 +485,6 @@ function QuestionStep({
   if (question.type === 'choice' && question.options) {
     const hasOutro = question.options.includes('Outro')
     const outroSelected = hasOutro && answer === 'Outro'
-    const [outroVal, setOutroVal] = useState('')
 
     return (
       <div>
@@ -507,18 +507,24 @@ function QuestionStep({
         </div>
         {outroSelected && (
           <div className="mt-4">
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">
+              Altura em metros
+            </label>
             <input
               type="number"
               step="0.1"
+              min="1"
+              max="10"
               value={outroVal}
               onChange={e => setOutroVal(e.target.value)}
-              placeholder={question.unit ? `ex: 2.6 (${question.unit})` : 'Introduza o valor'}
+              placeholder="ex: 2.6"
               className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
               autoFocus
             />
+            <p className="text-xs text-gray-600 mt-1">metros</p>
             <button
-              onClick={() => outroVal && onAnswer(outroVal + (question.unit ? question.unit : ''))}
+              onClick={() => outroVal && onAnswer(outroVal + 'm')}
               disabled={!outroVal}
               className="w-full mt-3 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
               style={{
