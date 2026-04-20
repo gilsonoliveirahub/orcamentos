@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2 } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const COLUMNS = [
@@ -24,8 +24,9 @@ const COLUMNS = [
   { id: 'perdido',     label: 'Perdido',     color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
 
-function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: () => void }) {
+function LeadCard({ lead, quote, onClick, onUnlock }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
+  const isLocked = lead.locked && lead.source === 'marketplace'
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 999, opacity: 0.9 }
@@ -36,36 +37,47 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
       ref={setNodeRef}
       style={{
         ...style,
-        background: 'linear-gradient(135deg, #1e2035 0%, #191b2e 100%)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: isLocked ? 'linear-gradient(135deg, #1a1a2e 0%, #16162a 100%)' : 'linear-gradient(135deg, #1e2035 0%, #191b2e 100%)',
+        border: isLocked ? '1px solid rgba(248,113,113,0.2)' : '1px solid rgba(255,255,255,0.07)',
         boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
       }}
       {...attributes}
       {...listeners}
-      onClick={onClick}
-      className={`group relative rounded-2xl p-4 cursor-pointer transition-all select-none ${
-        isDragging
-          ? 'shadow-2xl scale-105'
-          : 'hover:translate-y-[-2px] hover:shadow-xl'
+      onClick={isLocked ? undefined : onClick}
+      className={`group relative rounded-2xl p-4 transition-all select-none ${
+        isDragging ? 'shadow-2xl scale-105' : isLocked ? 'cursor-default' : 'cursor-pointer hover:translate-y-[-2px] hover:shadow-xl'
       }`}
     >
+      {/* Badge marketplace */}
+      {lead.source === 'marketplace' && (
+        <div className="flex items-center gap-1 mb-2">
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+            style={{ background: isLocked ? 'rgba(248,113,113,0.15)' : 'rgba(201,168,76,0.15)', color: isLocked ? '#f87171' : '#c9a84c' }}>
+            {isLocked ? <Lock size={9} /> : <Unlock size={9} />}
+            {isLocked ? 'Bloqueado' : 'Marketplace'}
+          </span>
+        </div>
+      )}
+
       {/* Avatar + nome */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            style={{ background: isLocked ? 'rgba(100,100,120,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
           >
-            {(lead.name || '?')[0].toUpperCase()}
+            {isLocked ? <Lock size={14} className="text-gray-500" /> : (lead.name || '?')[0].toUpperCase()}
           </div>
           <div>
-            <div className="font-bold text-sm text-white leading-tight">{lead.name || 'Sem nome'}</div>
+            <div className="font-bold text-sm text-white leading-tight">
+              {isLocked ? '••••••••' : (lead.name || 'Sem nome')}
+            </div>
             <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-              <Phone size={9} /> {lead.phone}
+              <Phone size={9} /> {isLocked ? '•••••••••' : lead.phone}
             </div>
           </div>
         </div>
-        <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 transition-colors" />
+        {!isLocked && <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 transition-colors" />}
       </div>
 
       {/* Tags */}
@@ -86,7 +98,15 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        {quote ? (
+        {isLocked ? (
+          <button
+            onClick={e => { e.stopPropagation(); onUnlock() }}
+            className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl transition-colors"
+            style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
+          >
+            <Unlock size={11} /> Desbloquear (1 crédito)
+          </button>
+        ) : quote ? (
           <>
             <span className="text-xs text-gray-500">Orçamento</span>
             <span className="text-sm font-black" style={{ color: '#34d399' }}>
@@ -108,7 +128,6 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
             <button
               onClick={async (e) => {
                 e.stopPropagation()
-                // Pintura usa calculadora exata; outras profissões usam estimativa
                 const endpoint = lead.q3_area_m2 ? '/api/quote/generate' : '/api/quote/estimate'
                 await fetch(endpoint, {
                   method: 'POST',
@@ -132,7 +151,7 @@ function LeadCard({ lead, quote, onClick }: { lead: any; quote: any; onClick: ()
   )
 }
 
-function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
+function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock }: any) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const colLeads = leads.filter((l: any) => l.status === id)
 
@@ -166,6 +185,7 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick }: any) {
             lead={lead}
             quote={quotes.find((q: any) => q.lead_id === lead.id)}
             onClick={() => onCardClick(lead.id)}
+            onUnlock={() => onUnlock(lead.id)}
           />
         ))}
         {colLeads.length === 0 && (
@@ -334,7 +354,7 @@ export default function Dashboard() {
     const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
-      user ? supabase.from('professionals').select('slug, name').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+      user ? supabase.from('professionals').select('slug, name, marketplace_credits').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setLeads(leadsData || [])
     setQuotes(quotesData || [])
@@ -348,6 +368,22 @@ export default function Dashboard() {
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleUnlock(leadId: string) {
+    const res = await fetch('/api/leads/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: leadId }),
+    })
+    if (res.ok) {
+      loadData()
+    } else {
+      const { error } = await res.json()
+      if (error === 'Sem créditos') {
+        router.push('/creditos')
+      }
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -472,6 +508,23 @@ export default function Dashboard() {
         )
       })()}
 
+      {/* Banner créditos marketplace */}
+      {professional && (
+        <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-white">
+              🏪 Créditos marketplace: <span style={{ color: '#c9a84c' }}>{professional.marketplace_credits ?? 0}</span>
+            </span>
+            <span className="text-xs text-gray-500">· leads que chegam pelo site</span>
+          </div>
+          <a href="/creditos" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+            Comprar →
+          </a>
+        </div>
+      )}
+
       {/* Pipeline */}
       <div className="p-6">
         {loading ? (
@@ -486,7 +539,8 @@ export default function Dashboard() {
             <div className="flex gap-4 overflow-x-auto pb-6" style={{ minHeight: 'calc(100vh - 140px)' }}>
               {COLUMNS.map(col => (
                 <Column key={col.id} {...col} leads={leads} quotes={quotes}
-                  onCardClick={(id: string) => router.push(`/leads/${id}`)} />
+                  onCardClick={(id: string) => router.push(`/leads/${id}`)}
+                  onUnlock={handleUnlock} />
               ))}
             </div>
           </DndContext>

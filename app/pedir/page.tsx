@@ -209,7 +209,7 @@ function ResultCard({ prof }: { prof: any }) {
           </div>
         </div>
         <Link
-          href={`/p/${prof.slug}`}
+          href={`/p/${prof.slug}?ref=marketplace`}
           className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-black text-white text-sm"
           style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}
         >

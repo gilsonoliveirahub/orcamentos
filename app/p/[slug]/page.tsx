@@ -9,6 +9,7 @@ import { getProfession, mapAnswersToLeadFields, type Question } from '@/lib/prof
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
+  const source = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ref') === 'marketplace' ? 'marketplace' : 'pessoal'
   const [professional, setProfessional] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0) // 0 = intro, 1..N = perguntas, N+1 = media, N+2 = contacto
@@ -80,19 +81,21 @@ export default function ProfessionalPublicPage() {
 
     const legacyFields = mapAnswersToLeadFields(answers)
 
-    const { data: lead } = await supabase.from('leads').insert({
-      professional_id: professional.id,
-      name,
-      phone,
-      email: email || null,
-      status: 'novo',
-      ...legacyFields,
-      metadata: answers,
-    }).select().single()
-
-    if (lead && mediaUrls.length > 0) {
-      await supabase.from('leads').update({ metadata: { ...answers, media_urls: mediaUrls } }).eq('id', lead.id)
-    }
+    const res = await fetch('/api/leads/public', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        professional_id: professional.id,
+        name,
+        phone,
+        email: email || null,
+        status: 'novo',
+        source,
+        ...legacyFields,
+        metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+      }),
+    })
+    const { lead } = await res.json()
 
     if (lead) {
       if (professional.specialty === 'Pintura' && legacyFields.q3_area_m2) {

@@ -28,15 +28,30 @@ export async function POST(req: NextRequest) {
     const professional_id = session.metadata?.professional_id
 
     if (professional_id) {
-      const plan = session.metadata?.plan || 'starter'
-      await supabaseAdmin
-        .from('professionals')
-        .update({
-          plan,
-          stripe_customer_id: session.customer as string,
-          stripe_subscription_id: session.subscription as string,
-        })
-        .eq('id', professional_id)
+      // Compra de créditos
+      if (session.metadata?.type === 'credits') {
+        const credits = parseInt(session.metadata.credits || '0')
+        const { data: prof } = await supabaseAdmin
+          .from('professionals')
+          .select('marketplace_credits')
+          .eq('id', professional_id)
+          .single()
+        await supabaseAdmin
+          .from('professionals')
+          .update({ marketplace_credits: (prof?.marketplace_credits || 0) + credits })
+          .eq('id', professional_id)
+      } else {
+        // Subscrição
+        const plan = session.metadata?.plan || 'starter'
+        await supabaseAdmin
+          .from('professionals')
+          .update({
+            plan,
+            stripe_customer_id: session.customer as string,
+            stripe_subscription_id: session.subscription as string,
+          })
+          .eq('id', professional_id)
+      }
     }
   }
 
