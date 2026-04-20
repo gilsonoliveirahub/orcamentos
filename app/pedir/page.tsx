@@ -55,7 +55,11 @@ export default function PedirPage() {
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="max-w-lg mx-auto px-6 py-5 flex items-center gap-3">
-          {step !== 'profissao' && (
+          {step === 'profissao' ? (
+            <Link href="/" className="text-gray-500 hover:text-gray-300 transition-colors">
+              <ChevronLeft size={22} />
+            </Link>
+          ) : (
             <button
               onClick={() => setStep(step === 'resultados' ? 'zona' : 'profissao')}
               className="text-gray-500 hover:text-gray-300 transition-colors"

@@ -28,10 +28,11 @@ export async function POST(req: NextRequest) {
     const professional_id = session.metadata?.professional_id
 
     if (professional_id) {
+      const plan = session.metadata?.plan || 'starter'
       await supabaseAdmin
         .from('professionals')
         .update({
-          plan: 'pro',
+          plan,
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: session.subscription as string,
         })
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
     const sub = event.data.object as Stripe.Subscription
     await supabaseAdmin
       .from('professionals')
-      .update({ plan: 'free' })
+      .update({ plan: 'inactive' })
       .eq('stripe_subscription_id', sub.id)
   }
 

@@ -58,6 +58,23 @@ export default function ProfessionalPublicPage() {
     if (submitting) return
     setSubmitting(true)
 
+    // Verificar limite de leads para plano Starter
+    if (professional.plan === 'starter') {
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+      const { count } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('professional_id', professional.id)
+        .gte('created_at', startOfMonth.toISOString())
+      if ((count ?? 0) >= 10) {
+        setSubmitting(false)
+        alert('Este profissional atingiu o limite de pedidos para este mês. Tente mais tarde.')
+        return
+      }
+    }
+
     const legacyFields = mapAnswersToLeadFields(answers)
 
     const { data: lead } = await supabase.from('leads').insert({
