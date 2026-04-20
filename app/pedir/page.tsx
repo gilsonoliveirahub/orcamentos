@@ -224,6 +224,55 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 // ── Pergunta ──────────────────────────────────────────────────────────────────
 function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, onBack }: any) {
   const [text, setText] = useState(answer || '')
+  const [selected, setSelected] = useState<string[]>(Array.isArray(answer) ? answer : [])
+
+  function toggleMulti(opt: string) {
+    setSelected(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt])
+  }
+
+  if (question.type === 'multiselect' && question.options) {
+    return (
+      <div>
+        <ProgressBar current={current} total={total} />
+        <h2 className="text-xl font-black text-white mb-2">{question.text}</h2>
+        <p className="text-sm text-gray-500 mb-5">Pode selecionar várias opções.</p>
+        <div className="space-y-2">
+          {question.options.map((opt: string) => {
+            const active = selected.includes(opt)
+            return (
+              <button key={opt} onClick={() => toggleMulti(opt)}
+                className="w-full text-left px-5 py-4 rounded-2xl font-semibold text-white transition-all flex items-center gap-3"
+                style={{
+                  background: active ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                  border: active ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                }}>
+                <div className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center"
+                  style={{ background: active ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)', border: active ? 'none' : '1px solid rgba(255,255,255,0.2)' }}>
+                  {active && <span className="text-xs font-black">✓</span>}
+                </div>
+                {opt}
+              </button>
+            )
+          })}
+        </div>
+        <button onClick={() => onAnswer(selected.length > 0 ? selected : null)}
+          disabled={selected.length === 0}
+          className="w-full mt-5 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+          style={{
+            background: selected.length > 0 ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+            opacity: selected.length === 0 ? 0.4 : 1,
+            boxShadow: selected.length > 0 ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+          }}>
+          Continuar ({selected.length} selecionado{selected.length !== 1 ? 's' : ''}) <ChevronRight size={18} />
+        </button>
+        {current > 1 && (
+          <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+            <ChevronLeft size={15} /> Voltar
+          </button>
+        )}
+      </div>
+    )
+  }
 
   if (question.type === 'choice' && question.options) {
     return (

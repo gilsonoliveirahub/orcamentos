@@ -1,4 +1,4 @@
-export type AnswerType = 'choice' | 'number' | 'text'
+export type AnswerType = 'choice' | 'multiselect' | 'number' | 'text'
 
 export interface Question {
   key: string
@@ -131,7 +131,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     emoji: '🏗️',
     label: 'Remodelação',
     questions: [
-      { key: 'tipo_trabalho', text: 'Que tipo de remodelação?', type: 'choice', options: ['Casa de banho', 'Cozinha', 'Quarto / Sala', 'Toda a habitação', 'Escritório', 'Outro'] },
+      { key: 'tipo_trabalho', text: 'Que áreas vão ser remodeladas?', type: 'multiselect', options: ['Casa de banho', 'Cozinha', 'Quarto', 'Sala', 'Escritório', 'Corredor / Hall', 'Toda a habitação', 'Exterior / Terraço', 'Outro'] },
       { key: 'area_m2', text: 'Área a remodelar em m²?', type: 'number', placeholder: 'ex: 12', unit: 'm²' },
       { key: 'estado', text: 'Estado atual do espaço?', type: 'choice', options: ['Precisa de obras totais', 'Só alguns acabamentos', 'Pequenas reparações'] },
       { key: 'materiais', text: 'Os materiais já estão comprados?', type: 'choice', options: ['Sim, todos', 'Parcialmente', 'Não, preciso de ajuda a escolher'] },
