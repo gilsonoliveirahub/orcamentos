@@ -26,8 +26,8 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais', 'Outro'], unit: 'm' },
       { key: 'num_quartos', text: 'Quantos quartos vão ser pintados?', type: 'choice', options: ['0', '1', '2', '3', '4 ou mais'] },
       { key: 'tem_sala', text: 'Inclui sala?', type: 'choice', options: ['Sim', 'Não'] },
-      { key: 'tem_cozinha', text: 'Inclui cozinha?', type: 'choice', options: ['Sim', 'Não'] },
-      { key: 'num_wc', text: 'Quantas casas de banho?', type: 'choice', options: ['0', '1', '2', '3 ou mais'] },
+      { key: 'tem_cozinha', text: 'Inclui cozinha? (normalmente só teto)', type: 'choice', options: ['Sim', 'Não'] },
+      { key: 'num_wc', text: 'Quantas casas de banho? (normalmente só teto)', type: 'choice', options: ['0', '1', '2', '3 ou mais'] },
       { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'area_total_m2', text: 'Área total da habitação em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true },
       { key: 'cor_escura', text: 'Qual a situação da cor?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor'] },
@@ -163,11 +163,10 @@ export function calcPaintingAreas(answers: Record<string, any>): { area_paredes:
   const wcMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3 ou mais': 3 }
   const wcs = wcMap[answers['num_wc']] ?? 1
 
-  // Perímetros médios por divisão (m)
+  // Perímetros médios por divisão (m) — só paredes sem azulejo
+  // Cozinha e WC normalmente têm paredes azulejadas, só contam no teto
   let perimeter = quartos * 14
   if (answers['tem_sala'] === 'Sim') perimeter += 18
-  if (answers['tem_cozinha'] === 'Sim') perimeter += 13
-  perimeter += wcs * 9
   if (answers['tem_hall'] === 'Sim') perimeter += 10
 
   const area_paredes = Math.max(Math.round(perimeter * height * 0.85), 10)

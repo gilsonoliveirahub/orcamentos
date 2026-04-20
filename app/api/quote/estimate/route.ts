@@ -16,9 +16,8 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: numb
       const wcMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3 ou mais': 3 }
       let perimeter = (quartosMap[a.num_quartos] ?? 1) * 14
       if (a.tem_sala === 'Sim') perimeter += 18
-      if (a.tem_cozinha === 'Sim') perimeter += 13
-      perimeter += (wcMap[a.num_wc] ?? 1) * 9
       if (a.tem_hall === 'Sim') perimeter += 10
+      // Cozinha e WC têm paredes azulejadas — só contam no teto
       area_paredes = Math.max(Math.round(perimeter * height * 0.85), 10)
       area_tetos = parseFloat(a.area_total_m2) || 0
     } else {
