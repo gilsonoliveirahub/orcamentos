@@ -8,6 +8,7 @@ export interface Question {
   placeholder?: string
   unit?: string
   optional?: boolean
+  minLength?: number
 }
 
 export interface ProfessionConfig {
@@ -139,7 +140,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'projeto', text: 'Tem projeto de arquitetura ou design?', type: 'choice', options: ['Sim, tenho projeto', 'Tenho ideia mas não projeto', 'Preciso de ajuda a planear'] },
       { key: 'orcamento_disponivel', text: 'Orçamento disponível para a obra?', type: 'choice', options: ['Até 2.000€', '2.000€ a 10.000€', '10.000€ a 30.000€', 'Mais de 30.000€', 'Ainda não definido'] },
       { key: 'prazo', text: 'Quando precisa de começar?', type: 'choice', options: ['O mais rápido possível', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
-      { key: 'notas', text: 'Descreva o projeto', type: 'text', placeholder: 'Materiais preferidos, referências, estilo...', optional: true },
+      { key: 'notas', text: 'Descreva o projeto', type: 'text', placeholder: 'Ex: quero remodelar a casa de banho com azulejos brancos, base de duche, bancada em pedra...', minLength: 30 },
     ],
   },
 }

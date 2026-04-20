@@ -507,28 +507,49 @@ function QuestionStep({
     )
   }
 
+  const minLen = question.minLength || 0
+  const meetsMin = !minLen || text.length >= minLen
+  const canContinue = meetsMin && (text.length > 0 || question.optional)
+
   return (
     <div>
       <ProgressBar current={current} total={total} />
       <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
-      <input
-        type={question.type === 'number' ? 'number' : 'text'}
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder={question.placeholder || ''}
-        className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-        autoFocus
-      />
+      {question.type === 'text' && !question.unit ? (
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={question.placeholder || ''}
+          rows={4}
+          className="w-full rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+          autoFocus
+        />
+      ) : (
+        <input
+          type={question.type === 'number' ? 'number' : 'text'}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder={question.placeholder || ''}
+          className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+          autoFocus
+        />
+      )}
       {question.unit && <p className="text-xs text-gray-600 mt-1">{question.unit}</p>}
+      {minLen > 0 && (
+        <p className="text-xs mt-2 transition-colors" style={{ color: meetsMin ? '#34d399' : text.length > 0 ? '#fbbf24' : '#6b7280' }}>
+          {text.length}/{minLen} caracteres mínimos
+        </p>
+      )}
       <button
         onClick={() => onTextNext(text)}
-        disabled={!text && !question.optional}
+        disabled={!canContinue}
         className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white transition-all"
         style={{
-          background: text || question.optional ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
-          opacity: !text && !question.optional ? 0.4 : 1,
-          boxShadow: text || question.optional ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+          background: canContinue ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+          opacity: !canContinue ? 0.4 : 1,
+          boxShadow: canContinue ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
         }}
       >
         {question.optional && !text ? 'Saltar' : 'Continuar'} <ChevronRight size={18} />
