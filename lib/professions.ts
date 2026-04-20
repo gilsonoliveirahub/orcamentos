@@ -33,7 +33,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'primer', text: 'Necessita de primário / preparação de superfície?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Alguma observação adicional?', type: 'text', placeholder: 'Tipo de tinta, acessos difíceis, referências de cor...', optional: true },
+      { key: 'notas', text: 'Alguma observação adicional?', type: 'text', placeholder: 'Tipo de tinta, cor pretendida, acessos difíceis...', minLength: 20 },
     ],
   },
 
@@ -48,7 +48,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'certificacao', text: 'Necessita de certificação elétrica (DGEG)?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
       { key: 'avaria_recente', text: 'A avaria/situação é recente?', type: 'choice', options: ['Sim, aconteceu agora', 'Há alguns dias', 'Problema antigo'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Emergência', 'Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Descreva o trabalho necessário', type: 'text', placeholder: 'Mais detalhes sobre o que precisa...' },
+      { key: 'notas', text: 'Descreva o trabalho necessário', type: 'text', placeholder: 'Ex: quadro elétrico a disparar, preciso de instalar 3 tomadas na sala...', minLength: 30 },
     ],
   },
 
@@ -63,7 +63,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'danos_visiveis', text: 'Há danos visíveis (humidade, manchas, inundação)?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'acesso', text: 'O acesso ao local é fácil?', type: 'choice', options: ['Sim', 'Acesso difícil (parede/teto)', 'Não sei'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Emergência (água a correr)', 'Urgente (hoje / amanhã)', 'Esta semana', 'Sem pressa'] },
-      { key: 'notas', text: 'Descreva o problema em detalhe', type: 'text', placeholder: 'Há quanto tempo, se há danos visíveis...' },
+      { key: 'notas', text: 'Descreva o problema em detalhe', type: 'text', placeholder: 'Ex: torneira da cozinha a pingar há 2 dias, já tentei apertar mas continua...', minLength: 30 },
     ],
   },
 
@@ -78,7 +78,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'num_pecas', text: 'Quantas peças ou módulos?', type: 'choice', options: ['1', '2 a 5', '6 a 10', 'Mais de 10', 'Não sei'] },
       { key: 'tem_projeto', text: 'Tem projeto ou desenho definido?', type: 'choice', options: ['Sim, tenho projeto', 'Tenho ideia mas não projeto', 'Não, preciso de sugestão'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Descreva o que precisa', type: 'text', placeholder: 'Dimensões, estilo, referências...' },
+      { key: 'notas', text: 'Descreva o que precisa', type: 'text', placeholder: 'Ex: roupeiro de 3m com portas deslizantes, interior com prateleiras e gavetas...', minLength: 30 },
     ],
   },
 
@@ -93,7 +93,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'acesso', text: 'Tipo de acesso ao jardim?', type: 'choice', options: ['Fácil (entrada larga)', 'Restrito (só a pé)', 'Com desnível'] },
       { key: 'frequencia', text: 'Com que frequência precisa do serviço?', type: 'choice', options: ['Uma vez', 'Semanal', 'Quinzenal', 'Mensal'] },
       { key: 'prazo', text: 'Quando precisa?', type: 'choice', options: ['Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Tipo de plantas, equipamentos disponíveis...', optional: true },
+      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Ex: jardim com relva e 2 laranjeiras, sem máquina de cortar relva disponível...', minLength: 20 },
     ],
   },
 
@@ -108,7 +108,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'embalagem', text: 'Precisa de serviço de embalagem?', type: 'choice', options: ['Sim, tudo', 'Só alguns itens', 'Não, embalo eu'] },
       { key: 'data_prevista', text: 'Data prevista para a mudança?', type: 'choice', options: ['Esta semana', 'Próximas 2 semanas', 'Este mês', 'Próximos 3 meses'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses'] },
-      { key: 'notas', text: 'Objetos especiais ou informações adicionais?', type: 'text', placeholder: 'Piano, cofre, obras de arte, andares...', optional: true },
+      { key: 'notas', text: 'Objetos especiais ou informações adicionais?', type: 'text', placeholder: 'Ex: T3 no 4º andar sem elevador, tenho piano e 2 sofás grandes...', minLength: 20 },
     ],
   },
 
@@ -124,7 +124,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'produtos', text: 'Prefere produtos específicos?', type: 'choice', options: ['Produtos ecológicos', 'Qualquer produto eficaz', 'Produtos fornecidos por mim'] },
       { key: 'frequencia', text: 'Frequência do serviço?', type: 'choice', options: ['Uma vez', 'Semanal', 'Quinzenal', 'Mensal'] },
       { key: 'prazo', text: 'Quando precisa?', type: 'choice', options: ['Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Zonas prioritárias, alergias a produtos...', optional: true },
+      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Ex: apartamento T2, cozinha e 2 casas de banho são prioridade, alérgico a lixívia...', minLength: 20 },
     ],
   },
 
