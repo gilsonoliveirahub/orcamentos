@@ -6,13 +6,15 @@ export const dynamic = 'force-dynamic'
 // Tabela de preços base por profissão (€/hora ou por unidade)
 const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: number; max: number; descricao: string }> = {
   Pintura: (a) => {
-    const area = parseFloat(a.area_m2 || a.q3_area_m2) || 30
+    const area_paredes = parseFloat(a.area_m2_paredes || a.area_m2 || a.q3_area_m2) || 30
+    const area_tetos = parseFloat(a.area_m2_tetos) || 0
     const tipo = (a.tipo_trabalho || a.q1_tipo_trabalho || 'interior').toLowerCase()
-    const pricePerM2 = tipo.includes('exterior') ? 6 : 4
-    const base = area * pricePerM2
-    const extras = (a.cor_escura || a.q4_cor_escura ? base * 0.25 : 0) + (a.teto || a.q8_teto ? area * 5 : 0)
+    const priceParedes = tipo.includes('exterior') ? 6 : 4
+    const base = area_paredes * priceParedes + area_tetos * 5
+    const extras = a.cor_escura || a.q4_cor_escura ? base * 0.25 : 0
     const min = Math.max(Math.round(base + extras), 150)
-    return { min, max: Math.round(min * 1.4), descricao: `Pintura ${tipo} (${area}m²)` }
+    const descricao = `Pintura ${tipo} — ${area_paredes}m² paredes${area_tetos > 0 ? ` + ${area_tetos}m² tetos` : ''}`
+    return { min, max: Math.round(min * 1.4), descricao }
   },
 
   Electricidade: (a) => {

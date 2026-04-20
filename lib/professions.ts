@@ -24,10 +24,10 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     questions: [
       { key: 'tipo_trabalho', text: 'Que tipo de pintura precisa?', type: 'choice', options: ['Interior', 'Exterior', 'Ambos'] },
       { key: 'tipo_imovel', text: 'Qual o tipo de imóvel?', type: 'choice', options: ['Apartamento', 'Moradia', 'Escritório / Comércio'] },
-      { key: 'area_m2', text: 'Qual a área aproximada em m²?', type: 'number', placeholder: 'ex: 80', unit: 'm²' },
+      { key: 'area_m2_paredes', text: 'Quantos m² de paredes para pintar?', type: 'number', placeholder: 'ex: 80', unit: 'm²' },
+      { key: 'area_m2_tetos', text: 'Quantos m² de tetos para pintar? (0 se não incluir)', type: 'number', placeholder: 'ex: 0', unit: 'm²', optional: true },
       { key: 'num_divisoes', text: 'Quantas divisões vão ser pintadas?', type: 'choice', options: ['1', '2', '3', '4', '5 ou mais'] },
       { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'] },
-      { key: 'teto', text: 'Inclui pintura do teto?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'cor_escura', text: 'A cor escolhida é escura?', type: 'choice', options: ['Sim', 'Não', 'Ainda não sei'] },
       { key: 'superficie', text: 'Tipo de superfície a pintar?', type: 'choice', options: ['Reboco / Estuque', 'Betão', 'Madeira', 'Metal', 'Misto'] },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'] },
@@ -156,12 +156,14 @@ export function mapAnswersToLeadFields(answers: Record<string, any>) {
   return {
     q1_tipo_trabalho: answers['tipo_trabalho'] || answers['tipo_imovel'] || null,
     q2_divisoes: answers['divisoes'] || answers['local'] || answers['num_divisoes'] || null,
-    q3_area_m2: answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
+    q3_area_m2: answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
+              : answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
     q4_cor_escura: answers['cor_escura'] === 'Sim',
     q5_fissuras: answers['fissuras'] === 'Sim',
     q6_mobilias: answers['mobilias'] === 'Sim',
     q7_primer: answers['primer'] === 'Sim',
-    q8_teto: answers['teto'] === 'Sim',
+    q8_teto: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) > 0
+           : answers['teto'] === 'Sim',
     q9_prazo: answers['prazo'] === 'Esta semana' || answers['prazo']?.includes('Emergência') || answers['prazo']?.includes('Urgente')
       ? 'urgente'
       : answers['prazo'] === 'Este mês'

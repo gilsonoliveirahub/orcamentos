@@ -100,13 +100,13 @@ export default function ProfessionalPublicPage() {
     if (lead) {
       if (professional.specialty === 'Pintura' && legacyFields.q3_area_m2) {
         const quoteInput = {
-          area_m2: legacyFields.q3_area_m2,
+          area_m2_paredes: legacyFields.q3_area_m2,
+          area_m2_tetos: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) : 0,
           tipo: (legacyFields.q1_tipo_trabalho?.toLowerCase() || 'interior') as 'interior' | 'exterior' | 'ambos',
           cor_escura: !!legacyFields.q4_cor_escura,
           fissuras: !!legacyFields.q5_fissuras,
           mobilias: !!legacyFields.q6_mobilias,
           primer: !!legacyFields.q7_primer,
-          teto: !!legacyFields.q8_teto,
           prices: {
             price_m2_walls: professional.price_m2_walls || 4,
             price_m2_ceiling: professional.price_m2_ceiling || 5,

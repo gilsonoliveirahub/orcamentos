@@ -1,11 +1,11 @@
 export interface QuoteInput {
-  area_m2: number
+  area_m2_paredes: number
+  area_m2_tetos: number
   tipo: 'interior' | 'exterior' | 'ambos'
   cor_escura: boolean
   fissuras: boolean
   mobilias: boolean
   primer: boolean
-  teto: boolean
   prices: {
     price_m2_walls: number
     price_m2_ceiling: number
@@ -29,25 +29,26 @@ export interface QuoteResult {
 }
 
 export function calculateQuote(input: QuoteInput): QuoteResult {
-  const { area_m2, tipo, cor_escura, fissuras, mobilias, primer, teto, prices, num_divisoes = 1 } = input
+  const { area_m2_paredes, area_m2_tetos, tipo, cor_escura, fissuras, mobilias, primer, prices, num_divisoes = 1 } = input
+  const area_total = area_m2_paredes + area_m2_tetos
   const breakdown: string[] = []
 
   // Valor base
   let valor_base = 0
   if (tipo === 'interior' || tipo === 'ambos') {
-    const paredes = area_m2 * prices.price_m2_walls
+    const paredes = area_m2_paredes * prices.price_m2_walls
     valor_base += paredes
-    breakdown.push(`Paredes (${area_m2}m² × €${prices.price_m2_walls}/m²) = €${paredes.toFixed(2)}`)
-    if (teto) {
-      const tecto = area_m2 * 0.4 * prices.price_m2_ceiling
+    breakdown.push(`Paredes (${area_m2_paredes}m² × €${prices.price_m2_walls}/m²) = €${paredes.toFixed(2)}`)
+    if (area_m2_tetos > 0) {
+      const tecto = area_m2_tetos * prices.price_m2_ceiling
       valor_base += tecto
-      breakdown.push(`Teto (${(area_m2 * 0.4).toFixed(0)}m² × €${prices.price_m2_ceiling}/m²) = €${tecto.toFixed(2)}`)
+      breakdown.push(`Tetos (${area_m2_tetos}m² × €${prices.price_m2_ceiling}/m²) = €${tecto.toFixed(2)}`)
     }
   }
   if (tipo === 'exterior' || tipo === 'ambos') {
-    const exterior = area_m2 * prices.price_m2_exterior
+    const exterior = area_m2_paredes * prices.price_m2_exterior
     valor_base += exterior
-    breakdown.push(`Exterior (${area_m2}m² × €${prices.price_m2_exterior}/m²) = €${exterior.toFixed(2)}`)
+    breakdown.push(`Exterior (${area_m2_paredes}m² × €${prices.price_m2_exterior}/m²) = €${exterior.toFixed(2)}`)
   }
 
   // Extras
@@ -59,9 +60,9 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
     breakdown.push(`Cor escura (+${((prices.extra_dark_color - 1) * 100).toFixed(0)}%) = +€${extra.toFixed(2)}`)
   }
   if (fissuras) {
-    const extra = area_m2 * prices.extra_cracks
+    const extra = area_total * prices.extra_cracks
     extras_total += extra
-    breakdown.push(`Tratamento de fissuras (${area_m2}m² × €${prices.extra_cracks}) = +€${extra.toFixed(2)}`)
+    breakdown.push(`Tratamento de fissuras (${area_total}m² × €${prices.extra_cracks}) = +€${extra.toFixed(2)}`)
   }
   if (mobilias) {
     const extra = num_divisoes * prices.extra_furniture_move
@@ -69,9 +70,9 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
     breakdown.push(`Deslocação de móveis (${num_divisoes} div. × €${prices.extra_furniture_move}) = +€${extra.toFixed(2)}`)
   }
   if (primer) {
-    const extra = area_m2 * prices.extra_primer
+    const extra = area_total * prices.extra_primer
     extras_total += extra
-    breakdown.push(`Primário (${area_m2}m² × €${prices.extra_primer}) = +€${extra.toFixed(2)}`)
+    breakdown.push(`Primário (${area_total}m² × €${prices.extra_primer}) = +€${extra.toFixed(2)}`)
   }
 
   let valor_final = Math.max(valor_base + extras_total, prices.min_quote)
