@@ -1,121 +1,165 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { ChevronRight, ChevronLeft, MapPin, Star, Briefcase, Loader2, Search } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { PROFESSIONS, SPECIALTY_LIST } from '@/lib/professions'
+import { supabase } from '@/lib/supabase'
+import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', 'Outra / Toda Portugal']
 
+type Phase = 'profissao' | 'zona' | 'perguntas' | 'media' | 'contacto' | 'enviado'
+
 export default function PedirPage() {
-  const [step, setStep] = useState<'profissao' | 'zona' | 'resultados'>('profissao')
+  const [phase, setPhase] = useState<Phase>('profissao')
   const [specialty, setSpecialty] = useState('')
   const [zona, setZona] = useState('')
-  const [professionals, setProfessionals] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState(1)
+  const [answers, setAnswers] = useState<Record<string, any>>({})
+  const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [assigned, setAssigned] = useState(false)
 
-  async function search(spec: string, z: string) {
-    setLoading(true)
-    let query = supabase.from('professionals').select('*').eq('active', true).eq('specialty', spec)
-    if (z && z !== 'Outra / Toda Portugal') {
-      query = query.ilike('zone', `%${z}%`)
-    }
-    const { data } = await query.order('created_at', { ascending: false })
+  const profession = specialty ? getProfession(specialty) : null
+  const questions = profession?.questions || []
+  const totalSteps = questions.length
 
-    // Se não há resultados na zona, mostra todos da especialidade
-    if (!data || data.length === 0) {
-      const { data: all } = await supabase
-        .from('professionals')
-        .select('*')
-        .eq('active', true)
-        .eq('specialty', spec)
-        .order('created_at', { ascending: false })
-      setProfessionals(all || [])
-    } else {
-      setProfessionals(data)
-    }
-    setLoading(false)
-    setStep('resultados')
+  function selectProfissao(s: string) { setSpecialty(s); setPhase('zona') }
+  function selectZona(z: string) { setZona(z); setPhase('perguntas'); setStep(1) }
+
+  function answerAndAdvance(key: string, value: any) {
+    const next = { ...answers, [key]: value }
+    setAnswers(next)
+    if (step < totalSteps) setStep(s => s + 1)
+    else setPhase('media')
   }
 
-  function selectProfissao(s: string) {
-    setSpecialty(s)
-    setStep('zona')
+  function answerText(key: string, value: any) {
+    answerAndAdvance(key, value)
   }
 
-  function selectZona(z: string) {
-    setZona(z)
-    search(specialty, z)
+  function goBack() {
+    if (phase === 'zona') { setPhase('profissao'); return }
+    if (phase === 'perguntas') {
+      if (step > 1) setStep(s => s - 1)
+      else setPhase('zona')
+      return
+    }
+    if (phase === 'media') { setPhase('perguntas'); setStep(totalSteps); return }
+    if (phase === 'contacto') { setPhase('media'); return }
+  }
+
+  async function handleSubmit() {
+    if (submitting) return
+    setSubmitting(true)
+
+    const legacyFields = mapAnswersToLeadFields(answers)
+
+    const res = await fetch('/api/leads/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        specialty,
+        zone_requested: zona !== 'Outra / Toda Portugal' ? zona : null,
+        name,
+        phone,
+        email: email || null,
+        status: 'novo',
+        ...legacyFields,
+        metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+      }),
+    })
+
+    const { lead, assigned: wasAssigned } = await res.json()
+    setAssigned(wasAssigned)
+    setSubmitting(false)
+    setPhase('enviado')
+  }
+
+  // ── Enviado ────────────────────────────────────────────────────────────────
+  if (phase === 'enviado') {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0a0c1a' }}>
+        <div className="text-center max-w-sm">
+          <div className="text-6xl mb-4">{assigned ? '🎉' : '📋'}</div>
+          <h1 className="text-2xl font-black text-white mb-3">
+            {assigned ? 'Pedido enviado!' : 'Pedido registado!'}
+          </h1>
+          <p className="text-gray-400 mb-8">
+            {assigned
+              ? 'O teu pedido foi atribuído a um profissional. Receberás contacto em breve.'
+              : 'Ainda não temos profissionais disponíveis na tua zona. Assim que um estiver disponível, entraremos em contacto.'}
+          </p>
+          <Link href="/" className="inline-block text-sm font-semibold px-6 py-3 rounded-2xl"
+            style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+            Voltar ao início
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
-
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="max-w-lg mx-auto px-6 py-5 flex items-center gap-3">
-          {step === 'profissao' ? (
+          {phase === 'profissao' ? (
             <Link href="/" className="text-gray-500 hover:text-gray-300 transition-colors">
               <ChevronLeft size={22} />
             </Link>
           ) : (
-            <button
-              onClick={() => setStep(step === 'resultados' ? 'zona' : 'profissao')}
-              className="text-gray-500 hover:text-gray-300 transition-colors"
-            >
+            <button onClick={goBack} className="text-gray-500 hover:text-gray-300 transition-colors">
               <ChevronLeft size={22} />
             </button>
           )}
           <div>
             <h1 className="text-xl font-black text-white">
-              {step === 'profissao' && 'De que serviço precisa?'}
-              {step === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
-              {step === 'resultados' && `Profissionais de ${specialty}`}
+              {phase === 'profissao' && 'De que serviço precisa?'}
+              {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
+              {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
+              {phase === 'media' && 'Fotos ou vídeo'}
+              {phase === 'contacto' && 'Os seus dados'}
             </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {step === 'profissao' && 'Escolha o tipo de trabalho'}
-              {step === 'zona' && 'Em que zona?'}
-              {step === 'resultados' && (zona && zona !== 'Outra / Toda Portugal' ? `Zona: ${zona}` : 'Toda Portugal')}
-            </p>
+            {phase === 'perguntas' && (
+              <p className="text-xs text-gray-500 mt-0.5">{step}/{totalSteps}</p>
+            )}
+            {phase === 'zona' && (
+              <p className="text-xs text-gray-500 mt-0.5">Em que zona?</p>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-6 py-8">
 
-        {/* Passo 1 — Escolher profissão */}
-        {step === 'profissao' && (
+        {/* Escolher profissão */}
+        {phase === 'profissao' && (
           <div className="grid grid-cols-2 gap-3">
             {SPECIALTY_LIST.map(s => (
-              <button
-                key={s}
-                onClick={() => selectProfissao(s)}
+              <button key={s} onClick={() => selectProfissao(s)}
                 className="flex items-center gap-4 p-5 rounded-2xl text-left transition-all hover:-translate-y-0.5"
-                style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+                style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <span className="text-3xl flex-shrink-0">{PROFESSIONS[s].emoji}</span>
                 <div>
                   <div className="font-black text-white text-sm">{s}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {PROFESSIONS[s].questions.length} perguntas
-                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{PROFESSIONS[s].questions.length} perguntas</div>
                 </div>
               </button>
             ))}
           </div>
         )}
 
-        {/* Passo 2 — Escolher zona */}
-        {step === 'zona' && (
+        {/* Escolher zona */}
+        {phase === 'zona' && (
           <div className="space-y-3">
             {ZONAS.map(z => (
-              <button
-                key={z}
-                onClick={() => selectZona(z)}
+              <button key={z} onClick={() => selectZona(z)}
                 className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-left transition-all hover:-translate-y-0.5"
-                style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
+                style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <MapPin size={16} className="text-indigo-400 flex-shrink-0" />
                 <span className="font-semibold text-white">{z}</span>
                 <ChevronRight size={16} className="text-gray-600 ml-auto" />
@@ -124,98 +168,222 @@ export default function PedirPage() {
           </div>
         )}
 
-        {/* Passo 3 — Resultados */}
-        {step === 'resultados' && (
-          <>
-            {loading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="animate-spin text-indigo-500" size={28} />
-              </div>
-            ) : professionals.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="text-5xl mb-4">😕</div>
-                <h2 className="text-white font-bold mb-2">Ainda sem profissionais aqui</h2>
-                <p className="text-gray-500 text-sm mb-6">
-                  Ainda não temos profissionais de {specialty} nesta zona. Experimente outra zona.
-                </p>
-                <button
-                  onClick={() => setStep('zona')}
-                  className="text-sm font-semibold px-5 py-3 rounded-xl"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
-                >
-                  Mudar zona
-                </button>
-              </div>
-            ) : (
-              <>
-                {zona && zona !== 'Outra / Toda Portugal' && professionals.some(p => !p.zone?.toLowerCase().includes(zona.toLowerCase())) && (
-                  <div
-                    className="flex items-center gap-2 p-3 rounded-xl mb-4 text-xs"
-                    style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', color: '#fbbf24' }}
-                  >
-                    <Search size={13} />
-                    Não encontrámos profissionais em {zona}. A mostrar todos os disponíveis.
-                  </div>
-                )}
-                <div className="grid gap-4">
-                  {professionals.map(prof => (
-                    <ResultCard key={prof.id} prof={prof} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
+        {/* Perguntas */}
+        {phase === 'perguntas' && profession && (
+          <QuestionStep
+            question={questions[step - 1]}
+            current={step}
+            total={totalSteps}
+            answer={answers[questions[step - 1].key]}
+            onAnswer={v => answerAndAdvance(questions[step - 1].key, v)}
+            onTextNext={v => answerText(questions[step - 1].key, v)}
+            onBack={goBack}
+          />
         )}
 
+        {/* Media */}
+        {phase === 'media' && (
+          <MediaStep
+            mediaUrls={mediaUrls}
+            onMediaChange={setMediaUrls}
+            onNext={() => setPhase('contacto')}
+            onBack={goBack}
+          />
+        )}
+
+        {/* Contacto */}
+        {phase === 'contacto' && (
+          <ContactStep
+            name={name} phone={phone} email={email}
+            submitting={submitting}
+            onNameChange={setName}
+            onPhoneChange={setPhone}
+            onEmailChange={setEmail}
+            onBack={goBack}
+            onSubmit={handleSubmit}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function ResultCard({ prof }: { prof: any }) {
-  const emoji = PROFESSIONS[prof.specialty]?.emoji || '🔧'
+// ── Barra de progresso ────────────────────────────────────────────────────────
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center gap-2 mb-6">
+      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="h-1.5 rounded-full transition-all duration-300"
+          style={{ width: `${(current / total) * 100}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+      </div>
+      <span className="text-xs text-gray-500">{current}/{total}</span>
+    </div>
+  )
+}
+
+// ── Pergunta ──────────────────────────────────────────────────────────────────
+function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, onBack }: any) {
+  const [text, setText] = useState(answer || '')
+
+  if (question.type === 'choice' && question.options) {
+    return (
+      <div>
+        <ProgressBar current={current} total={total} />
+        <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+        <div className="space-y-3">
+          {question.options.map((opt: string) => (
+            <button key={opt} onClick={() => onAnswer(opt)}
+              className="w-full text-left px-5 py-4 rounded-2xl font-semibold text-white transition-all"
+              style={{
+                background: answer === opt ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                border: answer === opt ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              }}>
+              {opt}
+            </button>
+          ))}
+        </div>
+        {current > 1 && (
+          <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+            <ChevronLeft size={15} /> Voltar
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden transition-all hover:-translate-y-0.5"
-      style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      <div className="p-5">
-        <div className="flex items-center gap-4 mb-4">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            {emoji}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-white">{prof.name}</h3>
-              <div className="flex items-center gap-1">
-                <Star size={12} className="text-amber-400" fill="currentColor" />
-                <span className="text-xs font-bold text-amber-400">5.0</span>
-              </div>
+    <div>
+      <ProgressBar current={current} total={total} />
+      <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+      <input
+        type={question.type === 'number' ? 'number' : 'text'}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder={question.placeholder || ''}
+        className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+        autoFocus
+      />
+      {question.unit && <p className="text-xs text-gray-600 mt-1">{question.unit}</p>}
+      <button onClick={() => onTextNext(text)} disabled={!text && !question.optional}
+        className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white transition-all"
+        style={{
+          background: text || question.optional ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+          opacity: !text && !question.optional ? 0.4 : 1,
+          boxShadow: text || question.optional ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+        }}>
+        {question.optional && !text ? 'Saltar' : 'Continuar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
+// ── Media ─────────────────────────────────────────────────────────────────────
+function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setError(''); setUploading(true)
+    const newUrls: string[] = []
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue
+      if (file.size > 50 * 1024 * 1024) { setError('Ficheiro demasiado grande (máx 50MB)'); continue }
+      const ext = file.name.split('.').pop()
+      const path = `leads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { data, error: upErr } = await supabase.storage.from('lead-media').upload(path, file, { upsert: false })
+      if (upErr) { setError('Erro ao carregar. Tente novamente.'); continue }
+      const { data: { publicUrl } } = supabase.storage.from('lead-media').getPublicUrl(data.path)
+      newUrls.push(publicUrl)
+    }
+    onMediaChange([...mediaUrls, ...newUrls]); setUploading(false)
+  }
+
+  return (
+    <div>
+      <h2 className="text-xl font-black text-white mb-1">Fotos ou vídeo</h2>
+      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a dar um orçamento mais preciso.</p>
+      {mediaUrls.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {mediaUrls.map((url: string) => (
+            <div key={url} className="relative aspect-square rounded-xl overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {url.match(/\.(mp4|mov|webm)$/i)
+                ? <video src={url} className="w-full h-full object-cover" />
+                : <img src={url} alt="" className="w-full h-full object-cover" />}
+              <button onClick={() => onMediaChange(mediaUrls.filter((u: string) => u !== url))}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.7)' }}>
+                <X size={12} className="text-white" />
+              </button>
             </div>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="flex items-center gap-1 text-xs" style={{ color: '#818cf8' }}>
-                <Briefcase size={10} /> {prof.specialty}
-              </span>
-              {prof.zone && (
-                <span className="flex items-center gap-1 text-xs text-gray-400">
-                  <MapPin size={10} /> {prof.zone}
-                </span>
-              )}
-            </div>
-          </div>
+          ))}
         </div>
-        <Link
-          href={`/p/${prof.slug}?ref=marketplace`}
-          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-black text-white text-sm"
-          style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}
-        >
-          Pedir Orçamento <ChevronRight size={16} />
-        </Link>
+      )}
+      <input ref={inputRef} type="file" accept="image/*,video/*" multiple className="hidden"
+        onChange={e => handleFiles(e.target.files)} />
+      <button onClick={() => inputRef.current?.click()} disabled={uploading}
+        className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-semibold text-sm"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.12)', color: '#9ca3af' }}>
+        {uploading ? <><Loader2 size={18} className="animate-spin" /> A carregar...</> : <><Camera size={18} /> Adicionar fotos ou vídeo</>}
+      </button>
+      {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+      <button onClick={onNext}
+        className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+        {mediaUrls.length > 0 ? 'Continuar' : 'Saltar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
+// ── Contacto ──────────────────────────────────────────────────────────────────
+function ContactStep({ name, phone, email, submitting, onNameChange, onPhoneChange, onEmailChange, onBack, onSubmit }: any) {
+  const ready = name.trim().length > 1 && phone.trim().length >= 9
+  return (
+    <div>
+      <h2 className="text-xl font-black text-white mb-2">Quase pronto!</h2>
+      <p className="text-gray-400 text-sm mb-6">Deixe os seus dados e um profissional entrará em contacto.</p>
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">O seu nome</label>
+          <input value={name} onChange={e => onNameChange(e.target.value)} placeholder="João Silva"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Telemóvel / WhatsApp</label>
+          <input value={phone} onChange={e => onPhoneChange(e.target.value)} placeholder="351912345678" type="tel"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Email <span className="text-gray-600 normal-case">(opcional)</span></label>
+          <input value={email} onChange={e => onEmailChange(e.target.value)} placeholder="joao@email.com" type="email"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+        </div>
       </div>
+      <button onClick={onSubmit} disabled={!ready || submitting}
+        className="w-full mt-6 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+        style={{
+          background: ready && !submitting ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+          boxShadow: ready && !submitting ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+          opacity: !ready || submitting ? 0.4 : 1,
+        }}>
+        {submitting ? 'A enviar...' : <>Enviar pedido <ChevronRight size={18} /></>}
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
     </div>
   )
 }
