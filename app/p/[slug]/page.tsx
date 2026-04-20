@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
-import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase } from 'lucide-react'
+import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2 } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { getProfession, mapAnswersToLeadFields, type Question } from '@/lib/professions'
 
@@ -11,8 +11,9 @@ export default function ProfessionalPublicPage() {
   const { slug } = useParams()
   const [professional, setProfessional] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [step, setStep] = useState(0) // 0 = intro, 1..N = perguntas, N+1 = contacto
+  const [step, setStep] = useState(0) // 0 = intro, 1..N = perguntas, N+1 = media, N+2 = contacto
   const [answers, setAnswers] = useState<Record<string, any>>({})
+  const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -46,7 +47,8 @@ export default function ProfessionalPublicPage() {
 
   const profession = getProfession(professional.specialty)
   const questions = profession.questions
-  const totalSteps = questions.length + 1 // +1 para contacto
+  const totalSteps = questions.length + 2 // +1 media, +1 contacto
+  const isMediaStep = step === questions.length + 1
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
@@ -85,6 +87,10 @@ export default function ProfessionalPublicPage() {
       ...legacyFields,
       metadata: answers,
     }).select().single()
+
+    if (lead && mediaUrls.length > 0) {
+      await supabase.from('leads').update({ metadata: { ...answers, media_urls: mediaUrls } }).eq('id', lead.id)
+    }
 
     if (lead) {
       if (professional.specialty === 'Pintura' && legacyFields.q3_area_m2) {
@@ -248,6 +254,18 @@ export default function ProfessionalPublicPage() {
           />
         )}
 
+        {/* Media */}
+        {isMediaStep && (
+          <MediaStep
+            current={questions.length + 1}
+            total={totalSteps}
+            mediaUrls={mediaUrls}
+            onMediaChange={setMediaUrls}
+            onNext={() => setStep(s => s + 1)}
+            onBack={() => setStep(s => s - 1)}
+          />
+        )}
+
         {/* Contacto */}
         {isContactStep && (
           <ContactStep
@@ -263,6 +281,112 @@ export default function ProfessionalPublicPage() {
         )}
 
       </div>
+    </div>
+  )
+}
+
+// ── Upload de media ───────────────────────────────────────────────────────────
+
+function MediaStep({
+  current, total, mediaUrls, onMediaChange, onNext, onBack,
+}: {
+  current: number
+  total: number
+  mediaUrls: string[]
+  onMediaChange: (urls: string[]) => void
+  onNext: () => void
+  onBack: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setError('')
+    setUploading(true)
+
+    const newUrls: string[] = []
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith('image/')
+      const isVideo = file.type.startsWith('video/')
+      if (!isImage && !isVideo) continue
+      if (file.size > 50 * 1024 * 1024) { setError('Ficheiro demasiado grande (máx 50MB)'); continue }
+
+      const ext = file.name.split('.').pop()
+      const path = `leads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { data, error: upErr } = await supabase.storage.from('lead-media').upload(path, file, { upsert: false })
+      if (upErr) { setError('Erro ao carregar ficheiro. Tente novamente.'); continue }
+      const { data: { publicUrl } } = supabase.storage.from('lead-media').getPublicUrl(data.path)
+      newUrls.push(publicUrl)
+    }
+
+    onMediaChange([...mediaUrls, ...newUrls])
+    setUploading(false)
+  }
+
+  function removeUrl(url: string) {
+    onMediaChange(mediaUrls.filter(u => u !== url))
+  }
+
+  return (
+    <div>
+      <ProgressBar current={current} total={total} />
+      <h2 className="text-xl font-black text-white mb-1">Fotos ou vídeo</h2>
+      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a preparar um orçamento mais preciso.</p>
+
+      {/* Prévia de ficheiros */}
+      {mediaUrls.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {mediaUrls.map(url => (
+            <div key={url} className="relative aspect-square rounded-xl overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {url.match(/\.(mp4|mov|webm)$/i) ? (
+                <video src={url} className="w-full h-full object-cover" />
+              ) : (
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              )}
+              <button
+                onClick={() => removeUrl(url)}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.7)' }}
+              >
+                <X size={12} className="text-white" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botão de upload */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        onChange={e => handleFiles(e.target.files)}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-semibold text-sm transition-all"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.12)', color: '#9ca3af' }}
+      >
+        {uploading ? <><Loader2 size={18} className="animate-spin" /> A carregar...</> : <><Camera size={18} /> Adicionar fotos ou vídeo</>}
+      </button>
+      {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+
+      <button
+        onClick={onNext}
+        className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}
+      >
+        {mediaUrls.length > 0 ? 'Continuar' : 'Saltar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
     </div>
   )
 }
