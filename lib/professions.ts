@@ -30,7 +30,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'num_wc', text: 'Quantas casas de banho? (normalmente só teto)', type: 'choice', options: ['0', '1', '2', '3 ou mais'] },
       { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'area_total_m2', text: 'Área total da habitação em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true },
-      { key: 'cor_escura', text: 'Qual a situação da cor?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor'] },
+      { key: 'cor_escura', text: 'Qual a situação da cor?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor', 'Cor / Passa a branco'] },
       { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'primer', text: 'Necessita de primário / preparação de superfície?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
@@ -186,7 +186,7 @@ export function mapAnswersToLeadFields(answers: Record<string, any>) {
     q3_area_m2: paintingAreas ? paintingAreas.area_paredes
               : answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
               : answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
-    q4_cor_escura: answers['cor_escura'] === 'Sim' || answers['cor_escura'] === 'Branco / Passa a cor',
+    q4_cor_escura: answers['cor_escura'] === 'Sim' || answers['cor_escura'] === 'Branco / Passa a cor' || answers['cor_escura'] === 'Cor / Passa a branco',
     q5_fissuras: answers['fissuras'] === 'Sim',
     q6_mobilias: answers['mobilias'] === 'Sim',
     q7_primer: answers['primer'] === 'Sim',
