@@ -16,6 +16,7 @@ export default function ProfessionalPublicPage() {
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -83,6 +84,7 @@ export default function ProfessionalPublicPage() {
       professional_id: professional.id,
       name,
       phone,
+      email: email || null,
       status: 'novo',
       ...legacyFields,
       metadata: answers,
@@ -271,10 +273,12 @@ export default function ProfessionalPublicPage() {
           <ContactStep
             name={name}
             phone={phone}
+            email={email}
             total={totalSteps}
             submitting={submitting}
             onNameChange={setName}
             onPhoneChange={setPhone}
+            onEmailChange={setEmail}
             onBack={() => setStep(s => s - 1)}
             onSubmit={handleSubmit}
           />
@@ -489,14 +493,16 @@ function QuestionStep({
 // ── Dados de contacto ─────────────────────────────────────────────────────────
 
 function ContactStep({
-  name, phone, total, submitting, onNameChange, onPhoneChange, onBack, onSubmit,
+  name, phone, email, total, submitting, onNameChange, onPhoneChange, onEmailChange, onBack, onSubmit,
 }: {
   name: string
   phone: string
+  email: string
   total: number
   submitting: boolean
   onNameChange: (v: string) => void
   onPhoneChange: (v: string) => void
+  onEmailChange: (v: string) => void
   onBack: () => void
   onSubmit: () => void
 }) {
@@ -519,11 +525,23 @@ function ContactStep({
           />
         </div>
         <div>
-          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">WhatsApp</label>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Telemóvel / WhatsApp</label>
           <input
             value={phone}
             onChange={e => onPhoneChange(e.target.value)}
             placeholder="351912345678"
+            type="tel"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Email <span className="text-gray-600 normal-case">(opcional)</span></label>
+          <input
+            value={email}
+            onChange={e => onEmailChange(e.target.value)}
+            placeholder="joao@email.com"
+            type="email"
             className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
