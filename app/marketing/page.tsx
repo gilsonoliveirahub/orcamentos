@@ -296,8 +296,8 @@ export default function MarketingPage() {
           <span className="text-lg font-semibold">Faço<span className="text-[#c9a84c]">PorTi</span></span>
           <p className="text-sm text-white/30">© 2026 FaçoPorTi. Todos os direitos reservados.</p>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-white/30 hover:text-white transition-colors">Privacidade</a>
-            <a href="#" className="text-sm text-white/30 hover:text-white transition-colors">Termos</a>
+            <Link href="/privacidade" className="text-sm text-white/30 hover:text-white transition-colors">Privacidade</Link>
+            <Link href="/termos" className="text-sm text-white/30 hover:text-white transition-colors">Termos</Link>
             <Link href="/login" className="text-sm text-white/30 hover:text-white transition-colors">Entrar</Link>
           </div>
         </div>

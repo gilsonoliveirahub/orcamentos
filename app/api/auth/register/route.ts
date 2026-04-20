@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { emailBoasVindas } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
         active: true,
       })
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+      // Email de boas-vindas
+      emailBoasVindas({ name, email, slug: `${slug}-${Math.random().toString(36).slice(2, 6)}` }).catch(() => {})
     } else {
       const { error } = await supabaseAdmin.from('clients').insert({
         user_id,

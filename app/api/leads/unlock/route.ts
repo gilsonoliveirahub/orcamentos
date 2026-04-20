@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
+import { emailLeadDesbloqueado } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Descontar 1 crédito e desbloquear lead
-    await Promise.all([
+    const [, { data: lead }] = await Promise.all([
       supabaseAdmin
         .from('professionals')
         .update({ marketplace_credits: prof.marketplace_credits - 1 })
@@ -34,8 +35,29 @@ export async function POST(req: NextRequest) {
         .from('leads')
         .update({ locked: false })
         .eq('id', lead_id)
-        .eq('professional_id', prof.id),
+        .eq('professional_id', prof.id)
+        .select()
+        .single(),
     ])
+
+    // Email de confirmação
+    if (lead) {
+      const { data: profFull } = await supabaseAdmin
+        .from('professionals')
+        .select('name, email')
+        .eq('id', prof.id)
+        .single()
+      if (profFull) {
+        emailLeadDesbloqueado({
+          profName: profFull.name,
+          profEmail: profFull.email,
+          leadName: lead.name || '—',
+          leadPhone: lead.phone || '—',
+          leadEmail: lead.email,
+          leadId: lead.id,
+        }).catch(() => {})
+      }
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
