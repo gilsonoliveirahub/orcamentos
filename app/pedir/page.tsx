@@ -121,7 +121,7 @@ export default function PedirPage() {
               {phase === 'profissao' && 'De que serviço precisa?'}
               {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
               {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
-              {phase === 'media' && 'Fotos ou vídeo'}
+              {phase === 'media' && 'Fotos e/ou vídeos'}
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
             {phase === 'perguntas' && (
@@ -412,7 +412,7 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
 
   return (
     <div>
-      <h2 className="text-xl font-black text-white mb-1">Fotos ou vídeo</h2>
+      <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
       <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a dar um orçamento mais preciso.</p>
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
@@ -436,7 +436,7 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
       <button onClick={() => inputRef.current?.click()} disabled={uploading}
         className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-semibold text-sm"
         style={{ background: 'rgba(255,255,255,0.04)', border: '2px dashed rgba(255,255,255,0.12)', color: '#9ca3af' }}>
-        {uploading ? <><Loader2 size={18} className="animate-spin" /> A carregar...</> : <><Camera size={18} /> Adicionar fotos ou vídeo</>}
+        {uploading ? <><Loader2 size={18} className="animate-spin" /> A carregar...</> : <><Camera size={18} /> Adicionar fotos e/ou vídeos</>}
       </button>
       {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
       <button onClick={onNext}
