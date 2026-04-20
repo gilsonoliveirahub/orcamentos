@@ -482,6 +482,10 @@ function QuestionStep({
   }
 
   if (question.type === 'choice' && question.options) {
+    const hasOutro = question.options.includes('Outro')
+    const outroSelected = hasOutro && answer === 'Outro'
+    const [outroVal, setOutroVal] = useState('')
+
     return (
       <div>
         <ProgressBar current={current} total={total} />
@@ -501,6 +505,32 @@ function QuestionStep({
             </button>
           ))}
         </div>
+        {outroSelected && (
+          <div className="mt-4">
+            <input
+              type="number"
+              step="0.1"
+              value={outroVal}
+              onChange={e => setOutroVal(e.target.value)}
+              placeholder={question.unit ? `ex: 2.6 (${question.unit})` : 'Introduza o valor'}
+              className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              autoFocus
+            />
+            <button
+              onClick={() => outroVal && onAnswer(outroVal + (question.unit ? question.unit : ''))}
+              disabled={!outroVal}
+              className="w-full mt-3 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+              style={{
+                background: outroVal ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.05)',
+                opacity: !outroVal ? 0.4 : 1,
+                boxShadow: outroVal ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
+              }}
+            >
+              Continuar <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
         {current > 1 && (
           <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
             <ChevronLeft size={15} /> Voltar

@@ -23,7 +23,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     label: 'Pintura',
     questions: [
       { key: 'tipo_trabalho', text: 'Que tipo de pintura precisa?', type: 'choice', options: ['Interior', 'Exterior', 'Ambos'] },
-      { key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais'] },
+      { key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais', 'Outro'], unit: 'm' },
       { key: 'num_quartos', text: 'Quantos quartos vão ser pintados?', type: 'choice', options: ['0', '1', '2', '3', '4 ou mais'] },
       { key: 'tem_sala', text: 'Inclui sala?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'tem_cozinha', text: 'Inclui cozinha?', type: 'choice', options: ['Sim', 'Não'] },
@@ -156,7 +156,7 @@ export function getProfession(specialty: string): ProfessionConfig {
 /** Calcula áreas de pintura a partir das divisões e altura */
 export function calcPaintingAreas(answers: Record<string, any>): { area_paredes: number; area_tetos: number } {
   const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
-  const height = heightMap[answers['altura_paredes']] || 2.4
+  const height = heightMap[answers['altura_paredes']] || parseFloat(answers['altura_paredes']) || 2.4
 
   const quartosMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3': 3, '4 ou mais': 4 }
   const quartos = quartosMap[answers['num_quartos']] ?? 1

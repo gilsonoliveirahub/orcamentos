@@ -11,7 +11,7 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: numb
     if (a.altura_paredes) {
       // novo formato: calcula a partir das divisões
       const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
-      const height = heightMap[a.altura_paredes] || 2.4
+      const height = heightMap[a.altura_paredes] || parseFloat(a.altura_paredes) || 2.4
       const quartosMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3': 3, '4 ou mais': 4 }
       const wcMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3 ou mais': 3 }
       let perimeter = (quartosMap[a.num_quartos] ?? 1) * 14
