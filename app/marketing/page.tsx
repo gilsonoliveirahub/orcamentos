@@ -49,7 +49,7 @@ export default function MarketingPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/pedir" className="w-full sm:w-auto text-center bg-[#c9a84c] text-black font-semibold px-8 py-4 rounded-full text-lg hover:bg-[#e0bf6a] transition-colors">
-              Pedir orçamento grátis
+              Pedir orçamento
             </Link>
             <Link href="/login" className="w-full sm:w-auto text-center border border-white/20 text-white px-8 py-4 rounded-full text-lg hover:border-white/40 transition-colors">
               Sou profissional
@@ -68,7 +68,7 @@ export default function MarketingPage() {
             {[
               { value: '8+', label: 'Profissões suportadas' },
               { value: '2 min', label: 'Para gerar um orçamento' },
-              { value: '0€', label: 'Para começar' },
+              { value: '€19', label: 'Para começar' },
               { value: '100%', label: 'Teus clientes, só teus' },
             ].map((stat) => (
               <div key={stat.label}>
@@ -203,8 +203,8 @@ export default function MarketingPage() {
             {/* Starter */}
             <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
               <h3 className="text-2xl font-bold mb-2">Starter</h3>
-              <div className="text-4xl font-bold mb-1">Grátis</div>
-              <p className="text-white/40 text-sm mb-8">Para experimentar</p>
+              <div className="text-4xl font-bold mb-1">€19<span className="text-lg font-normal text-white/40">/mês</span></div>
+              <p className="text-white/40 text-sm mb-8">Para começar</p>
               <ul className="space-y-3 mb-8">
                 {[
                   'Até 10 leads/mês',
@@ -218,7 +218,7 @@ export default function MarketingPage() {
                 ))}
               </ul>
               <Link href="/login" className="block text-center border border-white/20 text-white py-3 rounded-full hover:border-white/40 transition-colors">
-                Começar grátis
+                Começar
               </Link>
             </div>
 
@@ -226,7 +226,7 @@ export default function MarketingPage() {
             <div className="bg-[#c9a84c]/5 border border-[#c9a84c]/30 rounded-3xl p-8 relative">
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <div className="text-4xl font-bold mb-1">€29<span className="text-lg font-normal text-white/40">/mês</span></div>
+              <div className="text-4xl font-bold mb-1">€49<span className="text-lg font-normal text-white/40">/mês</span></div>
               <p className="text-white/40 -text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -283,9 +283,9 @@ export default function MarketingPage() {
         </div>
         <div className="relative z-10 text-center max-w-2xl mx-auto px-6">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">Pronto para fechar mais trabalhos?</h2>
-          <p className="text-white/50 text-lg mb-10">Cria a tua conta em 2 minutos. Sem cartão de crédito.</p>
+          <p className="text-white/50 text-lg mb-10">Cria a tua conta em 2 minutos.</p>
           <Link href="/login" className="inline-block bg-[#c9a84c] text-black font-semibold px-10 py-4 rounded-full text-lg hover:bg-[#e0bf6a] transition-colors">
-            Criar conta grátis
+            Criar conta
           </Link>
         </div>
       </section>
