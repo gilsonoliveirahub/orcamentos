@@ -23,17 +23,19 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     label: 'Pintura',
     questions: [
       { key: 'tipo_trabalho', text: 'Que tipo de pintura precisa?', type: 'choice', options: ['Interior', 'Exterior', 'Ambos'] },
-      { key: 'tipo_imovel', text: 'Qual o tipo de imóvel?', type: 'choice', options: ['Apartamento', 'Moradia', 'Escritório / Comércio'] },
-      { key: 'area_m2_paredes', text: 'Quantos m² de paredes para pintar?', type: 'number', placeholder: 'ex: 80', unit: 'm²' },
-      { key: 'area_m2_tetos', text: 'Quantos m² de tetos para pintar? (0 se não incluir)', type: 'number', placeholder: 'ex: 0', unit: 'm²', optional: true },
-      { key: 'num_divisoes', text: 'Quantas divisões vão ser pintadas?', type: 'choice', options: ['1', '2', '3', '4', '5 ou mais'] },
-      { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'] },
+      { key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais'] },
+      { key: 'num_quartos', text: 'Quantos quartos vão ser pintados?', type: 'choice', options: ['0', '1', '2', '3', '4 ou mais'] },
+      { key: 'tem_sala', text: 'Inclui sala?', type: 'choice', options: ['Sim', 'Não'] },
+      { key: 'tem_cozinha', text: 'Inclui cozinha?', type: 'choice', options: ['Sim', 'Não'] },
+      { key: 'num_wc', text: 'Quantas casas de banho?', type: 'choice', options: ['0', '1', '2', '3 ou mais'] },
+      { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'] },
+      { key: 'area_total_m2', text: 'Área total do espaço em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true },
       { key: 'cor_escura', text: 'A cor escolhida é escura?', type: 'choice', options: ['Sim', 'Não', 'Ainda não sei'] },
-      { key: 'superficie', text: 'Tipo de superfície a pintar?', type: 'choice', options: ['Reboco / Estuque', 'Betão', 'Madeira', 'Metal', 'Misto'] },
+      { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'primer', text: 'Necessita de primário / preparação de superfície?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Sem pressa'] },
-      { key: 'notas', text: 'Alguma observação adicional?', type: 'text', placeholder: 'Tipo de tinta, cor pretendida, acessos difíceis...', minLength: 20 },
+      { key: 'notas', text: 'Alguma observação adicional?', type: 'text', placeholder: 'Tipo de tinta, cor pretendida, acessos difíceis...', minLength: 20, optional: true },
     ],
   },
 
@@ -151,18 +153,46 @@ export function getProfession(specialty: string): ProfessionConfig {
   return PROFESSIONS[specialty] || PROFESSIONS['Pintura']
 }
 
+/** Calcula áreas de pintura a partir das divisões e altura */
+export function calcPaintingAreas(answers: Record<string, any>): { area_paredes: number; area_tetos: number } {
+  const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
+  const height = heightMap[answers['altura_paredes']] || 2.4
+
+  const quartosMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3': 3, '4 ou mais': 4 }
+  const quartos = quartosMap[answers['num_quartos']] ?? 1
+  const wcMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3 ou mais': 3 }
+  const wcs = wcMap[answers['num_wc']] ?? 1
+
+  // Perímetros médios por divisão (m)
+  let perimeter = quartos * 14
+  if (answers['tem_sala'] === 'Sim') perimeter += 18
+  if (answers['tem_cozinha'] === 'Sim') perimeter += 13
+  perimeter += wcs * 9
+  if (answers['tem_hall'] === 'Sim') perimeter += 10
+
+  const area_paredes = Math.max(Math.round(perimeter * height * 0.85), 10)
+  const area_tetos = answers['area_total_m2'] ? Math.max(parseFloat(answers['area_total_m2']) || 0, 0) : 0
+
+  return { area_paredes, area_tetos }
+}
+
 /** Mapeia as respostas para os campos legacy da tabela leads (compatibilidade) */
 export function mapAnswersToLeadFields(answers: Record<string, any>) {
+  const usesNewPaintingForm = !!answers['altura_paredes']
+  const paintingAreas = usesNewPaintingForm ? calcPaintingAreas(answers) : null
+
   return {
     q1_tipo_trabalho: answers['tipo_trabalho'] || answers['tipo_imovel'] || null,
     q2_divisoes: answers['divisoes'] || answers['local'] || answers['num_divisoes'] || null,
-    q3_area_m2: answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
+    q3_area_m2: paintingAreas ? paintingAreas.area_paredes
+              : answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
               : answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
     q4_cor_escura: answers['cor_escura'] === 'Sim',
     q5_fissuras: answers['fissuras'] === 'Sim',
     q6_mobilias: answers['mobilias'] === 'Sim',
     q7_primer: answers['primer'] === 'Sim',
-    q8_teto: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) > 0
+    q8_teto: paintingAreas ? paintingAreas.area_tetos > 0
+           : answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) > 0
            : answers['teto'] === 'Sim',
     q9_prazo: answers['prazo'] === 'Esta semana' || answers['prazo']?.includes('Emergência') || answers['prazo']?.includes('Urgente')
       ? 'urgente'

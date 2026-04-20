@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2 } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
-import { getProfession, mapAnswersToLeadFields, type Question } from '@/lib/professions'
+import { getProfession, mapAnswersToLeadFields, calcPaintingAreas, type Question } from '@/lib/professions'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -99,9 +99,12 @@ export default function ProfessionalPublicPage() {
 
     if (lead) {
       if (professional.specialty === 'Pintura' && legacyFields.q3_area_m2) {
+        const paintingAreas = answers['altura_paredes']
+          ? calcPaintingAreas(answers)
+          : { area_paredes: legacyFields.q3_area_m2 || 0, area_tetos: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) : 0 }
         const quoteInput = {
-          area_m2_paredes: legacyFields.q3_area_m2,
-          area_m2_tetos: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) : 0,
+          area_m2_paredes: paintingAreas.area_paredes,
+          area_m2_tetos: paintingAreas.area_tetos,
           tipo: (legacyFields.q1_tipo_trabalho?.toLowerCase() || 'interior') as 'interior' | 'exterior' | 'ambos',
           cor_escura: !!legacyFields.q4_cor_escura,
           fissuras: !!legacyFields.q5_fissuras,

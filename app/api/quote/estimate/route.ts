@@ -6,8 +6,25 @@ export const dynamic = 'force-dynamic'
 // Tabela de preços base por profissão (€/hora ou por unidade)
 const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: number; max: number; descricao: string }> = {
   Pintura: (a) => {
-    const area_paredes = parseFloat(a.area_m2_paredes || a.area_m2 || a.q3_area_m2) || 30
-    const area_tetos = parseFloat(a.area_m2_tetos) || 0
+    let area_paredes: number
+    let area_tetos: number
+    if (a.altura_paredes) {
+      // novo formato: calcula a partir das divisões
+      const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
+      const height = heightMap[a.altura_paredes] || 2.4
+      const quartosMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3': 3, '4 ou mais': 4 }
+      const wcMap: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3 ou mais': 3 }
+      let perimeter = (quartosMap[a.num_quartos] ?? 1) * 14
+      if (a.tem_sala === 'Sim') perimeter += 18
+      if (a.tem_cozinha === 'Sim') perimeter += 13
+      perimeter += (wcMap[a.num_wc] ?? 1) * 9
+      if (a.tem_hall === 'Sim') perimeter += 10
+      area_paredes = Math.max(Math.round(perimeter * height * 0.85), 10)
+      area_tetos = parseFloat(a.area_total_m2) || 0
+    } else {
+      area_paredes = parseFloat(a.area_m2_paredes || a.area_m2 || a.q3_area_m2) || 30
+      area_tetos = parseFloat(a.area_m2_tetos) || 0
+    }
     const tipo = (a.tipo_trabalho || a.q1_tipo_trabalho || 'interior').toLowerCase()
     const priceParedes = tipo.includes('exterior') ? 6 : 4
     const base = area_paredes * priceParedes + area_tetos * 5
