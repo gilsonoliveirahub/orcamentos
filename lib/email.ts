@@ -3,13 +3,17 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.ver
 
 async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY
-  if (!key) return
+  if (!key) throw new Error('RESEND_API_KEY não configurado')
 
-  await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({ from: FROM, to: [to], subject, html }),
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(`Resend error ${res.status}: ${JSON.stringify(body)}`)
+  }
 }
 
 function wrap(content: string) {
