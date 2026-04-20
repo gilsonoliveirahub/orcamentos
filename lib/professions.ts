@@ -29,8 +29,8 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'tem_cozinha', text: 'Inclui cozinha?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'num_wc', text: 'Quantas casas de banho?', type: 'choice', options: ['0', '1', '2', '3 ou mais'] },
       { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'] },
-      { key: 'area_total_m2', text: 'Área total do espaço em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true },
-      { key: 'cor_escura', text: 'A cor escolhida é escura?', type: 'choice', options: ['Sim', 'Não', 'Ainda não sei'] },
+      { key: 'area_total_m2', text: 'Área total da habitação em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true },
+      { key: 'cor_escura', text: 'Qual a situação da cor?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor'] },
       { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'] },
       { key: 'primer', text: 'Necessita de primário / preparação de superfície?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
@@ -187,7 +187,7 @@ export function mapAnswersToLeadFields(answers: Record<string, any>) {
     q3_area_m2: paintingAreas ? paintingAreas.area_paredes
               : answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
               : answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
-    q4_cor_escura: answers['cor_escura'] === 'Sim',
+    q4_cor_escura: answers['cor_escura'] === 'Sim' || answers['cor_escura'] === 'Branco / Passa a cor',
     q5_fissuras: answers['fissuras'] === 'Sim',
     q6_mobilias: answers['mobilias'] === 'Sim',
     q7_primer: answers['primer'] === 'Sim',
