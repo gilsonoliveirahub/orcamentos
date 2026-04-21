@@ -24,7 +24,7 @@ export default function PrivacidadePage() {
             <p className="mb-1"><strong className="text-white">Responsável pelo tratamento:</strong> Gilson Gomes de Oliveira</p>
             <p className="mb-1"><strong className="text-white">NIF:</strong> 232 619 808</p>
             <p className="mb-1"><strong className="text-white">Morada:</strong> Av. Embaixador Assis Chateaubriand, n.º 21, 2.º Direito, 2780-197 Oeiras, Lisboa, Portugal</p>
-            <p className="mt-2">Contacto geral: <a href="mailto:suporte@xn--faoporti-t0a.com" className="text-indigo-400 hover:underline">suporte@façoporti.com</a></p>
+            <p className="mt-2">Contacto geral: <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a></p>
           </section>
 
           <section>
@@ -52,7 +52,7 @@ export default function PrivacidadePage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">5. Com quem partilhamos os dados</h2>
             <ul className="space-y-2 list-disc list-inside">
-              <li><strong className="text-white">Profissional atribuído:</strong> o cliente aceita, ao submeter o pedido, que os seus dados de contacto sejam partilhados com o profissional ao qual o pedido é atribuído.</li>
+              <li><strong className="text-white">Profissional destinatário:</strong> ao submeter um pedido, o cliente aceita que os seus dados de contacto sejam partilhados com o profissional destinatário, que é determinado da seguinte forma: (a) se o pedido for feito através do link pessoal de um profissional, os dados vão exclusivamente para esse profissional; (b) se o pedido for feito através do marketplace, os dados vão para o profissional que desbloquear o lead com um crédito. Em nenhum caso os dados são partilhados com múltiplos profissionais simultaneamente.</li>
               <li><strong className="text-white">Stripe (EUA):</strong> processamento de pagamentos. A Stripe opera sob as Cláusulas Contratuais-Tipo (CCT/SCC) aprovadas pela Comissão Europeia, garantindo proteção adequada dos dados transferidos para fora da UE.</li>
               <li><strong className="text-white">Supabase:</strong> armazenamento de dados em servidores na União Europeia (Irlanda).</li>
               <li><strong className="text-white">Resend / Amazon SES (Irlanda):</strong> envio de emails transacionais, processado na UE.</li>
@@ -81,7 +81,7 @@ export default function PrivacidadePage() {
               <li>Retirar o consentimento a qualquer momento, sem prejuízo da licitude do tratamento efetuado antes da retirada</li>
               <li>Apresentar reclamação à CNPD (Comissão Nacional de Proteção de Dados — <a href="https://www.cnpd.pt" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">cnpd.pt</a>)</li>
             </ul>
-            <p className="mt-3">Para exercer os seus direitos, contacte-nos em <a href="mailto:suporte@xn--faoporti-t0a.com" className="text-indigo-400 hover:underline">suporte@façoporti.com</a>.</p>
+            <p className="mt-3">Para exercer os seus direitos, contacte-nos em <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
           </section>
 
           <section>

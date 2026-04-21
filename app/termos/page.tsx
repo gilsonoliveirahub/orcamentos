@@ -20,7 +20,7 @@ export default function TermosPage() {
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">1. Aceitação dos termos</h2>
-            <p>Ao aceder ou utilizar a plataforma FaçoPorTi (disponível em facoporti.pt), o utilizador aceita os presentes Termos de Serviço na sua totalidade. Se não concordar com algum dos termos, deverá abster-se de utilizar a plataforma.</p>
+            <p>Ao aceder ou utilizar a plataforma FaçoPorTi (disponível em facoporti.com), o utilizador aceita os presentes Termos de Serviço na sua totalidade. Se não concordar com algum dos termos, deverá abster-se de utilizar a plataforma.</p>
           </section>
 
           <section>
@@ -58,8 +58,9 @@ export default function TermosPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">5. Sistema de créditos e marketplace</h2>
-            <p className="mb-3">Os leads gerados através do marketplace do FaçoPorTi são atribuídos automaticamente a profissionais com perfil adequado. Para aceder aos dados de contacto de leads do marketplace, é necessário gastar 1 crédito por lead.</p>
+            <h2 className="text-lg font-bold text-white mb-3">5. Dois tipos de pedidos</h2>
+            <p className="mb-3"><strong className="text-white">Link pessoal:</strong> cada profissional dispõe de um link exclusivo. Pedidos submetidos através desse link são encaminhados única e exclusivamente para esse profissional — não são partilhados com nenhum outro. Os dados de contacto do cliente são imediatamente visíveis e estão incluídos no plano mensal, sem custo adicional por pedido.</p>
+            <p className="mb-3"><strong className="text-white">Marketplace:</strong> clientes que acedam ao site FaçoPorTi sem um link de profissional específico podem submeter pedidos que serão atribuídos automaticamente a um profissional disponível. Para aceder aos dados de contacto destes leads, é necessário gastar 1 crédito por lead.</p>
             <ul className="space-y-2 list-disc list-inside">
               <li>Os créditos são adquiridos em pacotes e não expiram</li>
               <li>Os créditos não são reembolsáveis após utilização</li>
@@ -70,7 +71,7 @@ export default function TermosPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">6. Cancelamentos e reembolsos</h2>
             <p className="mb-3">O utilizador pode cancelar a sua subscrição a qualquer momento através do dashboard. O acesso à plataforma mantém-se ativo até ao fim do período faturado.</p>
-            <p className="mb-3">Reembolsos de subscrições podem ser solicitados em até 14 dias após o início do plano, desde que não tenham sido utilizadas as funcionalidades pagas. Para solicitar reembolso, contacte <a href="mailto:suporte@facoporti.pt" className="text-indigo-400 hover:underline">suporte@facoporti.pt</a>.</p>
+            <p className="mb-3">Reembolsos de subscrições podem ser solicitados em até 14 dias após o início do plano, desde que não tenham sido utilizadas as funcionalidades pagas. Para solicitar reembolso, contacte <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
             <p>Pacotes de créditos não são reembolsáveis após compra.</p>
           </section>
 
@@ -120,7 +121,7 @@ export default function TermosPage() {
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">13. Contacto</h2>
-            <p>Para questões relacionadas com estes termos, contacte-nos em <a href="mailto:suporte@facoporti.pt" className="text-indigo-400 hover:underline">suporte@facoporti.pt</a>.</p>
+            <p>Para questões relacionadas com estes termos, contacte-nos em <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
           </section>
 
         </div>

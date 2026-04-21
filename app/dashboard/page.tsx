@@ -402,6 +402,9 @@ export default function Dashboard() {
   const faturacao = quotes
     .filter(q => leads.find(l => l.id === q.lead_id && l.status === 'fechado'))
     .reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
+  const potencial = quotes
+    .filter(q => leads.find(l => l.id === q.lead_id && l.status !== 'fechado' && l.status !== 'perdido'))
+    .reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -518,10 +521,21 @@ export default function Dashboard() {
             </span>
             <span className="text-xs text-gray-500">· leads que chegam pelo site</span>
           </div>
-          <a href="/creditos" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
-            Comprar →
+          <a href="/creditos" className="text-xs font-black px-4 py-2 rounded-lg transition-colors"
+            style={{ background: '#c9a84c', color: '#000' }}>
+            Comprar créditos
           </a>
+        </div>
+      )}
+
+      {/* Potencial */}
+      {potencial > 0 && (
+        <div className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3"
+          style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
+          <TrendingUp size={15} style={{ color: '#34d399' }} />
+          <span className="text-sm font-semibold" style={{ color: '#34d399' }}>
+            Potencial este mês: <span className="font-black">€{Math.round(potencial)}</span> em trabalhos
+          </span>
         </div>
       )}
 

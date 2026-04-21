@@ -9,6 +9,7 @@ export interface Question {
   unit?: string
   optional?: boolean
   minLength?: number
+  showIf?: { key: string; value: string | string[] }
 }
 
 export interface ProfessionConfig {
@@ -69,7 +70,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
   },
 
   Carpintaria: {
-    emoji: '🪚',
+    emoji: '🔨',
     label: 'Carpintaria',
     questions: [
       { key: 'tipo_trabalho', text: 'Que tipo de trabalho precisa?', type: 'choice', options: ['Roupeiro / Armário por medida', 'Cozinha por medida', 'Soalho / Parquet', 'Portas / Janelas', 'Deck / Terraço', 'Móvel de casa de banho', 'Reparação', 'Outro'] },
@@ -143,9 +144,78 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'notas', text: 'Descreva o projeto', type: 'text', placeholder: 'Ex: quero remodelar a casa de banho — nova base de duche, azulejos brancos, bancada em pedra...', minLength: 20, optional: true },
     ],
   },
+
+  'Pavimentos de Madeira': {
+    emoji: '🏡',
+    label: 'Pavimentos de Madeira',
+    questions: [
+      { key: 'tipo_servico', text: 'Qual é o serviço pretendido?', type: 'choice', options: ['Chão flutuante novo', 'Envernizamento de madeira'] },
+      { key: 'area_m2', text: 'Área total em m²?', type: 'number', placeholder: 'ex: 40', unit: 'm²' },
+      { key: 'mobilias', text: 'O espaço estará vazio ou tem mobília?', type: 'choice', options: ['Vazio', 'Com mobília', 'Misto'] },
+      { key: 'prazo', text: 'Quando precisa de iniciar?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
+      // Chão flutuante
+      { key: 'pavimento_nivelado', text: 'O pavimento atual está nivelado?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      { key: 'material_incluido', text: 'Já tem o material ou quer incluir no orçamento?', type: 'choice', options: ['Já tenho o material', 'Incluir no orçamento', 'Ainda não decidi'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      { key: 'classe_ac', text: 'Classe de resistência pretendida?', type: 'choice', options: ['AC4 (uso doméstico intenso)', 'AC5 (uso comercial)', 'Não sei / A definir'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      { key: 'cortar_portas', text: 'As portas precisam de ser cortadas para o novo pavimento?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      { key: 'rodapes', text: 'Pretende rodapés novos?', type: 'choice', options: ['Sim', 'Não', 'Só alguns'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      // Envernizamento
+      { key: 'madeira_danificada', text: 'A madeira tem danos visíveis (riscos, manchas, fissuras)?', type: 'choice', options: ['Sim, bastante', 'Alguns danos', 'Está bem, só precisa de renovar'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
+      { key: 'tipo_verniz', text: 'Preferência de verniz?', type: 'choice', options: ['Água (menos cheiro, mais rápido)', 'Solvente (mais durável)', 'Sem preferência'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
+      { key: 'nivel_brilho', text: 'Nível de brilho pretendido?', type: 'choice', options: ['Mate', 'Acetinado', 'Brilhante'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
+      { key: 'manter_cor', text: 'Deseja manter a cor natural ou alterar o tom?', type: 'choice', options: ['Manter cor natural', 'Alterar o tom', 'Aguardo sugestão'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
+      { key: 'preencher_juntas', text: 'É necessário preencher as juntas entre as tábuas?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
+      { key: 'notas', text: 'Pode descrever o estado atual do chão?', type: 'text', placeholder: 'Ex: soalho de pinho com alguns riscos, última vez que foi envernizado há 10 anos...', minLength: 10, optional: true },
+    ],
+  },
+
+  'Estuque e Pladur': {
+    emoji: '🧱',
+    label: 'Estuque e Pladur',
+    questions: [
+      { key: 'tipo_trabalho', text: 'Que tipo de trabalho precisa?', type: 'choice', options: ['Estuque projetado', 'Estuque tradicional', 'Pladur / Gesso cartonado', 'Regularização de paredes', 'Reparação / Correção de fissuras', 'Teto falso'] },
+      { key: 'divisoes', text: 'Que espaços vão ser intervencionados?', type: 'multiselect', options: ['Quarto', 'Sala', 'Cozinha', 'Casa de banho', 'Hall / Corredor', 'Exterior', 'Todo o imóvel'] },
+      { key: 'area_m2', text: 'Área total a tratar em m²?', type: 'number', placeholder: 'ex: 60', unit: 'm²' },
+      { key: 'altura_paredes', text: 'Qual a altura das paredes / pé-direito?', type: 'choice', options: ['Até 2.4m', '2.4m a 3m', 'Mais de 3m', 'Não sei'] },
+      { key: 'transporte_placas', text: 'Para pladur: há condições para transporte de placas?', type: 'choice', options: ['Sim, acesso fácil', 'Acesso difícil (escadas, elevador pequeno)', 'Não se aplica'] },
+      { key: 'mobilias', text: 'O espaço estará vazio ou tem mobília que precise de proteção?', type: 'choice', options: ['Estará vazio', 'Tem mobília — precisa de proteção', 'Misto'] },
+      { key: 'fornecimento', text: 'Pretende orçamento com material incluído ou apenas mão de obra?', type: 'choice', options: ['Material + mão de obra', 'Só mão de obra', 'Ainda não sei'] },
+      { key: 'prazo', text: 'Quando precisa de começar?', type: 'choice', options: ['O mais rápido possível', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
+      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Ex: paredes com fissuras nas juntas, teto a empenar, quero teto falso em pladur com aro de luz...', minLength: 20, optional: true },
+    ],
+  },
+
+  'Ar Condicionado': {
+    emoji: '❄️',
+    label: 'Ar Condicionado',
+    questions: [
+      { key: 'tipo_trabalho', text: 'Que trabalho precisa?', type: 'choice', options: ['Instalação nova', 'Substituição de equipamento existente', 'Manutenção / Limpeza', 'Reparação / Avaria'] },
+      { key: 'num_unidades', text: 'Quantas unidades interiores pretende instalar?', type: 'choice', options: ['1', '2', '3', '4 ou mais', 'Ainda não sei'] },
+      { key: 'tipo_espaco', text: 'Que tipo de espaço é?', type: 'choice', options: ['Quarto', 'Sala', 'Escritório / Comércio', 'Armazém / Industrial', 'Vários espaços'] },
+      { key: 'bomba_condensados', text: 'Será necessário bomba de condensados (drenagem)?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
+      { key: 'tomada_proxima', text: 'O local da unidade interior tem tomada elétrica próxima?', type: 'choice', options: ['Sim', 'Não', 'Não sei'] },
+      { key: 'equipamento', text: 'Já comprou o aparelho ou quer proposta com máquina incluída?', type: 'choice', options: ['Já tenho o aparelho', 'Quero proposta com máquina incluída', 'Ainda não decidi'] },
+      { key: 'marca_preferencia', text: 'Tem preferência de marca?', type: 'choice', options: ['Daikin', 'Mitsubishi Electric', 'LG', 'Samsung', 'Toshiba', 'Sem preferência'] },
+      { key: 'tipo_imovel', text: 'O imóvel é moradia ou apartamento?', type: 'choice', options: ['Moradia', 'Apartamento', 'Escritório / Comércio'] },
+      { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
+      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Ex: quarto de 15m², janela a sul, sem tomada junto à parede exterior...', minLength: 20, optional: true },
+    ],
+  },
 }
 
-export const SPECIALTY_LIST = Object.keys(PROFESSIONS)
+export const SPECIALTY_LIST = [
+  'Pintura',
+  'Remodelação',
+  'Limpeza',
+  'Canalização',
+  'Electricidade',
+  'Carpintaria',
+  'Pavimentos de Madeira',
+  'Estuque e Pladur',
+  'Ar Condicionado',
+  'Jardinagem',
+  'Mudanças',
+]
 
 export function getProfession(specialty: string): ProfessionConfig {
   return PROFESSIONS[specialty] || PROFESSIONS['Pintura']

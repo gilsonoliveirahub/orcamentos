@@ -1,13 +1,15 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta']
+const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta', '/upgrade', '/creditos']
+const AUTH_ONLY = ['/login']
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   const isProtected = PROTECTED.some(p => pathname.startsWith(p))
-  if (!isProtected) return NextResponse.next()
+  const isAuthOnly = AUTH_ONLY.some(p => pathname.startsWith(p))
+  if (!isProtected && !isAuthOnly) return NextResponse.next()
 
   const res = NextResponse.next()
 
@@ -26,8 +28,12 @@ export async function proxy(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
+  if (isProtected && !user) {
     return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  if (isAuthOnly && user) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return res

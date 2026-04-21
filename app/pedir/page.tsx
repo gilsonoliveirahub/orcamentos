@@ -24,7 +24,15 @@ export default function PedirPage() {
   const [assigned, setAssigned] = useState(false)
 
   const profession = specialty ? getProfession(specialty) : null
-  const questions = profession?.questions || []
+  const allQuestions = profession?.questions || []
+  function filterQuestions(ans: Record<string, any>) {
+    return allQuestions.filter(q => {
+      if (!q.showIf) return true
+      const val = ans[q.showIf.key]
+      return Array.isArray(q.showIf.value) ? q.showIf.value.includes(val) : val === q.showIf.value
+    })
+  }
+  const questions = filterQuestions(answers)
   const totalSteps = questions.length
 
   function selectProfissao(s: string) { setSpecialty(s); setPhase('zona') }
@@ -33,7 +41,8 @@ export default function PedirPage() {
   function answerAndAdvance(key: string, value: any) {
     const next = { ...answers, [key]: value }
     setAnswers(next)
-    if (step < totalSteps) setStep(s => s + 1)
+    const filtered = filterQuestions(next)
+    if (step < filtered.length) setStep(s => s + 1)
     else setPhase('media')
   }
 
@@ -124,6 +133,9 @@ export default function PedirPage() {
               {phase === 'media' && 'Fotos e/ou vídeos'}
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
+            {phase === 'profissao' && (
+              <p className="text-xs text-gray-500 mt-0.5">Escolha o tipo de trabalho — demora menos de 2 minutos</p>
+            )}
             {phase === 'perguntas' && (
               <p className="text-xs text-gray-500 mt-0.5">{step}/{totalSteps}</p>
             )}
@@ -139,17 +151,30 @@ export default function PedirPage() {
         {/* Escolher profissão */}
         {phase === 'profissao' && (
           <div className="grid grid-cols-2 gap-3">
-            {SPECIALTY_LIST.map(s => (
-              <button key={s} onClick={() => selectProfissao(s)}
-                className="flex items-center gap-4 p-5 rounded-2xl text-left transition-all hover:-translate-y-0.5"
-                style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="text-3xl flex-shrink-0">{PROFESSIONS[s].emoji}</span>
-                <div>
-                  <div className="font-black text-white text-sm">{s}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{PROFESSIONS[s].questions.length} perguntas</div>
-                </div>
-              </button>
-            ))}
+            {SPECIALTY_LIST.map(s => {
+              const qs = PROFESSIONS[s].questions
+              const base = qs.filter(q => !q.showIf).length
+              const conditional = qs.filter(q => !!q.showIf).length
+              const total = conditional > 0 ? base + Math.round(conditional / 2) : base
+              return (
+                <button key={s} onClick={() => selectProfissao(s)}
+                  className="group flex items-center gap-3 p-4 rounded-2xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                  style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}
+                  onMouseEnter={e => (e.currentTarget.style.border = '1px solid rgba(201,168,76,0.5)')}
+                  onMouseLeave={e => (e.currentTarget.style.border = '1px solid rgba(255,255,255,0.07)')}>
+                  <span className="w-10 h-10 flex items-center justify-center text-2xl flex-shrink-0 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    {PROFESSIONS[s].emoji}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="font-black text-white leading-tight" style={{ fontSize: s.length > 14 ? '0.75rem' : '0.875rem' }}>
+                      {PROFESSIONS[s].label}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">{total} perguntas</div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
 

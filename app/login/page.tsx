@@ -82,6 +82,14 @@ export default function LoginPage() {
           <p className="text-gray-500 text-sm mt-1">A plataforma que trabalha por si</p>
         </div>
 
+        {/* Texto acima do formulário (só no registo) */}
+        {tab === 'register' && (
+          <div className="text-center mb-6">
+            <p className="text-white text-lg font-semibold">Estás a um passo de começar a receber clientes.</p>
+            <p className="text-gray-500 text-sm mt-1">A partir de 19€/mês</p>
+          </div>
+        )}
+
         {/* Card */}
         <div className="rounded-3xl p-8" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.08)' }}>
 
@@ -153,6 +161,10 @@ export default function LoginPage() {
                     <option>Carpintaria</option>
                     <option>Jardinagem</option>
                     <option>Mudanças</option>
+                    <option>Remodelação</option>
+                    <option>Estuque e Pladur</option>
+                    <option>Pavimentos de Madeira</option>
+                    <option>Ar Condicionado</option>
                     <option>Outro</option>
                   </select>
                 </div>
@@ -199,6 +211,11 @@ export default function LoginPage() {
               <a href="/recuperar-password" className="block text-center text-xs text-gray-600 hover:text-gray-400 mt-2 transition-colors">
                 Esqueci a password
               </a>
+            )}
+            {tab === 'register' && (
+              <p className="text-center text-xs text-gray-500 mt-1">
+                Cria a tua conta em menos de 1 minuto
+              </p>
             )}
           </form>
         </div>

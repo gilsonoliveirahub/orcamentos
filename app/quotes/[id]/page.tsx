@@ -200,7 +200,7 @@ export default function QuotePDF() {
         {/* Footer */}
         <div style={{ background: '#1a1a2e', padding: '16px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>FaçoPorTi</div>
-          <div style={{ color: '#64748b', fontSize: 12 }}>facoporti.pt · A plataforma que trabalha por si</div>
+          <div style={{ color: '#64748b', fontSize: 12 }}>facoporti.com · A plataforma que trabalha por si</div>
         </div>
       </div>
     </>

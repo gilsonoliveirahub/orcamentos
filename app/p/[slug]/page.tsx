@@ -49,13 +49,22 @@ export default function ProfessionalPublicPage() {
   )
 
   const profession = getProfession(professional.specialty)
-  const questions = profession.questions
+  const allQuestions = profession.questions
+  function filterQuestions(ans: Record<string, any>) {
+    return allQuestions.filter(q => {
+      if (!q.showIf) return true
+      const val = ans[q.showIf.key]
+      return Array.isArray(q.showIf.value) ? q.showIf.value.includes(val) : val === q.showIf.value
+    })
+  }
+  const questions = filterQuestions(answers)
   const totalSteps = questions.length + 2 // +1 media, +1 contacto
   const isMediaStep = step === questions.length + 1
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
-    setAnswers(prev => ({ ...prev, [key]: value }))
+    const next = { ...answers, [key]: value }
+    setAnswers(next)
     setStep(s => s + 1)
   }
 

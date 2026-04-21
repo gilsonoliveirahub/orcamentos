@@ -73,7 +73,7 @@ export default function CookiesPage() {
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">5. Contacto</h2>
-            <p>Para questões sobre cookies, contacte-nos em <a href="mailto:suporte@xn--faoporti-t0a.com" className="text-indigo-400 hover:underline">suporte@façoporti.com</a>.</p>
+            <p>Para questões sobre cookies, contacte-nos em <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
           </section>
 
         </div>

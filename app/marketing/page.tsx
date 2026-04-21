@@ -10,12 +10,11 @@ export default function MarketingPage() {
           Faço<span className="text-[#c9a84c]">PorTi</span>
         </span>
         <div className="flex items-center gap-6">
-          <Link href="/profissionais" className="text-sm text-white/60 hover:text-white transition-colors">Profissionais</Link>
           <a href="#como-funciona" className="text-sm text-white/60 hover:text-white transition-colors">Como funciona</a>
           <a href="#precos" className="text-sm text-white/60 hover:text-white transition-colors">Preços</a>
           <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Entrar</Link>
-          <Link href="/pedir" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
-            Pedir orçamento
+          <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
+            Criar conta
           </Link>
         </div>
       </nav>
@@ -39,43 +38,49 @@ export default function MarketingPage() {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold leading-tight tracking-tight mb-6">
-            O teu negócio,<br />
-            <span className="text-[#c9a84c]">mais clientes.</span>
+            Recebe clientes diretamente<br />
+            <span className="text-[#c9a84c]">no teu WhatsApp.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Canalizador, eletricista, pintor, carpinteiro — cria o teu perfil, partilha o teu link e recebe pedidos qualificados diretamente. Sem concorrência. Sem pagar por lead.
+          <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto mb-3 leading-relaxed">
+            Cria o teu link profissional, partilha nas redes e recebe pedidos já com orçamento estimado.
+          </p>
+          <p className="text-base text-white/40 max-w-xl mx-auto mb-10 leading-relaxed">
+            Também podes aceder a pedidos da plataforma na tua zona.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/pedir" className="w-full sm:w-auto text-center bg-[#c9a84c] text-black font-semibold px-8 py-4 rounded-full text-lg hover:bg-[#e0bf6a] transition-colors">
-              Pedir orçamento
+            <Link href="/login" className="w-full sm:w-auto text-center bg-[#c9a84c] text-black font-semibold px-8 py-4 rounded-full text-lg hover:bg-[#e0bf6a] transition-colors">
+              Começar a receber clientes
             </Link>
-            <Link href="/login" className="w-full sm:w-auto text-center border border-white/20 text-white px-8 py-4 rounded-full text-lg hover:border-white/40 transition-colors">
-              Sou profissional
-            </Link>
+            <a href="#como-funciona" className="w-full sm:w-auto text-center border border-white/20 text-white px-8 py-4 rounded-full text-lg hover:border-white/40 transition-colors">
+              Ver como funciona
+            </a>
           </div>
 
-          <p className="text-sm text-white/30 mt-6">Sem cartão de crédito • Resposta em minutos</p>
+          <p className="text-sm text-white/30 mt-6">Um único trabalho pode pagar o mês inteiro. Começa com 19€.</p>
         </div>
       </section>
 
-      {/* PROVA SOCIAL */}
+      {/* NÚMEROS */}
       <section className="py-16 border-y border-white/5">
         <div className="max-w-5xl mx-auto px-6">
-          <p className="text-center text-white/30 text-sm uppercase tracking-widest mb-10">Resultados reais</p>
+          <p className="text-center text-white/30 text-sm uppercase tracking-widest mb-10">Como funciona na prática</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: '8+', label: 'Profissões suportadas' },
-              { value: '2 min', label: 'Para gerar um orçamento' },
-              { value: '€19', label: 'Para começar' },
-              { value: '100%', label: 'Teus clientes, só teus' },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <div className="text-4xl font-bold text-[#c9a84c] mb-2">{stat.value}</div>
-                <div className="text-sm text-white/50">{stat.label}</div>
-              </div>
-            ))}
+            <div>
+              <div className="text-sm font-semibold text-white/70 leading-snug">Várias profissões suportadas</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-[#c9a84c] mb-2">2 min</div>
+              <div className="text-sm text-white/50">Para gerar um orçamento</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-[#c9a84c] mb-2">€19</div>
+              <div className="text-sm text-white/50">Para começar</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white/70 leading-snug">Clientes do teu link são só teus</div>
+            </div>
           </div>
         </div>
       </section>
@@ -83,28 +88,28 @@ export default function MarketingPage() {
       {/* COMO FUNCIONA */}
       <section id="como-funciona" className="py-32 max-w-6xl mx-auto px-6">
         <div className="text-center mb-20">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">Como funciona</h2>
-          <p className="text-white/50 text-lg">Três passos simples para fechar mais trabalhos</p>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">3 passos para começares a receber pedidos</h2>
+          <p className="text-white/50 text-lg">Em poucos minutos tens o teu link ativo e pronto a receber clientes.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {[
             {
               step: '01',
-              title: 'Partilhas o teu link',
-              desc: 'Crias a tua conta e recebes um link pessoal. Partilhas no Instagram, WhatsApp, cartão de visita — onde quiseres.',
+              title: 'Crias o teu link profissional',
+              desc: 'Recebes um link próprio e partilhas no WhatsApp, Instagram ou onde quiseres.',
               image: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=600&q=80',
             },
             {
               step: '02',
-              title: 'O cliente preenche',
-              desc: 'O cliente responde a 12 perguntas simples sobre o trabalho. Envia fotos. Leva menos de 2 minutos.',
+              title: 'O cliente envia o pedido',
+              desc: 'Responde a perguntas simples, envia fotos e recebe um orçamento estimado.',
               image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&q=80',
             },
             {
               step: '03',
-              title: 'Tu recebes o lead qualificado',
-              desc: 'Recebes o pedido com orçamento estimado já calculado, proposta pronta para enviar por WhatsApp e estado no teu pipeline.',
+              title: 'Recebes o pedido pronto para fechar',
+              desc: 'Recebes tudo organizado, com orçamento estimado e contacto direto para responder rapidamente.',
               image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
             },
           ].map((item) => (
@@ -121,45 +126,29 @@ export default function MarketingPage() {
             </div>
           ))}
         </div>
+
+        <p className="text-center text-white/30 text-sm mt-14">Em poucos minutos estás pronto para receber clientes.</p>
       </section>
 
-      {/* DIFERENCIAL vs ZAASK */}
+      {/* DIFERENCIAL */}
       <section className="py-24 bg-white/2 border-y border-white/5">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Uma abordagem diferente</h2>
-            <p className="text-white/50 text-lg">Noutras plataformas competis com outros profissionais. No FaçoPorTi, o cliente já é teu.</p>
+            <h2 className="text-4xl font-bold mb-4">Duas formas de receber clientes</h2>
+            <p className="text-white/50 text-lg max-w-2xl mx-auto">No FaçoPorTi, recebes clientes diretamente pelo teu link e podes aceder a pedidos extra da plataforma.</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Zaask */}
-            <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
-              <h3 className="text-xl font-semibold text-white/40 mb-6">Plataformas tradicionais</h3>
-              <ul className="space-y-4">
-                {[
-                  'Cliente envia pedido a 5 pintores',
-                  'Competis por preço',
-                  'Pagas por cada lead',
-                  'Clientes sem qualificação prévia',
-                  'Sem controlo do processo',
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-white/40">
-                    <span className="text-red-400/60">✕</span> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* FaçoPorTi */}
+            {/* Link pessoal */}
             <div className="bg-[#c9a84c]/5 border border-[#c9a84c]/20 rounded-3xl p-8">
-              <h3 className="text-xl font-semibold text-[#c9a84c] mb-6">FaçoPorTi</h3>
+              <h3 className="text-xl font-semibold text-[#c9a84c] mb-2">Pelo teu link profissional</h3>
+              <p className="text-white/30 text-sm mb-6">Incluído no plano mensal</p>
               <ul className="space-y-4">
                 {[
-                  'O cliente chega diretamente a ti',
-                  'Sem concorrência de preço',
-                  'Plano fixo mensal, leads ilimitados',
-                  'Lead qualificado com 12 perguntas + fotos',
-                  'Tu geres o teu pipeline',
+                  'O cliente entra diretamente no teu link',
+                  'O pedido fica associado a ti',
+                  'Sem concorrência direta',
+                  'Orçamento automático com base nos teus preços',
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-white/80">
                     <span className="text-[#c9a84c]">✓</span> {item}
@@ -167,26 +156,65 @@ export default function MarketingPage() {
                 ))}
               </ul>
             </div>
+
+            {/* Marketplace */}
+            <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
+              <h3 className="text-xl font-semibold text-white/70 mb-2">Pelo marketplace</h3>
+              <p className="text-white/30 text-sm mb-6">Opcional — pagas por lead</p>
+              <ul className="space-y-4">
+                {[
+                  'O cliente entra diretamente no FaçoPorTi',
+                  'O pedido pode ficar disponível para profissionais compatíveis',
+                  'Podes desbloquear a lead se quiseres',
+                  'Pagas apenas quando queres contactar',
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-white/50">
+                    <span className="text-white/30">→</span> {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
+
+          <p className="text-center text-white/30 text-sm mt-10">
+            Clientes do teu link são só teus. O marketplace é opcional.
+          </p>
         </div>
       </section>
 
-      {/* SCREENSHOT / PREVIEW */}
-      <section className="py-32 max-w-6xl mx-auto px-6 text-center">
-        <h2 className="text-4xl md:text-5xl font-bold mb-4">O teu dashboard</h2>
-        <p className="text-white/50 text-lg mb-16">Todos os teus leads num só lugar. Pipeline visual, orçamentos automáticos, propostas prontas.</p>
-
-        <div className="relative rounded-3xl overflow-hidden border border-white/10">
-          <img
-            src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1400&q=80"
-            alt="Dashboard FaçoPorTi"
-            className="w-full opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-            <Link href="/login" className="bg-[#c9a84c] text-black font-semibold px-8 py-3 rounded-full hover:bg-[#e0bf6a] transition-colors">
-              Experimentar agora
+      {/* DASHBOARD */}
+      <section className="py-32 max-w-6xl mx-auto px-6">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <div>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">Tudo organizado num só lugar</h2>
+            <p className="text-white/50 text-lg mb-10">Pedidos, orçamento estimado, propostas e acompanhamento — sem confusão no WhatsApp.</p>
+            <ul className="space-y-4 mb-10">
+              {[
+                'Vês todos os pedidos num só painel',
+                'Recebes o pedido já preenchido',
+                'Confirmas o valor mais rápido',
+                'Acompanhas cada cliente até fechar trabalho',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3 text-white/70">
+                  <span className="w-5 h-5 rounded-full bg-[#c9a84c]/20 border border-[#c9a84c]/40 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[#c9a84c] text-xs">✓</span>
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link href="/login" className="inline-block bg-[#c9a84c] text-black font-semibold px-8 py-4 rounded-full hover:bg-[#e0bf6a] transition-colors">
+              Criar conta profissional
             </Link>
+          </div>
+
+          <div className="relative rounded-3xl overflow-hidden border border-white/10">
+            <img
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80"
+              alt="Dashboard FaçoPorTi"
+              className="w-full opacity-60"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/60 via-transparent to-transparent" />
           </div>
         </div>
       </section>
@@ -207,10 +235,12 @@ export default function MarketingPage() {
               <p className="text-white/40 text-sm mb-8">Para começar</p>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Até 10 leads/mês',
-                  'Link pessoal',
+                  'Link profissional',
+                  'Até 10 pedidos por mês no teu link',
                   'Orçamentos automáticos',
-                  'Pipeline Kanban',
+                  'Pipeline visual',
+                  'Acesso ao marketplace',
+                  'Pode comprar leads extra',
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-white/60 text-sm">
                     <span className="text-[#c9a84c]">✓</span> {f}
@@ -226,16 +256,18 @@ export default function MarketingPage() {
             <div className="bg-[#c9a84c]/5 border border-[#c9a84c]/30 rounded-3xl p-8 relative">
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <div className="text-4xl font-bold mb-1">€49<span className="text-lg font-normal text-white/40">/mês</span></div>
-              <p className="text-white/40 -text-sm mb-8">Para profissionais a crescer</p>
+              <div className="text-4xl font-bold mb-1">€39<span className="text-lg font-normal text-white/40">/mês</span></div>
+              <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Leads ilimitados',
-                  'Follow-up automático (D0/D2/D5)',
+                  'Link profissional',
+                  'Até 50 pedidos por mês no teu link',
+                  'Follow-up automático',
                   'Notificações WhatsApp',
                   'PDF de orçamento',
                   'Estatísticas avançadas',
                   'Suporte prioritário',
+                  'Leads do marketplace a preço mais baixo',
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-white/80 text-sm">
                     <span className="text-[#c9a84c]">✓</span> {f}
@@ -247,6 +279,60 @@ export default function MarketingPage() {
               </Link>
             </div>
           </div>
+
+          <div className="text-center mt-10 space-y-1">
+            <p className="text-white/50 text-sm">Leads do marketplace desde 2,5€</p>
+            <p className="text-white/30 text-sm">Os pedidos do teu link contam para o plano. O marketplace é opcional.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-32 max-w-3xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">Perguntas frequentes</h2>
+          <p className="text-white/50 text-lg">Tudo o que precisas de saber antes de começar</p>
+        </div>
+
+        <div className="space-y-4">
+          {[
+            {
+              q: 'O cliente que usa o meu link vai para outros profissionais?',
+              a: 'Não. O cliente que acede ao teu link pessoal é encaminhado exclusivamente para ti. Nenhum outro profissional recebe esse pedido.',
+            },
+            {
+              q: 'O que é o marketplace?',
+              a: 'É a secção pública do FaçoPorTi onde qualquer pessoa pode pedir um orçamento sem ter o link de um profissional específico. Esses pedidos são atribuídos automaticamente a profissionais disponíveis na zona e especialidade.',
+            },
+            {
+              q: 'Quando pago por uma lead?',
+              a: 'Só pagas quando recebes um lead do marketplace — desde 2,50€ por lead. Pedidos que chegam pelo teu link pessoal estão totalmente incluídos no plano mensal, sem custo adicional.',
+            },
+            {
+              q: 'O que está incluído no plano mensal?',
+              a: 'O teu link pessoal, a receção e gestão ilimitada de pedidos via esse link, o pipeline Kanban e os orçamentos automáticos. No plano Pro tens ainda follow-up automático, notificações WhatsApp, PDF de orçamento e estatísticas avançadas.',
+            },
+            {
+              q: 'Posso comprar mais leads do marketplace?',
+              a: 'Sim. Podes comprar pacotes de créditos a qualquer momento. Os créditos não expiram.',
+            },
+            {
+              q: 'Os pedidos do meu link contam para algum limite?',
+              a: 'Sim. No plano Starter o máximo é 10 pedidos/mês via link pessoal. No plano Pro o máximo é 50 pedidos/mês.',
+            },
+            {
+              q: 'Posso cancelar a qualquer momento?',
+              a: 'Sim, sem compromissos. Cancelas no dashboard e o plano mantém-se ativo até ao fim do período já pago.',
+            },
+          ].map((item) => (
+            <details key={item.q} className="group bg-white/3 border border-white/8 rounded-2xl overflow-hidden">
+              <summary className="flex items-center justify-between px-6 py-5 cursor-pointer list-none font-medium text-white/90 hover:text-white transition-colors">
+                {item.q}
+                <span className="text-[#c9a84c] text-xl ml-4 group-open:rotate-45 transition-transform duration-200">+</span>
+              </summary>
+              <p className="px-6 pb-5 text-white/50 leading-relaxed">{item.a}</p>
+            </details>
+          ))}
         </div>
       </section>
 
@@ -264,7 +350,7 @@ export default function MarketingPage() {
               className="w-12 h-12 rounded-full object-cover"
             />
             <div className="text-left">
-              <div className="font-semibold">Gilson Oliveira</div>
+              <div className="font-semibold">Profissional independente</div>
               <div className="text-sm text-white/40">Pintor, Lisboa</div>
             </div>
           </div>
@@ -282,24 +368,25 @@ export default function MarketingPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/80 to-[#0a0a0a]" />
         </div>
         <div className="relative z-10 text-center max-w-2xl mx-auto px-6">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">Pronto para fechar mais trabalhos?</h2>
-          <p className="text-white/50 text-lg mb-10">Cria a tua conta em 2 minutos.</p>
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">Cria a tua conta e começa a receber pedidos organizados em poucos minutos.</h2>
           <Link href="/login" className="inline-block bg-[#c9a84c] text-black font-semibold px-10 py-4 rounded-full text-lg hover:bg-[#e0bf6a] transition-colors">
-            Criar conta
+            Criar conta profissional
           </Link>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer className="border-t border-white/5 py-10 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <span className="text-lg font-semibold">Faço<span className="text-[#c9a84c]">PorTi</span></span>
-          <p className="text-sm text-white/30">© 2026 FaçoPorTi. Todos os direitos reservados.</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
+            <Link href="/sobre" className="text-sm text-white/30 hover:text-white transition-colors">Sobre nós</Link>
+            <Link href="/contactos" className="text-sm text-white/30 hover:text-white transition-colors">Contactos</Link>
             <Link href="/privacidade" className="text-sm text-white/30 hover:text-white transition-colors">Privacidade</Link>
             <Link href="/termos" className="text-sm text-white/30 hover:text-white transition-colors">Termos</Link>
             <Link href="/login" className="text-sm text-white/30 hover:text-white transition-colors">Entrar</Link>
           </div>
+          <p className="text-sm text-white/20">© 2026 FaçoPorTi</p>
         </div>
       </footer>
 
