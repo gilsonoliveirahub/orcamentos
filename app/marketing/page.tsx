@@ -13,6 +13,9 @@ export default function MarketingPage() {
           <a href="#como-funciona" className="text-sm text-white/60 hover:text-white transition-colors">Como funciona</a>
           <a href="#precos" className="text-sm text-white/60 hover:text-white transition-colors">Preços</a>
           <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Entrar</Link>
+          <Link href="/pedir" className="text-sm text-white/60 hover:text-white transition-colors border border-white/20 px-4 py-2 rounded-full hover:border-white/40 transition-colors">
+            Pedir orçamento
+          </Link>
           <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
             Criar conta
           </Link>
