@@ -115,11 +115,11 @@ export default function UpgradePage() {
                 <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(201,168,76,0.2)', color: '#c9a84c' }}>ATIVO</span>
               )}
             </div>
-            <div className="text-3xl font-black text-white mb-1">€49<span className="text-base font-normal text-gray-400">/mês</span></div>
+            <div className="text-3xl font-black text-white mb-1">€39<span className="text-base font-normal text-gray-400">/mês</span></div>
             <p className="text-xs text-gray-500 mb-5">Para quem quer crescer a sério</p>
             <ul className="space-y-3 mb-8 flex-1">
               {[
-                'Leads ilimitados',
+                'Até 50 pedidos/mês via link',
                 'Follow-up automático',
                 'Notificações WhatsApp',
                 'PDF de orçamento',
