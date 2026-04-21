@@ -119,15 +119,17 @@ export default function UpgradePage() {
             <p className="text-xs text-gray-500 mb-5">Para quem quer crescer a sério</p>
             <ul className="space-y-3 mb-8 flex-1">
               {[
-                'Até 50 pedidos/mês via link',
-                'Follow-up automático',
-                'Notificações WhatsApp',
-                'PDF de orçamento',
-                'Estatísticas avançadas',
-                'Suporte prioritário',
+                { label: 'Até 50 pedidos/mês via link', soon: false },
+                { label: 'Follow-up automático', soon: false },
+                { label: 'Notificações WhatsApp', soon: true },
+                { label: 'PDF de orçamento', soon: true },
+                { label: 'Estatísticas avançadas', soon: false },
+                { label: 'Suporte prioritário', soon: false },
               ].map(f => (
-                <li key={f} className="flex items-center gap-2 text-sm text-white">
-                  <CheckCircle size={14} className="text-amber-400 flex-shrink-0" /> {f}
+                <li key={f.label} className="flex items-center gap-2 text-sm text-white">
+                  <CheckCircle size={14} className="text-amber-400 flex-shrink-0" />
+                  {f.label}
+                  {f.soon && <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>em breve</span>}
                 </li>
               ))}
             </ul>

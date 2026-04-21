@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
       const metadata = lead.metadata || {}
       const servico = metadata.tipo_trabalho || lead.q1_tipo_trabalho || prof.specialty || 'serviço'
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://xn--faoporti-t0a.com'
       const isDay5 = days === 5
 
       await fetch('https://api.resend.com/emails', {

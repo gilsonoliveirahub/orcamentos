@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Notificar profissional se atribuído
     if (professional && lead) {
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'}/api/notifications/lead`, {
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://xn--faoporti-t0a.com'}/api/notifications/lead`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: lead.id }),

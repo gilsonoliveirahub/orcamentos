@@ -263,17 +263,18 @@ export default function MarketingPage() {
               <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[
-                  'Link profissional',
-                  'Até 50 pedidos por mês no teu link',
-                  'Follow-up automático',
-                  'Notificações WhatsApp',
-                  'PDF de orçamento',
-                  'Estatísticas avançadas',
-                  'Suporte prioritário',
-                  'Leads do marketplace a preço mais baixo',
+                  { label: 'Link profissional', soon: false },
+                  { label: 'Até 50 pedidos por mês no teu link', soon: false },
+                  { label: 'Follow-up automático', soon: false },
+                  { label: 'Notificações WhatsApp', soon: true },
+                  { label: 'PDF de orçamento', soon: true },
+                  { label: 'Estatísticas avançadas', soon: false },
+                  { label: 'Suporte prioritário', soon: false },
+                  { label: 'Leads do marketplace a preço mais baixo', soon: false },
                 ].map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-white/80 text-sm">
-                    <span className="text-[#c9a84c]">✓</span> {f}
+                  <li key={f.label} className="flex items-center gap-3 text-white/80 text-sm">
+                    <span className="text-[#c9a84c]">✓</span> {f.label}
+                    {f.soon && <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>em breve</span>}
                   </li>
                 ))}
               </ul>

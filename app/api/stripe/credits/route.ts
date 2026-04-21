@@ -27,10 +27,9 @@ export async function POST(req: NextRequest) {
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://xn--faoporti-t0a.com'
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       mode: 'payment',
       customer_email: prof.email,
       metadata: { professional_id: prof.id, credits: String(selectedPack.credits), type: 'credits' },
