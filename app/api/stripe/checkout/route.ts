@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
     const selectedPlan = PLANS[plan as keyof typeof PLANS]
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       mode: 'subscription',
       customer_email: prof.email,
       metadata: { professional_id: prof.id, plan },
