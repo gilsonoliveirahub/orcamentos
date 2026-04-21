@@ -1,4 +1,4 @@
-const FROM = 'onboarding@resend.dev'
+const FROM = 'noreply@xn--faoporti-t0a.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'
 
 async function sendEmail(to: string, subject: string, html: string) {
