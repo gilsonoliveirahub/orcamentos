@@ -19,14 +19,16 @@ export async function POST(req: NextRequest) {
 
     const professional = lead.professionals || {}
 
+    const area_paredes = lead.q3_area_m2 || 50
+    const area_tetos = lead.q8_teto ? Math.round(area_paredes * 0.3) : 0
     const quoteInput = {
-      area_m2: lead.q3_area_m2 || 50,
+      area_m2_paredes: area_paredes,
+      area_m2_tetos: area_tetos,
       tipo: (lead.q1_tipo_trabalho || 'interior') as 'interior' | 'exterior' | 'ambos',
       cor_escura: !!lead.q4_cor_escura,
       fissuras: !!lead.q5_fissuras,
       mobilias: !!lead.q6_mobilias,
       primer: !!lead.q7_primer,
-      teto: !!lead.q8_teto,
       prices: {
         price_m2_walls: professional.price_m2_walls || 4,
         price_m2_ceiling: professional.price_m2_ceiling || 5,
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       .upsert({
         lead_id: lead.id,
         professional_id: lead.professional_id,
-        area_m2: quoteInput.area_m2,
+        area_m2: area_paredes,
         valor_base: quoteResult.valor_base,
         extras_total: quoteResult.extras_total,
         valor_final: quoteResult.valor_final,

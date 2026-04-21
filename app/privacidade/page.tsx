@@ -20,7 +20,11 @@ export default function PrivacidadePage() {
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">1. Quem somos</h2>
-            <p>O FaçoPorTi é uma plataforma de gestão de leads e orçamentos para profissionais independentes em Portugal. O responsável pelo tratamento dos dados é o FaçoPorTi, contactável através de <a href="mailto:suporte@facoporti.pt" className="text-indigo-400 hover:underline">suporte@facoporti.pt</a>.</p>
+            <p className="mb-2">O FaçoPorTi é uma plataforma de gestão de leads e orçamentos para profissionais independentes em Portugal.</p>
+            <p className="mb-1"><strong className="text-white">Responsável pelo tratamento:</strong> Gilson Gomes de Oliveira</p>
+            <p className="mb-1"><strong className="text-white">NIF:</strong> 232 619 808</p>
+            <p className="mb-1"><strong className="text-white">Morada:</strong> Av. Embaixador Assis Chateaubriand, n.º 21, 2.º Direito, 2780-197 Oeiras, Lisboa, Portugal</p>
+            <p className="mt-2">Contacto: <a href="mailto:suporte@facoporti.pt" className="text-indigo-400 hover:underline">suporte@facoporti.pt</a></p>
           </section>
 
           <section>

@@ -38,17 +38,19 @@ export async function POST(req: NextRequest) {
       professional = data
     }
 
-    const isMarketplace = true
-    const hasCredits = (professional?.marketplace_credits ?? 0) > 0
-    const locked = professional ? !hasCredits : false
-
-    // Descontar crédito se tiver
-    if (professional && hasCredits) {
-      await supabaseAdmin
+    // Atomic decrement: só actualiza se marketplace_credits ainda for o valor lido (optimistic lock)
+    let hasCredits = false
+    if (professional && (professional.marketplace_credits ?? 0) > 0) {
+      const { data: deducted } = await supabaseAdmin
         .from('professionals')
         .update({ marketplace_credits: professional.marketplace_credits - 1 })
         .eq('id', professional.id)
+        .eq('marketplace_credits', professional.marketplace_credits)
+        .select('id')
+        .maybeSingle()
+      hasCredits = !!deducted
     }
+    const locked = professional ? !hasCredits : false
 
     const { data: lead, error } = await supabaseAdmin
       .from('leads')

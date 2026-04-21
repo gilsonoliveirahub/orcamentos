@@ -175,8 +175,8 @@ export default function PedirPage() {
             current={step}
             total={totalSteps}
             answer={answers[questions[step - 1].key]}
-            onAnswer={v => answerAndAdvance(questions[step - 1].key, v)}
-            onTextNext={v => answerText(questions[step - 1].key, v)}
+            onAnswer={(v: any) => answerAndAdvance(questions[step - 1].key, v)}
+            onTextNext={(v: any) => answerText(questions[step - 1].key, v)}
             onBack={goBack}
           />
         )}
@@ -454,7 +454,8 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
 
 // ── Contacto ──────────────────────────────────────────────────────────────────
 function ContactStep({ name, phone, email, submitting, onNameChange, onPhoneChange, onEmailChange, onBack, onSubmit }: any) {
-  const ready = name.trim().length > 1 && phone.trim().length >= 9
+  const [rgpd, setRgpd] = useState(false)
+  const ready = name.trim().length > 1 && phone.trim().length >= 9 && rgpd
   return (
     <div>
       <h2 className="text-xl font-black text-white mb-2">Quase pronto!</h2>
@@ -478,6 +479,17 @@ function ContactStep({ name, phone, email, submitting, onNameChange, onPhoneChan
             className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
         </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={rgpd} onChange={e => setRgpd(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+          <span className="text-xs text-gray-400">
+            Aceito a{' '}
+            <Link href="/privacidade" target="_blank" className="text-indigo-400 underline hover:text-indigo-300">
+              Política de Privacidade
+            </Link>
+            {' '}e consinto o tratamento dos meus dados pessoais para receber um orçamento.
+          </span>
+        </label>
       </div>
       <button onClick={onSubmit} disabled={!ready || submitting}
         className="w-full mt-6 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"

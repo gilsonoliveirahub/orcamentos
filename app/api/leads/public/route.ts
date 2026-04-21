@@ -16,18 +16,20 @@ export async function POST(req: NextRequest) {
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
 
-    // Lead do marketplace — verificar créditos
+    // Lead do marketplace — atomic decrement para evitar race condition
     const isMarketplace = source === 'marketplace'
-    const hasCredits = (prof.marketplace_credits ?? 0) > 0
-    const locked = isMarketplace && !hasCredits
-
-    // Se tem créditos, descontar 1
-    if (isMarketplace && hasCredits) {
-      await supabaseAdmin
+    let hasCredits = false
+    if (isMarketplace && (prof.marketplace_credits ?? 0) > 0) {
+      const { data: deducted } = await supabaseAdmin
         .from('professionals')
         .update({ marketplace_credits: prof.marketplace_credits - 1 })
         .eq('id', professional_id)
+        .eq('marketplace_credits', prof.marketplace_credits)
+        .select('id')
+        .maybeSingle()
+      hasCredits = !!deducted
     }
+    const locked = isMarketplace && !hasCredits
 
     const { data: lead, error } = await supabaseAdmin
       .from('leads')

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2 } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { getProfession, mapAnswersToLeadFields, calcPaintingAreas, type Question } from '@/lib/professions'
@@ -127,7 +128,7 @@ export default function ProfessionalPublicPage() {
         await supabase.from('quotes').insert({
           lead_id: lead.id,
           professional_id: professional.id,
-          area_m2: quoteInput.area_m2,
+          area_m2: quoteInput.area_m2_paredes,
           valor_base: quoteResult.valor_base,
           extras_total: quoteResult.extras_total,
           valor_final: quoteResult.valor_final,
@@ -619,7 +620,8 @@ function ContactStep({
   onBack: () => void
   onSubmit: () => void
 }) {
-  const ready = name.trim().length > 1 && phone.trim().length >= 9
+  const [rgpd, setRgpd] = useState(false)
+  const ready = name.trim().length > 1 && phone.trim().length >= 9 && rgpd
 
   return (
     <div>
@@ -659,6 +661,17 @@ function ContactStep({
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
         </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={rgpd} onChange={e => setRgpd(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+          <span className="text-xs text-gray-400">
+            Aceito a{' '}
+            <Link href="/privacidade" target="_blank" className="text-indigo-400 underline hover:text-indigo-300">
+              Política de Privacidade
+            </Link>
+            {' '}e consinto o tratamento dos meus dados pessoais para receber um orçamento.
+          </span>
+        </label>
       </div>
       <button
         onClick={onSubmit}
