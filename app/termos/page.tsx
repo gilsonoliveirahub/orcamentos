@@ -131,6 +131,7 @@ export default function TermosPage() {
           <p className="text-sm text-gray-600">© 2026 FaçoPorTi</p>
           <div className="flex gap-6">
             <Link href="/privacidade" className="text-sm text-gray-600 hover:text-white transition-colors">Privacidade</Link>
+            <Link href="/cookies" className="text-sm text-gray-600 hover:text-white transition-colors">Cookies</Link>
             <Link href="/termos" className="text-sm text-gray-600 hover:text-white transition-colors">Termos</Link>
           </div>
         </div>
