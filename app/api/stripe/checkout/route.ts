@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
 
 const PLANS = {
-  starter: { amount: 1900, name: 'FaçoPorTi Starter', description: 'Até 10 leads/mês, link pessoal, orçamentos automáticos' },
-  pro: { amount: 4900, name: 'FaçoPorTi Pro', description: 'Leads ilimitados, follow-up automático, PDF de orçamento, estatísticas avançadas' },
+  starter: { priceId: 'price_1TOgCOLOUpiyyJOUFgMHL8Vx' },
+  pro:     { priceId: 'price_1TOgDPLOUpiyyJOUu2ajrTnl' },
 }
 
 export async function POST(req: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
     const selectedPlan = PLANS[plan as keyof typeof PLANS]
 
     const session = await stripe.checkout.sessions.create({
@@ -35,20 +35,7 @@ export async function POST(req: NextRequest) {
       mode: 'subscription',
       customer_email: prof.email,
       metadata: { professional_id: prof.id, plan },
-      line_items: [
-        {
-          price_data: {
-            currency: 'eur',
-            recurring: { interval: 'month' },
-            product_data: {
-              name: selectedPlan.name,
-              description: selectedPlan.description,
-            },
-            unit_amount: selectedPlan.amount,
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: selectedPlan.priceId, quantity: 1 }],
       success_url: `${appUrl}/upgrade?success=1`,
       cancel_url: `${appUrl}/upgrade?cancelled=1`,
     })
