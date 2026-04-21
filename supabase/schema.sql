@@ -115,6 +115,9 @@ alter table professionals add column if not exists active      boolean default t
 alter table professionals add column if not exists plan        text default 'free';
 alter table professionals add column if not exists trial_ends_at timestamptz;
 alter table professionals add column if not exists updated_at  timestamptz default now();
+alter table professionals add column if not exists stripe_customer_id     text;
+alter table professionals add column if not exists stripe_subscription_id text;
+alter table professionals add column if not exists marketplace_credits    integer default 0;
 
 alter table leads add column if not exists metadata jsonb default '{}';
 
