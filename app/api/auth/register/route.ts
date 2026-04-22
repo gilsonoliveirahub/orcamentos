@@ -38,6 +38,13 @@ export async function POST(req: NextRequest) {
       emailBoasVindas({ name, email, slug }).catch(() => {})
 
       if (!SPECIALTY_LIST.includes(specialty)) {
+        // Gera perguntas via Claude e notifica admin
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        fetch(`${baseUrl}/api/professions/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ specialty }),
+        }).catch(() => {})
         emailNovaProfissao({ profName: name, profEmail: email, specialty, slug }).catch(() => {})
       }
     } else {

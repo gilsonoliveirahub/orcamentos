@@ -6,12 +6,13 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2 } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
-import { getProfession, mapAnswersToLeadFields, calcPaintingAreas, type Question } from '@/lib/professions'
+import { getProfession, PROFESSIONS, mapAnswersToLeadFields, calcPaintingAreas, type Question, type ProfessionConfig } from '@/lib/professions'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
   const source = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ref') === 'marketplace' ? 'marketplace' : 'pessoal'
   const [professional, setProfessional] = useState<any>(null)
+  const [profession, setProfession] = useState<ProfessionConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0) // 0 = intro, 1..N = perguntas, N+1 = media, N+2 = contacto
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -29,7 +30,37 @@ export default function ProfessionalPublicPage() {
       .eq('slug', slug)
       .eq('active', true)
       .maybeSingle()
-      .then(({ data }) => { setProfessional(data); setLoading(false) })
+      .then(async ({ data: prof }) => {
+        if (!prof) { setLoading(false); return }
+        setProfessional(prof)
+
+        if (PROFESSIONS[prof.specialty]) {
+          setProfession(getProfession(prof.specialty))
+          setLoading(false)
+        } else {
+          // Profissão personalizada — carrega config gerada (ou gera agora)
+          const { data: row } = await supabase
+            .from('profession_configs')
+            .select('config')
+            .eq('specialty', prof.specialty)
+            .maybeSingle()
+
+          if (row?.config) {
+            setProfession(row.config as ProfessionConfig)
+          } else {
+            // Ainda não foi gerada — pede geração e usa genérico enquanto aguarda
+            fetch('/api/professions/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ specialty: prof.specialty }),
+            }).then(r => r.json()).then(({ config }) => {
+              if (config) setProfession(config)
+            }).catch(() => {})
+            setProfession(getProfession(prof.specialty)) // fallback genérico
+          }
+          setLoading(false)
+        }
+      })
   }, [slug])
 
   if (loading) return (
@@ -38,7 +69,7 @@ export default function ProfessionalPublicPage() {
     </div>
   )
 
-  if (!professional) return (
+  if (!professional || !profession) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
       <div className="text-center">
         <div className="text-5xl mb-4">😕</div>
@@ -47,8 +78,6 @@ export default function ProfessionalPublicPage() {
       </div>
     </div>
   )
-
-  const profession = getProfession(professional.specialty)
   const allQuestions = profession.questions
   function filterQuestions(ans: Record<string, any>) {
     return allQuestions.filter(q => {
