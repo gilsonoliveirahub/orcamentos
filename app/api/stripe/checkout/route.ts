@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
 
 const PLANS = {
-  starter: { priceId: 'price_1TOgpYLFTn4mze6d8vw4uqmZ' },
-  pro:     { priceId: 'price_1TOgpcLFTn4mze6doVsdAt1O' },
+  starter: { priceId: 'price_1TPAO4LFTn4mze6d70qkDWAj' },
+  pro:     { priceId: 'price_1TPAOELFTn4mze6dDaYx6snk' },
 }
 
 export async function POST(req: NextRequest) {
