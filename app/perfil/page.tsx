@@ -41,7 +41,7 @@ export default function PerfilPage() {
       phone: form.phone,
       specialty: form.specialty,
       zone: form.zone,
-      bio: form.bio,
+      description: form.description,
     }).eq('id', professional.id)
     setSaving(false)
     setSaved(true)
@@ -139,7 +139,7 @@ export default function PerfilPage() {
 
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Sobre mim</label>
-            <textarea value={form.bio} onChange={e => setForm(p => ({ ...p, bio: e.target.value }))}
+            <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
               placeholder="Descreve o teu trabalho, experiência, especialidades..."
               rows={3} className={inp} style={ist} />
           </div>
