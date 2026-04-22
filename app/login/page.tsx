@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Briefcase, Eye, EyeOff } from 'lucide-react'
+import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 
 export default function LoginPage() {
   const [tab, setTab] = useState<'login' | 'register'>('login')
@@ -154,18 +155,9 @@ export default function LoginPage() {
                   <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Especialidade</label>
                   <select value={specialty} onChange={e => setSpecialty(e.target.value)}
                     className={inputClass} style={inputStyle}>
-                    <option>Pintura</option>
-                    <option>Limpeza</option>
-                    <option>Electricidade</option>
-                    <option>Canalização</option>
-                    <option>Carpintaria</option>
-                    <option>Jardinagem</option>
-                    <option>Mudanças</option>
-                    <option>Remodelação</option>
-                    <option>Estuque e Pladur</option>
-                    <option>Pavimentos de Madeira</option>
-                    <option>Ar Condicionado</option>
-                    <option>Outro</option>
+                    {SPECIALTY_LIST.map(s => (
+                      <option key={s} value={s}>{PROFESSIONS[s].label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

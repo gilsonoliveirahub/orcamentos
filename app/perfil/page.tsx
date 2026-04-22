@@ -5,8 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings } from 'lucide-react'
 import Link from 'next/link'
-
-const SPECIALTIES = ['Pintura', 'Electricidade', 'Canalização', 'Carpintaria', 'Jardinagem', 'Mudanças', 'Limpeza', 'Remodelação', 'Outro']
+import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 
 export default function PerfilPage() {
   const router = useRouter()
@@ -15,7 +14,7 @@ export default function PerfilPage() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
-  const [form, setForm] = useState({ name: '', phone: '', specialty: 'Pintura', zone: '', bio: '' })
+  const [form, setForm] = useState({ name: '', phone: '', specialty: 'Pintura', zone: '', description: '' })
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -28,7 +27,7 @@ export default function PerfilPage() {
         phone: prof.phone || '',
         specialty: prof.specialty || 'Pintura',
         zone: prof.zone || '',
-        bio: prof.bio || '',
+        description: prof.description || '',
       })
       setLoading(false)
     })
@@ -128,7 +127,7 @@ export default function PerfilPage() {
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Especialidade</label>
               <select value={form.specialty} onChange={e => setForm(p => ({ ...p, specialty: e.target.value }))}
                 className={inp} style={ist}>
-                {SPECIALTIES.map(s => <option key={s}>{s}</option>)}
+                {SPECIALTY_LIST.map(s => <option key={s} value={s}>{PROFESSIONS[s].label}</option>)}
               </select>
             </div>
             <div>
@@ -163,7 +162,7 @@ export default function PerfilPage() {
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Estado</span>
               <span className={professional.active ? 'text-green-400' : 'text-red-400'}>
-                {professional.active ? 'Activo' : 'Inactivo'}
+                {professional.active ? 'Ativo' : 'Inativo'}
               </span>
             </div>
             <div className="flex justify-between text-sm">
