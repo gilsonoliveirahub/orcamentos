@@ -7,9 +7,10 @@ export const dynamic = 'force-dynamic'
 // Finds leads that are 2 or 5 days old and still active, sends follow-up email to professional
 
 export async function GET(req: NextRequest) {
-  // Simple auth: require secret header
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const cronSecret = process.env.CRON_SECRET
+  const header = req.headers.get('authorization') || req.headers.get('x-cron-secret') || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : header
+  if (cronSecret && token !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
         body: JSON.stringify({
-          from: 'FaçoPorTi <onboarding@resend.dev>',
+          from: 'FaçoPorTi <noreply@xn--faoporti-t0a.com>',
           to: [prof.email],
           subject: isDay5
             ? `⚠️ Lead fria há 5 dias — ${lead.name || 'Cliente'}`
