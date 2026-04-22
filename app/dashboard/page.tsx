@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const COLUMNS = [
@@ -232,9 +232,9 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   const inputStyle = { background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.08)' }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl"
+      <div className="w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl"
         style={{ background: '#13152a', border: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex items-center justify-between p-6"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -249,8 +249,8 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nome</label>
               <input value={form.name} onChange={e => set('name', e.target.value)}
@@ -263,7 +263,7 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Tipo</label>
               <select value={form.q1_tipo_trabalho} onChange={e => set('q1_tipo_trabalho', e.target.value)}
@@ -338,6 +338,7 @@ export default function Dashboard() {
   const [showModal, setShowModal] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
   const [copied, setCopied] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -412,8 +413,9 @@ export default function Dashboard() {
 
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="px-6 py-4 flex items-center justify-between">
 
+        {/* Desktop header */}
+        <div className="hidden md:flex px-6 py-4 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -427,7 +429,7 @@ export default function Dashboard() {
           </div>
 
           {/* KPIs */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="flex items-center gap-2">
             {[
               { icon: <User size={13} />, value: totalLeads, label: 'Leads', color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
               { icon: <TrendingUp size={13} />, value: totalOrcamentos, label: 'Orçamentos', color: '#c084fc', bg: 'rgba(192,132,252,0.1)' },
@@ -491,6 +493,84 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Mobile header */}
+        <div className="flex md:hidden px-4 py-3 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+              <Briefcase size={16} className="text-white" />
+            </div>
+            <h1 className="text-base font-black text-white">Faço<span style={{ color: '#818cf8' }}>Por</span>Ti</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 text-white font-bold text-xs px-3 py-2 rounded-xl"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+              <Plus size={13} /> Novo Lead
+            </button>
+            <button onClick={() => setMobileMenuOpen(o => !o)}
+              className="p-2 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden px-4 pb-4 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {/* KPIs */}
+            <div className="flex items-center gap-2 py-3 overflow-x-auto">
+              {[
+                { icon: <User size={12} />, value: totalLeads, label: 'Leads', color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
+                { icon: <TrendingUp size={12} />, value: totalOrcamentos, label: 'Orçamentos', color: '#c084fc', bg: 'rgba(192,132,252,0.1)' },
+                { icon: <CheckCircle size={12} />, value: totalFechado, label: 'Fechados', color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
+                ...(faturacao > 0 ? [{ icon: <Euro size={12} />, value: `€${Math.round(faturacao)}`, label: 'Faturado', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' }] : []),
+              ].map((kpi, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl flex-shrink-0"
+                  style={{ background: kpi.bg, border: `1px solid ${kpi.color}20` }}>
+                  <span style={{ color: kpi.color }}>{kpi.icon}</span>
+                  <div>
+                    <div className="text-sm font-black text-white leading-tight">{kpi.value}</div>
+                    <div className="text-xs leading-tight" style={{ color: kpi.color + 'aa' }}>{kpi.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Link */}
+            {professional?.slug && (
+              <button onClick={() => { copyLink(); setMobileMenuOpen(false) }}
+                className="flex items-center gap-2 text-sm font-bold px-4 py-3 rounded-xl w-full"
+                style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818cf8', border: `1px solid ${copied ? '#34d39930' : '#6366f130'}` }}>
+                <Link2 size={14} /> {copied ? 'Copiado!' : 'Copiar meu link'}
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <a href="/acordos" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                📋 Acordos
+              </a>
+              <a href="/stats" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <BarChart2 size={14} /> Stats
+              </a>
+              <a href="/config" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                ⚙️ Preços
+              </a>
+              <a href="/perfil" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                👤 Perfil
+              </a>
+            </div>
+            <button onClick={handleLogout}
+              className="flex items-center justify-center gap-2 text-sm px-3 py-3 rounded-xl"
+              style={{ color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)' }}>
+              <LogOut size={14} /> Sair da conta
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Banner trial */}
@@ -498,12 +578,12 @@ export default function Dashboard() {
         const days = Math.max(0, Math.ceil((new Date(professional.trial_ends_at).getTime() - Date.now()) / 86400000))
         if (days > 3 || professional?.plan === 'pro') return null
         return (
-          <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-xl"
+          <div className="mx-3 md:mx-6 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-3 rounded-xl"
             style={{ background: days === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(201,168,76,0.08)', border: `1px solid ${days === 0 ? 'rgba(239,68,68,0.2)' : 'rgba(201,168,76,0.2)'}` }}>
             <span className="text-sm font-semibold" style={{ color: days === 0 ? '#f87171' : '#c9a84c' }}>
               {days === 0 ? '⚠️ Trial expirado — limitado a 10 leads' : `⚡ Trial: ${days} dia${days !== 1 ? 's' : ''} restante${days !== 1 ? 's' : ''}`}
             </span>
-            <a href="/upgrade" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors"
+            <a href="/upgrade" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors self-start sm:self-auto"
               style={{ background: days === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(201,168,76,0.15)', color: days === 0 ? '#f87171' : '#c9a84c' }}>
               Upgrade →
             </a>
@@ -513,15 +593,15 @@ export default function Dashboard() {
 
       {/* Banner créditos marketplace */}
       {professional && (
-        <div className="mx-6 mt-4 flex items-center justify-between px-4 py-3 rounded-xl"
+        <div className="mx-3 md:mx-6 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-3 rounded-xl"
           style={{ background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)' }}>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-white">
               🏪 Créditos marketplace: <span style={{ color: '#c9a84c' }}>{professional.marketplace_credits ?? 0}</span>
             </span>
             <span className="text-xs text-gray-500">· leads que chegam pelo site</span>
           </div>
-          <a href="/creditos" className="text-xs font-black px-4 py-2 rounded-lg transition-colors"
+          <a href="/creditos" className="text-xs font-black px-4 py-2 rounded-lg transition-colors self-start sm:self-auto"
             style={{ background: '#c9a84c', color: '#000' }}>
             Comprar créditos
           </a>
@@ -530,7 +610,7 @@ export default function Dashboard() {
 
       {/* Potencial */}
       {potencial > 0 && (
-        <div className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3"
+        <div className="mx-3 md:mx-6 mt-3 px-4 py-3 rounded-xl flex items-center gap-3"
           style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
           <TrendingUp size={15} style={{ color: '#34d399' }} />
           <span className="text-sm font-semibold" style={{ color: '#34d399' }}>
@@ -540,7 +620,7 @@ export default function Dashboard() {
       )}
 
       {/* Pipeline */}
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         {loading ? (
           <div className="flex items-center justify-center py-32">
             <div className="text-center">

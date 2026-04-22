@@ -1,25 +1,57 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function MarketingPage() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white font-sans">
 
       {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
-        <span className="text-xl font-semibold tracking-tight">
-          Faço<span className="text-[#c9a84c]">PorTi</span>
-        </span>
-        <div className="flex items-center gap-6">
-          <a href="#como-funciona" className="text-sm text-white/60 hover:text-white transition-colors">Como funciona</a>
-          <a href="#precos" className="text-sm text-white/60 hover:text-white transition-colors">Preços</a>
-          <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Entrar</Link>
-          <Link href="/pedir" className="text-sm text-white/60 hover:text-white transition-colors border border-white/20 px-4 py-2 rounded-full hover:border-white/40 transition-colors">
-            Pedir orçamento
-          </Link>
-          <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
-            Criar conta
-          </Link>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
+        <div className="flex items-center justify-between px-5 md:px-8 py-4 md:py-5">
+          <span className="text-xl font-semibold tracking-tight">
+            Faço<span className="text-[#c9a84c]">PorTi</span>
+          </span>
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-6">
+            <a href="#como-funciona" className="text-sm text-white/60 hover:text-white transition-colors">Como funciona</a>
+            <a href="#precos" className="text-sm text-white/60 hover:text-white transition-colors">Preços</a>
+            <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Entrar</Link>
+            <Link href="/pedir" className="text-sm text-white/60 hover:text-white transition-colors border border-white/20 px-4 py-2 rounded-full hover:border-white/40 transition-colors">
+              Pedir orçamento
+            </Link>
+            <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
+              Criar conta
+            </Link>
+          </div>
+          {/* Mobile nav toggle */}
+          <div className="flex md:hidden items-center gap-3">
+            <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full">
+              Criar conta
+            </Link>
+            <button onClick={() => setMobileNavOpen(o => !o)}
+              className="flex flex-col gap-1.5 p-1"
+              aria-label="Menu">
+              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? 'rotate-45 translate-y-2' : ''}`} />
+              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? 'opacity-0' : ''}`} />
+              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+            </button>
+          </div>
         </div>
+        {/* Mobile menu */}
+        {mobileNavOpen && (
+          <div className="md:hidden flex flex-col px-5 pb-5 gap-3 border-t border-white/5">
+            <a href="#como-funciona" onClick={() => setMobileNavOpen(false)}
+              className="text-sm text-white/70 py-3 border-b border-white/5">Como funciona</a>
+            <a href="#precos" onClick={() => setMobileNavOpen(false)}
+              className="text-sm text-white/70 py-3 border-b border-white/5">Preços</a>
+            <Link href="/pedir" className="text-sm text-white/70 py-3 border-b border-white/5">Pedir orçamento</Link>
+            <Link href="/login" className="text-sm text-white/70 py-3">Entrar</Link>
+          </div>
+        )}
       </nav>
 
       {/* HERO */}
