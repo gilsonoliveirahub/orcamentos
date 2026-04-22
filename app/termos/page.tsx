@@ -51,7 +51,7 @@ export default function TermosPage() {
             <p className="mb-3">O FaçoPorTi oferece os seguintes planos pagos para profissionais:</p>
             <ul className="space-y-2 list-disc list-inside mb-3">
               <li><strong className="text-white">Starter — €19/mês:</strong> acesso à plataforma com funcionalidades base</li>
-              <li><strong className="text-white">Pro — €49/mês:</strong> acesso completo com funcionalidades avançadas</li>
+              <li><strong className="text-white">Pro — €39/mês:</strong> acesso completo com funcionalidades avançadas</li>
             </ul>
             <p className="mb-3">Os pagamentos são processados pela Stripe de forma segura. As subscrições são cobradas mensalmente e renovadas automaticamente até cancelamento.</p>
             <p>Adicionalmente, estão disponíveis pacotes de créditos para desbloquear leads do marketplace, adquiridos separadamente através de pagamento único.</p>

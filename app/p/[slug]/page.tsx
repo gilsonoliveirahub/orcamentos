@@ -215,7 +215,7 @@ export default function ProfessionalPublicPage() {
               <h1 className="text-xl font-black text-white">{professional.name}</h1>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <span className="flex items-center gap-1 text-xs" style={{ color: '#818cf8' }}>
-                  <Briefcase size={11} /> {professional.specialty}
+                  <Briefcase size={11} /> {profession.label}
                 </span>
                 {professional.zone && (
                   <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -242,9 +242,9 @@ export default function ProfessionalPublicPage() {
             </p>
             <div className="space-y-3 mb-8">
               {[
-                `${profession.emoji} ${professional.specialty} — especialista verificado`,
+                `${profession.emoji} ${profession.label} — especialista verificado`,
                 '⚡ Menos de 2 minutos',
-                '📱 Contacto directo via WhatsApp',
+                '📱 Contacto direto via WhatsApp',
               ].map(item => (
                 <div key={item} className="flex items-center gap-3 text-sm text-gray-300">{item}</div>
               ))}

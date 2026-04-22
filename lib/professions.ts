@@ -42,7 +42,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
 
   Electricidade: {
     emoji: '⚡',
-    label: 'Electricidade',
+    label: 'Eletricidade',
     questions: [
       { key: 'tipo_trabalho', text: 'Que tipo de trabalho elétrico precisa?', type: 'choice', options: ['Reparação / Avaria', 'Nova instalação', 'Tomadas / Interruptores', 'Quadro elétrico', 'Iluminação', 'Outro'] },
       { key: 'num_pontos', text: 'Quantos pontos elétricos (tomadas, interruptores, luzes)?', type: 'choice', options: ['1 a 3', '4 a 10', '11 a 20', 'Mais de 20', 'Não sei'] },
@@ -78,7 +78,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'area_m2', text: 'Área total (m²)? — para soalho ou deck', type: 'number', placeholder: 'ex: 20', unit: 'm²', optional: true },
       { key: 'material', text: 'Preferência de material?', type: 'choice', options: ['Madeira maciça', 'MDF lacado', 'MDF melamina', 'Contraplacado', 'Sem preferência'] },
       { key: 'acabamento', text: 'Acabamento pretendido?', type: 'choice', options: ['Natural / Envernizado', 'Lacado a cor (branco ou outro)', 'Oleado', 'Sem preferência'] },
-      { key: 'tem_medidas', text: 'Tem as medidas definidas?', type: 'choice', options: ['Sim, tenho medidas exactas', 'Tenho ideia aproximada', 'Preciso de medição no local'] },
+      { key: 'tem_medidas', text: 'Tem as medidas definidas?', type: 'choice', options: ['Sim, tenho medidas exatas', 'Tenho ideia aproximada', 'Preciso de medição no local'] },
       { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
       { key: 'notas', text: 'Descreva o que precisa', type: 'text', placeholder: 'Ex: roupeiro de 3m com portas deslizantes, interior com prateleiras e gavetas...', minLength: 20, optional: true },
     ],

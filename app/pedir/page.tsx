@@ -128,8 +128,8 @@ export default function PedirPage() {
           <div>
             <h1 className="text-xl font-black text-white">
               {phase === 'profissao' && 'De que serviço precisa?'}
-              {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
-              {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${specialty}`}
+              {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
+              {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
               {phase === 'media' && 'Fotos e/ou vídeos'}
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
