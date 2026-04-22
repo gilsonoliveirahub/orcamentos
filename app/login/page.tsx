@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [specialty, setSpecialty] = useState('Pintura')
+  const [customSpecialty, setCustomSpecialty] = useState('')
   const [zone, setZone] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
@@ -51,7 +52,7 @@ export default function LoginPage() {
     await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: data.user.id, role, name, email, phone, specialty, zone }),
+      body: JSON.stringify({ user_id: data.user.id, role, name, email, phone, specialty: specialty === 'Outro' ? customSpecialty.trim() : specialty, zone }),
     })
 
     if (role === 'professional') {
@@ -153,12 +154,23 @@ export default function LoginPage() {
               <>
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Especialidade</label>
-                  <select value={specialty} onChange={e => setSpecialty(e.target.value)}
+                  <select value={specialty} onChange={e => { setSpecialty(e.target.value); setCustomSpecialty('') }}
                     className={inputClass} style={inputStyle}>
                     {SPECIALTY_LIST.map(s => (
                       <option key={s} value={s}>{PROFESSIONS[s].label}</option>
                     ))}
+                    <option value="Outro">Outra profissão</option>
                   </select>
+                  {specialty === 'Outro' && (
+                    <input
+                      required
+                      value={customSpecialty}
+                      onChange={e => setCustomSpecialty(e.target.value)}
+                      placeholder="ex: Editor de Vídeo, Designer, Fotógrafo..."
+                      className={inputClass}
+                      style={{ ...inputStyle, marginTop: '8px' }}
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Zona de trabalho</label>

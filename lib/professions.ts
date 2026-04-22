@@ -217,8 +217,18 @@ export const SPECIALTY_LIST = [
   'Mudanças',
 ]
 
+const GENERIC_PROFESSION: ProfessionConfig = {
+  emoji: '💼',
+  label: 'Outro',
+  questions: [
+    { key: 'tipo_trabalho', text: 'Que serviço precisa?', type: 'text', placeholder: 'Descreva brevemente o que precisa...', minLength: 10 },
+    { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
+    { key: 'notas', text: 'Mais detalhes sobre o trabalho', type: 'text', placeholder: 'Quanto mais detalhe der, mais preciso será o orçamento...', minLength: 20, optional: true },
+  ],
+}
+
 export function getProfession(specialty: string): ProfessionConfig {
-  return PROFESSIONS[specialty] || PROFESSIONS['Pintura']
+  return PROFESSIONS[specialty] || GENERIC_PROFESSION
 }
 
 /** Calcula áreas de pintura a partir das divisões e altura */

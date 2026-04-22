@@ -113,6 +113,47 @@ export async function emailBoasVindas({
   `))
 }
 
+// ── Nova profissão desconhecida (notificação admin) ───────────────────────────
+export async function emailNovaProfissao({
+  profName, profEmail, specialty, slug,
+}: {
+  profName: string; profEmail: string; specialty: string; slug: string
+}) {
+  const ADMIN_EMAIL = 'gilsongomesoliveira1@hotmail.com'
+  await sendEmail(ADMIN_EMAIL, `🆕 Nova profissão não suportada — ${specialty}`, wrap(`
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px 32px">
+      <h2 style="margin:0;color:#000;font-size:20px">🆕 Nova profissão registada!</h2>
+      <p style="margin:4px 0 0;color:rgba(0,0,0,0.6);font-size:14px">Profissão fora da lista — avaliar implementação</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 20px">Um novo profissional registou-se com uma profissão não suportada:</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Nome</td>
+          <td style="padding:10px;font-weight:bold;color:#fff">${profName}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;color:#64748b;font-size:13px">Email</td>
+          <td style="padding:10px;color:#818cf8">${profEmail}</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Profissão pedida</td>
+          <td style="padding:10px;font-weight:bold;font-size:16px" style="color:#f59e0b">${specialty}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;color:#64748b;font-size:13px">Link público</td>
+          <td style="padding:10px;color:#818cf8">${APP_URL}/p/${slug}</td>
+        </tr>
+      </table>
+      <p style="color:#64748b;font-size:13px">O profissional está a usar o formulário genérico até implementares perguntas específicas para esta área.</p>
+      <a href="${APP_URL}/admin"
+        style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Ver no admin →
+      </a>
+    </div>
+  `))
+}
+
 // ── Lead desbloqueado ─────────────────────────────────────────────────────────
 export async function emailLeadDesbloqueado({
   profName, profEmail, leadName, leadPhone, leadEmail, leadId,

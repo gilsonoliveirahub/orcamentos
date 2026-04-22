@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { emailBoasVindas } from '@/lib/email'
+import { emailBoasVindas, emailNovaProfissao } from '@/lib/email'
+import { SPECIALTY_LIST } from '@/lib/professions'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
       emailBoasVindas({ name, email, slug }).catch(() => {})
+
+      if (!SPECIALTY_LIST.includes(specialty)) {
+        emailNovaProfissao({ profName: name, profEmail: email, specialty, slug }).catch(() => {})
+      }
     } else {
       const { error } = await supabaseAdmin.from('clients').insert({
         user_id,
