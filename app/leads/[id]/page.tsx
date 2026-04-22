@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
+import { PROFESSIONS } from '@/lib/professions'
 
 // Legacy paint fields
 const PAINT_LABELS: Record<string, string> = {
@@ -146,7 +147,7 @@ export default function LeadDetail() {
             <h1 className="text-lg font-black text-white">{lead.name || 'Sem nome'}</h1>
             <p className="text-gray-500 text-xs flex items-center gap-1">
               <Phone size={11} /> {lead.phone} · {new Date(lead.created_at).toLocaleDateString('pt-PT')}
-              {specialty && <span className="ml-1 text-indigo-400">· {specialty}</span>}
+              {specialty && <span className="ml-1 text-indigo-400">· {PROFESSIONS[specialty]?.label || specialty}</span>}
             </p>
           </div>
           <a
@@ -203,14 +204,15 @@ export default function LeadDetail() {
           <div className="rounded-2xl p-5" style={cardStyle}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-400">Orçamento Gerado</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <a
                   href={`/quotes/${quote.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
                 >
-                  <FileDown size={12} /> PDF
+                  <FileDown size={12} /> Descarregar PDF
                 </a>
                 <button
                   onClick={handleGenerateQuote}
