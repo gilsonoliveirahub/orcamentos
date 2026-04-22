@@ -1,18 +1,40 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Eye, EyeOff, CheckCircle, LogOut } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, CheckCircle, LogOut, CreditCard } from 'lucide-react'
 
 export default function ContaPage() {
   const router = useRouter()
+  const [professional, setProfessional] = useState<any>(null)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase.from('professionals').select('id, stripe_customer_id, plan').eq('user_id', user.id).maybeSingle()
+      if (data) setProfessional(data)
+    })
+  }, [])
+
+  async function handlePortal() {
+    setOpeningPortal(true)
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ professional_id: professional.id }),
+    })
+    const { url, error } = await res.json()
+    if (url) window.location.href = url
+    else { alert(error || 'Erro ao abrir portal'); setOpeningPortal(false) }
+  }
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
@@ -88,6 +110,18 @@ export default function ContaPage() {
             {loading ? 'A guardar...' : 'Actualizar password'}
           </button>
         </form>
+
+        {/* Subscrição */}
+        {professional?.stripe_customer_id && (
+          <div className="rounded-2xl p-6" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <h2 className="font-black text-white mb-4">Subscrição</h2>
+            <button onClick={handlePortal} disabled={openingPortal}
+              className="flex items-center gap-2 text-sm font-bold px-4 py-3 rounded-xl transition-all"
+              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)', opacity: openingPortal ? 0.6 : 1 }}>
+              <CreditCard size={15} /> {openingPortal ? 'A abrir...' : 'Gerir subscrição · Faturas · Cancelar'}
+            </button>
+          </div>
+        )}
 
         {/* Sair */}
         <div className="rounded-2xl p-6" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>

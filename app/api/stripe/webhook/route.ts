@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
     const professional_id = session.metadata?.professional_id
 
     if (professional_id) {
-      // Compra de créditos
       if (session.metadata?.type === 'credits') {
         const credits = parseInt(session.metadata.credits || '0')
         const { data: prof } = await supabaseAdmin
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
           .update({ marketplace_credits: (prof?.marketplace_credits || 0) + credits })
           .eq('id', professional_id)
       } else {
-        // Subscrição
         const plan = session.metadata?.plan || 'starter'
         await supabaseAdmin
           .from('professionals')
@@ -52,6 +50,32 @@ export async function POST(req: NextRequest) {
           })
           .eq('id', professional_id)
       }
+    }
+  }
+
+  // Renovação mensal confirmada — mantém plano ativo
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object as Stripe.Invoice
+    const subId = (invoice as any).subscription as string | null
+    if (subId) {
+      const sub = await stripe.subscriptions.retrieve(subId)
+      const plan = sub.metadata?.plan || (sub.items.data[0]?.price?.id === 'price_1TOgpcLFTn4mze6doVsdAt1O' ? 'pro' : 'starter')
+      await supabaseAdmin
+        .from('professionals')
+        .update({ plan })
+        .eq('stripe_subscription_id', subId)
+    }
+  }
+
+  // Pagamento falhado — desativa plano
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice
+    const subId = (invoice as any).subscription as string | null
+    if (subId) {
+      await supabaseAdmin
+        .from('professionals')
+        .update({ plan: 'inactive' })
+        .eq('stripe_subscription_id', subId)
     }
   }
 

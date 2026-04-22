@@ -10,6 +10,7 @@ export default function UpgradePage() {
   const [professional, setProfessional] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState<string | null>(null)
+  const [openingPortal, setOpeningPortal] = useState(false)
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const success = searchParams?.get('success') === '1'
@@ -23,6 +24,18 @@ export default function UpgradePage() {
       setLoading(false)
     })
   }, [router])
+
+  const handlePortal = async () => {
+    setOpeningPortal(true)
+    const res = await fetch('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ professional_id: professional.id }),
+    })
+    const { url, error } = await res.json()
+    if (url) window.location.href = url
+    else { alert(error || 'Erro ao abrir portal'); setOpeningPortal(false) }
+  }
 
   const handleCheckout = async (plan: 'starter' | 'pro') => {
     setPaying(plan)
@@ -155,6 +168,19 @@ export default function UpgradePage() {
         <p className="text-center text-xs text-gray-600 mt-6">
           Sem contrato · Cancela a qualquer momento · Pagamento seguro via Stripe
         </p>
+
+        {/* Portal de gestão — só aparece se já tem subscrição */}
+        {professional?.stripe_customer_id && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={handlePortal}
+              disabled={openingPortal}
+              className="text-sm text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2"
+            >
+              {openingPortal ? 'A abrir...' : 'Gerir subscrição · Faturas · Cancelar'}
+            </button>
+          </div>
+        )}
 
         {currentPlan === 'inactive' && (
           <div className="mt-6 p-4 rounded-2xl flex items-center gap-3"
