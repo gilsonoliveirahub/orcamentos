@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { sendWhatsApp } from '@/lib/whatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,15 @@ export async function GET(req: NextRequest) {
           `,
         }),
       })
+
+      // WhatsApp ao profissional
+      if (prof.phone) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
+        const msg = isDay5
+          ? `⚠️ *Lead sem resposta há 5 dias*\n\n👤 ${lead.name || '—'} · ${servico}\n📱 ${lead.phone || '—'}\n\nVer lead: ${appUrl}/leads/${lead.id}`
+          : `💡 *Follow-up D+2*\n\nJá contactaste *${lead.name || 'o cliente'}*?\n📱 ${lead.phone || '—'} · ${servico}\n\nVer lead: ${appUrl}/leads/${lead.id}`
+        sendWhatsApp(prof.phone, msg).catch(() => {})
+      }
 
       totalSent++
     }

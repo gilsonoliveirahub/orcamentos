@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailNovoLead } from '@/lib/email'
+import { sendWhatsApp } from '@/lib/whatsapp'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,18 @@ export async function POST(req: NextRequest) {
       source: lead.source || 'pessoal',
       extraRows,
     })
+
+    // WhatsApp ao profissional
+    if (prof.phone) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
+      await sendWhatsApp(prof.phone,
+        `🔔 *Novo pedido de orçamento!*\n\n` +
+        `👤 *Cliente:* ${lead.name || '—'}\n` +
+        `📱 *Telefone:* ${lead.phone || '—'}\n` +
+        `🔧 *Serviço:* ${servico}\n\n` +
+        `Ver detalhes: ${appUrl}/leads/${lead.id}`
+      )
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
