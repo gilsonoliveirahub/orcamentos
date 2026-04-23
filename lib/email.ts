@@ -184,6 +184,84 @@ export async function emailNovaProfissao({
   `))
 }
 
+// ── Novo registo (notificação admin) ─────────────────────────────────────────
+export async function emailNovoRegisto({
+  tipo, name, email, phone, specialty, slug,
+}: {
+  tipo: 'profissional' | 'cliente'
+  name: string; email: string; phone?: string; specialty?: string; slug?: string
+}) {
+  const ADMIN_EMAIL = 'gilsongomesoliveira1@hotmail.com'
+  const isPro = tipo === 'profissional'
+  await sendEmail(ADMIN_EMAIL, `👤 Novo ${tipo} registado — ${name}`, wrap(`
+    <div style="background:linear-gradient(135deg,${isPro ? '#6366f1,#8b5cf6' : '#34d399,#059669'});padding:24px 32px">
+      <h2 style="margin:0;color:#fff;font-size:20px">👤 Novo ${tipo} registado!</h2>
+      <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:14px">${new Date().toLocaleString('pt-PT')}</p>
+    </div>
+    <div style="padding:24px 32px">
+      <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Nome</td>
+          <td style="padding:10px;font-weight:bold;color:#fff">${name}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;color:#64748b;font-size:13px">Email</td>
+          <td style="padding:10px;color:#818cf8">${email}</td>
+        </tr>
+        ${phone ? `<tr style="background:rgba(255,255,255,0.05)"><td style="padding:10px;color:#64748b;font-size:13px">Telefone</td><td style="padding:10px;color:#fff">${phone}</td></tr>` : ''}
+        ${specialty ? `<tr><td style="padding:10px;color:#64748b;font-size:13px">Profissão</td><td style="padding:10px;color:#fff">${specialty}</td></tr>` : ''}
+        ${slug ? `<tr style="background:rgba(255,255,255,0.05)"><td style="padding:10px;color:#64748b;font-size:13px">Link público</td><td style="padding:10px;color:#818cf8">${APP_URL}/p/${slug}</td></tr>` : ''}
+      </table>
+      <a href="${APP_URL}/admin"
+        style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Ver no admin →
+      </a>
+    </div>
+  `))
+}
+
+// ── Novo pagamento (notificação admin) ────────────────────────────────────────
+export async function emailNovoPagamento({
+  tipo, name, email, valor, plano,
+}: {
+  tipo: 'subscricao' | 'creditos'
+  name: string; email: string; valor: string; plano?: string
+}) {
+  const ADMIN_EMAIL = 'gilsongomesoliveira1@hotmail.com'
+  const isSubscricao = tipo === 'subscricao'
+  await sendEmail(ADMIN_EMAIL, `💰 Novo pagamento — ${name} · ${valor}`, wrap(`
+    <div style="background:linear-gradient(135deg,#c9a84c,#e0bf6a);padding:24px 32px">
+      <h2 style="margin:0;color:#000;font-size:20px">💰 Novo pagamento recebido!</h2>
+      <p style="margin:4px 0 0;color:rgba(0,0,0,0.6);font-size:14px">${isSubscricao ? `Subscrição — Plano ${plano}` : 'Compra de créditos marketplace'}</p>
+    </div>
+    <div style="padding:24px 32px">
+      <table style="width:100%;border-collapse:collapse;margin:0 0 24px">
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Nome</td>
+          <td style="padding:10px;font-weight:bold;color:#fff">${name}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;color:#64748b;font-size:13px">Email</td>
+          <td style="padding:10px;color:#818cf8">${email}</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Tipo</td>
+          <td style="padding:10px;color:#fff">${isSubscricao ? 'Subscrição' : 'Créditos'}</td>
+        </tr>
+        ${plano ? `<tr><td style="padding:10px;color:#64748b;font-size:13px">Plano</td><td style="padding:10px;font-weight:bold;color:#c9a84c;font-size:16px">${plano}</td></tr>` : ''}
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Valor</td>
+          <td style="padding:10px;font-weight:bold;color:#34d399;font-size:18px">${valor}</td>
+        </tr>
+      </table>
+      <a href="${APP_URL}/admin"
+        style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Ver no admin →
+      </a>
+    </div>
+  `))
+}
+
 // ── Lead desbloqueado ─────────────────────────────────────────────────────────
 export async function emailLeadDesbloqueado({
   profName, profEmail, leadName, leadPhone, leadEmail, leadId,
