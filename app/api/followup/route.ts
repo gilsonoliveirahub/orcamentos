@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendWhatsApp } from '@/lib/whatsapp'
+import { emailTrialAExpirar } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -112,6 +113,34 @@ export async function GET(req: NextRequest) {
         sendWhatsApp(prof.phone, msg).catch(() => {})
       }
 
+      totalSent++
+    }
+  }
+
+  // Trials a expirar — avisa em D-2 e D-1
+  const trialAlerts = [48, 24] // horas antes de expirar
+  for (const horas of trialAlerts) {
+    const from = new Date(now); from.setHours(from.getHours() + horas - 1)
+    const to = new Date(now); to.setHours(to.getHours() + horas + 1)
+
+    const { data: profs } = await supabaseAdmin
+      .from('professionals')
+      .select('id, name, email, phone, slug')
+      .eq('plan', 'free')
+      .gte('trial_ends_at', from.toISOString())
+      .lte('trial_ends_at', to.toISOString())
+
+    if (!profs) continue
+
+    for (const prof of profs) {
+      if (!prof.email) continue
+      await emailTrialAExpirar({ name: prof.name, email: prof.email, slug: prof.slug, horasRestantes: horas }).catch(() => {})
+      if (prof.phone) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
+        sendWhatsApp(prof.phone,
+          `⏳ *O teu trial FaçoPorTi expira ${horas <= 24 ? 'amanhã' : 'em 2 dias'}!*\n\nPara continuares a receber leads escolhe um plano:\n${appUrl}/upgrade`
+        ).catch(() => {})
+      }
       totalSent++
     }
   }

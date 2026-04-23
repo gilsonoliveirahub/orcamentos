@@ -113,6 +113,36 @@ export async function emailBoasVindas({
   `))
 }
 
+// ── Trial a expirar ───────────────────────────────────────────────────────────
+export async function emailTrialAExpirar({
+  name, email, slug, horasRestantes,
+}: {
+  name: string; email: string; slug: string; horasRestantes: number
+}) {
+  const isUltimosDias = horasRestantes <= 24
+  await sendEmail(email, `⏳ O teu trial ${isUltimosDias ? 'expira amanhã' : 'expira em breve'} — FaçoPorTi`, wrap(`
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px 32px">
+      <h2 style="margin:0;color:#000;font-size:20px">⏳ O teu trial está a expirar</h2>
+      <p style="margin:4px 0 0;color:rgba(0,0,0,0.6);font-size:14px">${isUltimosDias ? 'Menos de 24 horas restantes' : `${Math.ceil(horasRestantes / 24)} dias restantes`}</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${name}</strong>,</p>
+      <p style="color:#94a3b8;margin:0 0 24px">
+        O teu período de trial gratuito ${isUltimosDias ? 'termina amanhã' : `termina em ${Math.ceil(horasRestantes / 24)} dias`}. Para continuares a receber pedidos de orçamento pelo teu link pessoal, escolhe um plano.
+      </p>
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin:0 0 24px">
+        <p style="color:#64748b;font-size:12px;margin:0 0 8px;text-transform:uppercase;letter-spacing:1px">O teu link pessoal</p>
+        <p style="color:#818cf8;font-size:15px;font-weight:bold;margin:0">${APP_URL}/p/${slug}</p>
+      </div>
+      <a href="${APP_URL}/upgrade"
+        style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Escolher plano →
+      </a>
+      <p style="color:#475569;font-size:12px;margin:20px 0 0">A partir de €19/mês · Sem compromisso · Cancela a qualquer momento</p>
+    </div>
+  `))
+}
+
 // ── Nova profissão desconhecida (notificação admin) ───────────────────────────
 export async function emailNovaProfissao({
   profName, profEmail, specialty, slug,
