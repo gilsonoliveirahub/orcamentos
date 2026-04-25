@@ -408,7 +408,11 @@ export default function Dashboard() {
     const newStatus = over.id as string
     if (!COLUMNS.find(c => c.id === newStatus)) return
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
-    await supabase.from('leads').update({ status: newStatus }).eq('id', leadId)
+    await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: leadId, status: newStatus }),
+    })
   }
 
   const totalFechado = leads.filter(l => l.status === 'fechado').length

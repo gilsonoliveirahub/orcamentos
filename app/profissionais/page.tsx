@@ -20,8 +20,17 @@ export default function ProfissionaisPage() {
       .from('professionals')
       .select('*')
       .eq('active', true)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { setProfessionals(data || []); setLoading(false) })
+      .then(({ data }) => {
+        const all = data || []
+        const planScore = (plan: string) => plan === 'pro' ? 3 : plan === 'starter' ? 2 : 1
+        const sorted = [...all].sort((a, b) => {
+          const diff = planScore(b.plan) - planScore(a.plan)
+          if (diff !== 0) return diff
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        })
+        setProfessionals(all.length > 20 ? sorted.slice(0, 20) : sorted)
+        setLoading(false)
+      })
   }, [])
 
   const filtered = professionals.filter(p => {

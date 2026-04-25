@@ -74,7 +74,11 @@ export default function LeadDetail() {
   }
 
   async function handleStatusChange(newStatus: string) {
-    await supabase.from('leads').update({ status: newStatus }).eq('id', id)
+    await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: id, status: newStatus }),
+    })
     setLead((prev: any) => ({ ...prev, status: newStatus }))
   }
 

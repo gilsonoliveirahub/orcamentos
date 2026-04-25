@@ -262,6 +262,42 @@ export async function emailNovoPagamento({
   `))
 }
 
+// ── Pedido de depoimento após trabalho fechado ────────────────────────────────
+export async function emailPedidoDepoimento({
+  tipo, name, email, outroNome,
+}: {
+  tipo: 'profissional' | 'cliente'
+  name: string; email: string; outroNome: string
+}) {
+  const isPro = tipo === 'profissional'
+  const subject = isPro
+    ? `Como correu o trabalho com ${outroNome}? Deixa a tua opinião`
+    : `Como foi a experiência com ${outroNome}? Partilha a tua opinião`
+
+  await sendEmail(email, subject, wrap(`
+    <div style="background:linear-gradient(135deg,#c9a84c,#e0bf6a);padding:24px 32px">
+      <h2 style="margin:0;color:#000;font-size:20px">⭐ Conta-nos como correu!</h2>
+      <p style="margin:4px 0 0;color:rgba(0,0,0,0.6);font-size:14px">A tua opinião ajuda outros ${isPro ? 'profissionais' : 'clientes'}</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${name}</strong>,</p>
+      <p style="color:#94a3b8;margin:0 0 24px">
+        ${isPro
+          ? `O trabalho com <strong style="color:#fff">${outroNome}</strong> foi marcado como concluído. Ficámos contentes por ter chegado a bom porto!`
+          : `O teu pedido de orçamento com <strong style="color:#fff">${outroNome}</strong> foi concluído. Esperamos que tenha corrido bem!`
+        }
+      </p>
+      <p style="color:#94a3b8;margin:0 0 24px">
+        Podes deixar o teu depoimento respondendo diretamente a este email — a tua opinião sobre o <strong style="color:#fff">FaçoPorTi</strong> ajuda-nos a melhorar e aparece na nossa página para outros ${isPro ? 'profissionais' : 'clientes'}.
+      </p>
+      <a href="mailto:gilsongomesoliveira1@hotmail.com?subject=Depoimento%20FaçoPorTi&body=Olá%2C%20quero%20partilhar%20a%20minha%20experiência%20com%20o%20FaçoPorTi%3A%0A%0A"
+        style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e0bf6a);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Deixar depoimento →
+      </a>
+    </div>
+  `))
+}
+
 // ── Nudge para upgradar plano ─────────────────────────────────────────────────
 export async function emailUpgradeNudge({
   name, email, totalLeads, dia,
