@@ -42,6 +42,15 @@ export default function LeadDetail() {
   useEffect(() => { loadData() }, [id])
 
   async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: prof } = await supabase.from('professionals').select('plan').eq('user_id', user.id).maybeSingle()
+      if (!prof || prof.plan === 'free' || !prof.plan) {
+        router.replace('/upgrade')
+        return
+      }
+    }
+
     const [{ data: leadData }, { data: quoteData }] = await Promise.all([
       supabase.from('leads').select('*, professionals(*)').eq('id', id).single(),
       supabase.from('quotes').select('*').eq('lead_id', id).maybeSingle(),

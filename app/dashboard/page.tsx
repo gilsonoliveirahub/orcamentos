@@ -24,9 +24,12 @@ const COLUMNS = [
   { id: 'perdido',     label: 'Perdido',     color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
 
-function LeadCard({ lead, quote, onClick, onUnlock }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void }) {
+function LeadCard({ lead, quote, onClick, onUnlock, isPaid }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; isPaid: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
-  const isLocked = lead.locked && lead.source === 'marketplace'
+  const router = useRouter()
+  const isPlanLocked = !isPaid
+  const isMarketplaceLocked = !isPlanLocked && lead.locked && lead.source === 'marketplace'
+  const isLocked = isPlanLocked || isMarketplaceLocked
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 999, opacity: 0.9 }
@@ -99,6 +102,15 @@ function LeadCard({ lead, quote, onClick, onUnlock }: { lead: any; quote: any; o
       {/* Footer */}
       <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         {isLocked ? (
+          isPlanLocked ? (
+            <button
+              onClick={e => { e.stopPropagation(); router.push('/upgrade') }}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl transition-colors"
+              style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
+            >
+              <Lock size={11} /> Ativar plano para ver
+            </button>
+          ) : (
           <button
             onClick={e => { e.stopPropagation(); onUnlock() }}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl transition-colors"
@@ -106,6 +118,7 @@ function LeadCard({ lead, quote, onClick, onUnlock }: { lead: any; quote: any; o
           >
             <Unlock size={11} /> Desbloquear (1 crédito)
           </button>
+          )
         ) : quote ? (
           <>
             <span className="text-xs text-gray-500">Orçamento</span>
@@ -151,7 +164,7 @@ function LeadCard({ lead, quote, onClick, onUnlock }: { lead: any; quote: any; o
   )
 }
 
-function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock }: any) {
+function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, isPaid }: any) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const colLeads = leads.filter((l: any) => l.status === id)
 
@@ -186,6 +199,7 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock }: 
             quote={quotes.find((q: any) => q.lead_id === lead.id)}
             onClick={() => onCardClick(lead.id)}
             onUnlock={() => onUnlock(lead.id)}
+            isPaid={isPaid}
           />
         ))}
         {colLeads.length === 0 && (
@@ -355,7 +369,7 @@ export default function Dashboard() {
     const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
-      user ? supabase.from('professionals').select('slug, name, marketplace_credits').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setLeads(leadsData || [])
     setQuotes(quotesData || [])
@@ -634,7 +648,8 @@ export default function Dashboard() {
               {COLUMNS.map(col => (
                 <Column key={col.id} {...col} leads={leads} quotes={quotes}
                   onCardClick={(id: string) => router.push(`/leads/${id}`)}
-                  onUnlock={handleUnlock} />
+                  onUnlock={handleUnlock}
+                  isPaid={professional?.plan === 'starter' || professional?.plan === 'pro'} />
               ))}
             </div>
           </DndContext>

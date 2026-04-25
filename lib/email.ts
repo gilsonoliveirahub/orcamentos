@@ -262,6 +262,42 @@ export async function emailNovoPagamento({
   `))
 }
 
+// ── Nudge para upgradar plano ─────────────────────────────────────────────────
+export async function emailUpgradeNudge({
+  name, email, totalLeads, dia,
+}: {
+  name: string; email: string; totalLeads: number; dia: number
+}) {
+  const subjects: Record<number, string> = {
+    1: `${totalLeads} lead${totalLeads > 1 ? 's' : ''} à tua espera — activa o teu plano`,
+    3: `Já tens ${totalLeads} cliente${totalLeads > 1 ? 's' : ''} à espera e não podes responder`,
+    7: `${name}, os teus clientes ainda estão à espera`,
+  }
+  const subject = subjects[dia] || `Novos leads no FaçoPorTi — ${name}`
+
+  await sendEmail(email, subject, wrap(`
+    <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 32px">
+      <h2 style="margin:0;color:#fff;font-size:20px">🔒 ${totalLeads} lead${totalLeads > 1 ? 's' : ''} bloqueado${totalLeads > 1 ? 's' : ''}</h2>
+      <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:14px">Activa um plano para ver os contactos</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${name}</strong>,</p>
+      <p style="color:#94a3b8;margin:0 0 24px">
+        Já tens <strong style="color:#fff">${totalLeads} pedido${totalLeads > 1 ? 's' : ''} de orçamento</strong> no teu dashboard — mas não podes ver os contactos sem um plano ativo.
+      </p>
+      <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:20px;margin:0 0 24px;text-align:center">
+        <p style="color:#818cf8;font-size:32px;font-weight:900;margin:0 0 4px">${totalLeads}</p>
+        <p style="color:#64748b;font-size:13px;margin:0">cliente${totalLeads > 1 ? 's' : ''} à espera de resposta</p>
+      </div>
+      <a href="${APP_URL}/upgrade"
+        style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        Activar plano — a partir de €19/mês →
+      </a>
+      <p style="color:#475569;font-size:12px;margin:20px 0 0">Sem compromisso · Cancela a qualquer momento</p>
+    </div>
+  `))
+}
+
 // ── Lead desbloqueado ─────────────────────────────────────────────────────────
 export async function emailLeadDesbloqueado({
   profName, profEmail, leadName, leadPhone, leadEmail, leadId,
