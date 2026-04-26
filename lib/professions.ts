@@ -185,6 +185,21 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     ],
   },
 
+  'Editor de vídeos': {
+    emoji: '🎬',
+    label: 'Editor de Vídeos',
+    questions: [
+      { key: 'tipo_projeto', text: 'Que tipo de projeto precisa editar?', type: 'choice', options: ['Vídeo corporativo', 'Conteúdo redes sociais', 'Casamento/evento', 'Publicidade', 'Tutorial/educativo', 'Outro'] },
+      { key: 'duracao_video', text: 'Qual a duração total do vídeo?', type: 'choice', options: ['Até 1 minuto', '1-5 minutos', '5-10 minutos', '10-30 minutos', 'Mais de 30 minutos'] },
+      { key: 'material_bruto', text: 'Já tem o material (vídeo/fotos) gravado?', type: 'choice', options: ['Sim, tenho tudo', 'Parcialmente', 'Não, precisa de ajuda com gravação também'] },
+      { key: 'servicos_adicionais', text: 'Que serviços adicionais precisa?', type: 'multiselect', options: ['Efeitos especiais', 'Animações/motion graphics', 'Correção de cor', 'Legendagem', 'Trilha sonora/música', 'Voice-over', 'Nenhum'] },
+      { key: 'resolucao', text: 'Qual a resolução desejada?', type: 'choice', options: ['HD (720p)', 'Full HD (1080p)', '4K (2160p)', 'Não tenho preferência'] },
+      { key: 'numero_videos', text: 'Quantos vídeos precisa editar?', type: 'number', unit: 'vídeos' },
+      { key: 'prazo', text: 'Qual a urgência?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
+      { key: 'notas', text: 'Algum detalhe adicional?', type: 'text', placeholder: 'Ex: estilo específico, referências, software preferido...', optional: true },
+    ],
+  },
+
   'Ar Condicionado': {
     emoji: '❄️',
     label: 'Ar Condicionado',
@@ -215,6 +230,7 @@ export const SPECIALTY_LIST = [
   'Ar Condicionado',
   'Jardinagem',
   'Mudanças',
+  'Editor de vídeos',
 ]
 
 const GENERIC_PROFESSION: ProfessionConfig = {
