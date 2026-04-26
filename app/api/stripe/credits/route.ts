@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://xn--faoporti-t0a.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',

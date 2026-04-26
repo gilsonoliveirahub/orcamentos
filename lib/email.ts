@@ -1,5 +1,5 @@
-const FROM = 'FaçoPorTi <noreply@xn--faoporti-t0a.com>'
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://orcamentos-taupe.vercel.app'
+const FROM = 'FaçoPorTi <noreply@façoporti.com>'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
 async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY

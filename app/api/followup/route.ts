@@ -51,14 +51,14 @@ export async function GET(req: NextRequest) {
 
       const metadata = lead.metadata || {}
       const servico = metadata.tipo_trabalho || lead.q1_tipo_trabalho || prof.specialty || 'serviço'
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://xn--faoporti-t0a.com'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
       const isDay5 = days === 5
 
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resendKey}` },
         body: JSON.stringify({
-          from: 'FaçoPorTi <noreply@xn--faoporti-t0a.com>',
+          from: 'FaçoPorTi <noreply@façoporti.com>',
           to: [prof.email],
           subject: isDay5
             ? `⚠️ Lead fria há 5 dias — ${lead.name || 'Cliente'}`
