@@ -45,26 +45,33 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { data, error } = await supabase.auth.signUp({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
-    if (!data.user) { setError('Erro ao criar conta.'); setLoading(false); return }
-
-    await fetch('/api/auth/register', {
+    // Criar utilizador e perfil no servidor (sem email de confirmação do Supabase)
+    const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: data.user.id, role, name, email, phone, specialty: specialty === 'Outro' ? customSpecialty.trim() : specialty, zone }),
+      body: JSON.stringify({ password, role, name, email, phone, specialty: specialty === 'Outro' ? customSpecialty.trim() : specialty, zone }),
     })
-
-    if (role === 'professional') {
-      // Login imediato e vai para onboarding completar perfil
-      await supabase.auth.signInWithPassword({ email, password })
-      router.push('/onboarding')
+    const result = await res.json()
+    if (!res.ok || result.error) {
+      setError(result.error || 'Erro ao criar conta.')
+      setLoading(false)
       return
     }
 
-    setSuccess('Conta criada! Já pode entrar.')
-    setTab('login')
-    setLoading(false)
+    // Login imediato (conta já confirmada)
+    const { error: loginError } = await supabase.auth.signInWithPassword({ email, password })
+    if (loginError) {
+      setError('Conta criada! Ocorreu um erro ao entrar, tente fazer login.')
+      setTab('login')
+      setLoading(false)
+      return
+    }
+
+    if (role === 'professional') {
+      router.push('/onboarding')
+    } else {
+      router.push('/cliente/dashboard')
+    }
   }
 
   const inputClass = "w-full rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"

@@ -7,7 +7,19 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { user_id, role, name, email, phone, specialty, zone } = await req.json()
+    const { user_id: existingUserId, password, role, name, email, phone, specialty, zone } = await req.json()
+
+    // Se vier password, criamos o utilizador no servidor (sem email de confirmação do Supabase)
+    let user_id = existingUserId
+    if (password) {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Conta ativa imediatamente, sem email do Supabase
+      })
+      if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
+      user_id = authData.user.id
+    }
 
     if (role === 'professional') {
       const baseSlug = name
