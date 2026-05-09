@@ -156,27 +156,28 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
     ],
   },
 
-  'Pavimentos de Madeira': {
-    emoji: '🏡',
-    label: 'Pavimentos de Madeira',
+  'Pavimentos e Revestimentos': {
+    emoji: '🪵',
+    label: 'Pavimentos e Revestimentos',
     questions: [
-      { key: 'tipo_servico', text: 'Qual é o serviço pretendido?', type: 'choice', options: ['Chão flutuante novo', 'Envernizamento de madeira'] },
+      { key: 'tipo_servico', text: 'Qual é o serviço pretendido?', type: 'choice', options: ['Chão flutuante novo', 'Soalho / Parquet em madeira', 'Cerâmica / Porcelânico', 'Vinílico / LVT', 'Envernizamento de madeira existente'] },
       { key: 'area_m2', text: 'Área total em m²?', type: 'number', placeholder: 'ex: 40', unit: 'm²' },
       { key: 'mobilias', text: 'O espaço estará vazio ou tem mobília?', type: 'choice', options: ['Vazio', 'Com mobília', 'Misto'] },
       { key: 'prazo', text: 'Quando precisa de iniciar?', type: 'choice', options: ['Esta semana', 'Este mês', 'Próximos 3 meses', 'Sem pressa'] },
-      // Chão flutuante
-      { key: 'pavimento_nivelado', text: 'O pavimento atual está nivelado?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
-      { key: 'material_incluido', text: 'Já tem o material ou quer incluir no orçamento?', type: 'choice', options: ['Já tenho o material', 'Incluir no orçamento', 'Ainda não decidi'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
-      { key: 'classe_ac', text: 'Classe de resistência pretendida?', type: 'choice', options: ['AC4 (uso doméstico intenso)', 'AC5 (uso comercial)', 'Não sei / A definir'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
-      { key: 'cortar_portas', text: 'As portas precisam de ser cortadas para o novo pavimento?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
-      { key: 'rodapes', text: 'Pretende rodapés novos?', type: 'choice', options: ['Sim', 'Não', 'Só alguns'], showIf: { key: 'tipo_servico', value: 'Chão flutuante novo' } },
+      // Chão flutuante / Vinílico / Soalho
+      { key: 'pavimento_nivelado', text: 'O pavimento atual está nivelado?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: ['Chão flutuante novo', 'Soalho / Parquet em madeira', 'Vinílico / LVT'] } },
+      { key: 'material_incluido', text: 'Já tem o material ou quer incluir no orçamento?', type: 'choice', options: ['Já tenho o material', 'Incluir no orçamento', 'Ainda não decidi'], showIf: { key: 'tipo_servico', value: ['Chão flutuante novo', 'Soalho / Parquet em madeira', 'Vinílico / LVT'] } },
+      { key: 'cortar_portas', text: 'As portas precisam de ser cortadas para o novo pavimento?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: ['Chão flutuante novo', 'Soalho / Parquet em madeira', 'Vinílico / LVT'] } },
+      { key: 'rodapes', text: 'Pretende rodapés novos?', type: 'choice', options: ['Sim', 'Não', 'Só alguns'], showIf: { key: 'tipo_servico', value: ['Chão flutuante novo', 'Soalho / Parquet em madeira', 'Vinílico / LVT'] } },
+      // Cerâmica
+      { key: 'ceramica_local', text: 'Onde vai ser colocada a cerâmica?', type: 'multiselect', options: ['Sala', 'Cozinha', 'Casa de banho', 'Quarto', 'Exterior / Varanda', 'Outro'], showIf: { key: 'tipo_servico', value: 'Cerâmica / Porcelânico' } },
+      { key: 'ceramica_material', text: 'Já tem o material escolhido?', type: 'choice', options: ['Sim, já tenho a cerâmica', 'Não, incluir no orçamento', 'Ainda não decidi'], showIf: { key: 'tipo_servico', value: 'Cerâmica / Porcelânico' } },
+      { key: 'ceramica_remocao', text: 'É necessário remover o pavimento antigo?', type: 'choice', options: ['Sim', 'Não (colocar por cima)', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Cerâmica / Porcelânico' } },
       // Envernizamento
-      { key: 'madeira_danificada', text: 'A madeira tem danos visíveis (riscos, manchas, fissuras)?', type: 'choice', options: ['Sim, bastante', 'Alguns danos', 'Está bem, só precisa de renovar'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
-      { key: 'tipo_verniz', text: 'Preferência de verniz?', type: 'choice', options: ['Água (menos cheiro, mais rápido)', 'Solvente (mais durável)', 'Sem preferência'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
-      { key: 'nivel_brilho', text: 'Nível de brilho pretendido?', type: 'choice', options: ['Mate', 'Acetinado', 'Brilhante'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
-      { key: 'manter_cor', text: 'Deseja manter a cor natural ou alterar o tom?', type: 'choice', options: ['Manter cor natural', 'Alterar o tom', 'Aguardo sugestão'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
-      { key: 'preencher_juntas', text: 'É necessário preencher as juntas entre as tábuas?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira' } },
-      { key: 'notas', text: 'Pode descrever o estado atual do chão?', type: 'text', placeholder: 'Ex: soalho de pinho com alguns riscos, última vez que foi envernizado há 10 anos...', minLength: 10, optional: true },
+      { key: 'madeira_danificada', text: 'A madeira tem danos visíveis (riscos, manchas, fissuras)?', type: 'choice', options: ['Sim, bastante', 'Alguns danos', 'Está bem, só precisa de renovar'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira existente' } },
+      { key: 'tipo_verniz', text: 'Preferência de verniz?', type: 'choice', options: ['Água (menos cheiro, mais rápido)', 'Solvente (mais durável)', 'Sem preferência'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira existente' } },
+      { key: 'nivel_brilho', text: 'Nível de brilho pretendido?', type: 'choice', options: ['Mate', 'Acetinado', 'Brilhante'], showIf: { key: 'tipo_servico', value: 'Envernizamento de madeira existente' } },
+      { key: 'notas', text: 'Mais algum detalhe sobre o trabalho?', type: 'text', placeholder: 'Ex: chão de T2, sala + 2 quartos, flutuante AC4 bege...', minLength: 10, optional: true },
     ],
   },
 
@@ -236,7 +237,7 @@ export const SPECIALTY_LIST = [
   'Canalização',
   'Electricidade',
   'Carpintaria',
-  'Pavimentos de Madeira',
+  'Pavimentos e Revestimentos',
   'Estuque e Pladur',
   'Ar Condicionado',
   'Jardinagem',
