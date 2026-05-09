@@ -139,10 +139,10 @@ export default function PerfilPage() {
               ))}
             </div>
             <select value="" onChange={e => { if (e.target.value) setSpecialties(p => p.includes(e.target.value) ? p : [...p, e.target.value]) }}
-              className={inp} style={ist}>
-              <option value="">+ Adicionar especialidade</option>
+              className={inp} style={{ ...ist, color: '#94a3b8' }}>
+              <option value="" style={{ background: '#1e2035', color: '#64748b' }}>+ Adicionar especialidade</option>
               {SPECIALTY_LIST.filter(s => !specialties.includes(s)).map(s => (
-                <option key={s} value={s}>{PROFESSIONS[s]?.label || s}</option>
+                <option key={s} value={s} style={{ background: '#1e2035', color: '#e2e8f0' }}>{PROFESSIONS[s]?.label || s}</option>
               ))}
             </select>
           </div>
