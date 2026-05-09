@@ -23,6 +23,19 @@ export const metadata: Metadata = {
     locale: 'pt_PT',
     type: 'website',
   },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'FaçoPorTi',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-touch-icon': '/icon-192.png',
+    'msapplication-TileColor': '#6366f1',
+  },
 };
 
 export default function RootLayout({
