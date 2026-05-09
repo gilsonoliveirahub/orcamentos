@@ -84,12 +84,20 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid }: { lead: any; quote
       </div>
 
       {/* Tags */}
-      {lead.q1_tipo_trabalho && (
+      {(lead.metadata?._service_specialty || lead.q1_tipo_trabalho || lead.q3_area_m2) && (
         <div className="flex flex-wrap gap-1.5 mb-3">
-          <span className="text-xs px-2 py-0.5 rounded-lg font-medium capitalize"
-            style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-            {lead.q1_tipo_trabalho}
-          </span>
+          {lead.metadata?._service_specialty && (
+            <span className="text-xs px-2 py-0.5 rounded-lg font-medium"
+              style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+              {lead.metadata._service_specialty}
+            </span>
+          )}
+          {lead.q1_tipo_trabalho && (
+            <span className="text-xs px-2 py-0.5 rounded-lg font-medium capitalize"
+              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+              {lead.q1_tipo_trabalho}
+            </span>
+          )}
           {lead.q3_area_m2 && (
             <span className="text-xs px-2 py-0.5 rounded-lg font-medium"
               style={{ background: 'rgba(96,165,250,0.2)', color: '#60a5fa' }}>

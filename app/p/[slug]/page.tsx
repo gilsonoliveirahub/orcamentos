@@ -22,6 +22,23 @@ export default function ProfessionalPublicPage() {
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null)
+
+  async function loadSpecialtyConfig(spec: string) {
+    if (PROFESSIONS[spec]) {
+      setProfession(getProfession(spec))
+    } else {
+      const { data: row } = await supabase.from('profession_configs').select('config').eq('specialty', spec).maybeSingle()
+      if (row?.config) {
+        setProfession(row.config as ProfessionConfig)
+      } else {
+        fetch('/api/professions/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ specialty: spec }) })
+          .then(r => r.json()).then(({ config }) => { if (config) setProfession(config) }).catch(() => {})
+        setProfession(getProfession(spec))
+      }
+    }
+    setLoading(false)
+  }
 
   useEffect(() => {
     supabase
@@ -33,41 +50,74 @@ export default function ProfessionalPublicPage() {
       .then(async ({ data: prof }) => {
         if (!prof) { setLoading(false); return }
         setProfessional(prof)
-
-        if (PROFESSIONS[prof.specialty]) {
-          setProfession(getProfession(prof.specialty))
-          setLoading(false)
+        const specs: string[] = prof.specialties?.length ? prof.specialties : [prof.specialty]
+        if (specs.length > 1) {
+          setLoading(false) // show service picker
         } else {
-          // Profissão personalizada — carrega config gerada (ou gera agora)
-          const { data: row } = await supabase
-            .from('profession_configs')
-            .select('config')
-            .eq('specialty', prof.specialty)
-            .maybeSingle()
-
-          if (row?.config) {
-            setProfession(row.config as ProfessionConfig)
-          } else {
-            // Ainda não foi gerada — pede geração e usa genérico enquanto aguarda
-            fetch('/api/professions/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ specialty: prof.specialty }),
-            }).then(r => r.json()).then(({ config }) => {
-              if (config) setProfession(config)
-            }).catch(() => {})
-            setProfession(getProfession(prof.specialty)) // fallback genérico
-          }
-          setLoading(false)
+          setSelectedSpecialty(specs[0])
+          await loadSpecialtyConfig(specs[0])
         }
       })
   }, [slug])
+
+  async function handleSelectSpecialty(spec: string) {
+    setSelectedSpecialty(spec)
+    setLoading(true)
+    await loadSpecialtyConfig(spec)
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
       <div className="w-10 h-10 border-4 border-indigo-900 border-t-indigo-500 rounded-full animate-spin" />
     </div>
   )
+
+  if (professional && !selectedSpecialty) {
+    const specs: string[] = professional.specialties?.length ? professional.specialties : [professional.specialty]
+    return (
+      <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
+        <div style={{ background: 'linear-gradient(135deg, #0d0f1e, #13152a)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="max-w-lg mx-auto px-6 py-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
+                💼
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-white">{professional.name}</h1>
+                {professional.zone && (
+                  <span className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                    <MapPin size={11} /> {professional.zone}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-lg mx-auto px-6 py-8">
+          <h2 className="text-2xl font-black text-white mb-2">Qual o serviço?</h2>
+          <p className="text-gray-400 mb-6">Escolha o serviço que pretende orçamentar.</p>
+          <div className="space-y-3">
+            {specs.map((spec: string) => {
+              const pConf = getProfession(spec)
+              return (
+                <button key={spec} onClick={() => handleSelectSpecialty(spec)}
+                  className="w-full flex items-center gap-4 p-5 rounded-2xl text-left transition-all hover:opacity-90"
+                  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                  <span className="text-3xl">{pConf.emoji}</span>
+                  <div>
+                    <div className="font-black text-white">{pConf.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Pedido de orçamento rápido</div>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-500 ml-auto" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!professional || !profession) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
@@ -131,13 +181,13 @@ export default function ProfessionalPublicPage() {
         status: 'novo',
         source,
         ...legacyFields,
-        metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+        metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
       }),
     })
     const { lead } = await res.json()
 
     if (lead) {
-      if (professional.specialty === 'Pintura' && legacyFields.q3_area_m2) {
+      if (selectedSpecialty === 'Pintura' && legacyFields.q3_area_m2) {
         const paintingAreas = answers['altura_paredes']
           ? calcPaintingAreas(answers)
           : { area_paredes: legacyFields.q3_area_m2 || 0, area_tetos: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) : 0 }
@@ -178,7 +228,7 @@ export default function ProfessionalPublicPage() {
       }
 
       // Auto-generate estimate for non-paint professions
-      if (professional.specialty !== 'Pintura') {
+      if (selectedSpecialty !== 'Pintura') {
         fetch('/api/quote/estimate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

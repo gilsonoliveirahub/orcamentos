@@ -14,7 +14,8 @@ export default function PerfilPage() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
-  const [form, setForm] = useState({ name: '', phone: '', specialty: 'Pintura', zone: '', description: '' })
+  const [form, setForm] = useState({ name: '', phone: '', zone: '', description: '' })
+  const [specialties, setSpecialties] = useState<string[]>(['Pintura'])
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -25,10 +26,10 @@ export default function PerfilPage() {
       setForm({
         name: prof.name || '',
         phone: prof.phone || '',
-        specialty: prof.specialty || 'Pintura',
         zone: prof.zone || '',
         description: prof.description || '',
       })
+      setSpecialties(prof.specialties?.length ? prof.specialties : [prof.specialty || 'Pintura'])
       setLoading(false)
     })
   }, [router])
@@ -39,7 +40,8 @@ export default function PerfilPage() {
     await supabase.from('professionals').update({
       name: form.name,
       phone: form.phone,
-      specialty: form.specialty,
+      specialty: specialties[0],
+      specialties,
       zone: form.zone,
       description: form.description,
     }).eq('id', professional.id)
@@ -88,7 +90,7 @@ export default function PerfilPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-black text-white text-lg">{form.name}</div>
-            <div className="text-sm text-gray-500">{form.specialty} {form.zone ? `· ${form.zone}` : ''}</div>
+            <div className="text-sm text-gray-500">{specialties.join(' · ')} {form.zone ? `· ${form.zone}` : ''}</div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-indigo-400 truncate">/p/{professional.slug}</span>
               <button onClick={copyLink}
@@ -122,19 +124,33 @@ export default function PerfilPage() {
               placeholder="351912345678" className={inp} style={ist} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Especialidade</label>
-              <select value={form.specialty} onChange={e => setForm(p => ({ ...p, specialty: e.target.value }))}
-                className={inp} style={ist}>
-                {SPECIALTY_LIST.map(s => <option key={s} value={s}>{PROFESSIONS[s].label}</option>)}
-              </select>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Especialidades</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {specialties.map(s => (
+                <span key={s} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl"
+                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                  {PROFESSIONS[s]?.label || s}
+                  {specialties.length > 1 && (
+                    <button type="button" onClick={() => setSpecialties(p => p.filter(x => x !== s))}
+                      className="text-indigo-400 hover:text-red-400 transition-colors leading-none ml-0.5">&times;</button>
+                  )}
+                </span>
+              ))}
             </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Zona</label>
-              <input value={form.zone} onChange={e => setForm(p => ({ ...p, zone: e.target.value }))}
-                placeholder="Lisboa, Porto..." className={inp} style={ist} />
-            </div>
+            <select value="" onChange={e => { if (e.target.value) setSpecialties(p => p.includes(e.target.value) ? p : [...p, e.target.value]) }}
+              className={inp} style={ist}>
+              <option value="">+ Adicionar especialidade</option>
+              {SPECIALTY_LIST.filter(s => !specialties.includes(s)).map(s => (
+                <option key={s} value={s}>{PROFESSIONS[s]?.label || s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Zona</label>
+            <input value={form.zone} onChange={e => setForm(p => ({ ...p, zone: e.target.value }))}
+              placeholder="Lisboa, Porto..." className={inp} style={ist} />
           </div>
 
           <div>
