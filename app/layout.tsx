@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import CookieBanner from "@/components/CookieBanner";
+import CookieBanner from "@/components/CookieBanner"
+import PWAInstall from "@/components/PWAInstall";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,6 +52,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <CookieBanner />
+        <PWAInstall />
       </body>
     </html>
   );
