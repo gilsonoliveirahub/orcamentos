@@ -70,13 +70,14 @@ export default function PerfilPage() {
 
   async function handleAvatarUpload(file: File) {
     setUploadingAvatar(true)
-    const ext = file.name.split('.').pop()
-    const path = `avatars/${professional.id}/${Date.now()}.${ext}`
-    const { data, error } = await supabase.storage.from('lead-media').upload(path, file, { upsert: true })
-    if (error) { setUploadingAvatar(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('lead-media').getPublicUrl(data.path)
-    await supabase.from('professionals').update({ avatar_url: publicUrl }).eq('id', professional.id)
-    setProfessional((p: any) => ({ ...p, avatar_url: publicUrl }))
+    const form = new FormData()
+    form.append('file', file)
+    form.append('type', 'avatar')
+    const res = await fetch('/api/portfolio', { method: 'POST', body: form })
+    const json = await res.json()
+    if (!res.ok) { alert(`Erro avatar: ${json.error}`); setUploadingAvatar(false); return }
+    await supabase.from('professionals').update({ avatar_url: json.item.url }).eq('id', professional.id)
+    setProfessional((p: any) => ({ ...p, avatar_url: json.item.url }))
     setUploadingAvatar(false)
   }
 
@@ -87,26 +88,19 @@ export default function PerfilPage() {
       const isImage = file.type.startsWith('image/')
       const isVideo = file.type.startsWith('video/')
       if (!isImage && !isVideo) continue
-      if (file.size > 100 * 1024 * 1024) continue
-      const ext = file.name.split('.').pop()
-      const path = `portfolio/${professional.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { data, error } = await supabase.storage.from('lead-media').upload(path, file, { upsert: false })
-      if (error) continue
-      const { data: { publicUrl } } = supabase.storage.from('lead-media').getPublicUrl(data.path)
-      const { data: inserted, error: dbError } = await supabase.from('professional_portfolio').insert({
-        professional_id: professional.id,
-        url: publicUrl,
-        type: isVideo ? 'video' : 'image',
-        sort_order: portfolio.length,
-      }).select().single()
-      if (dbError) { alert(`Erro ao guardar ficheiro: ${dbError.message}`); continue }
-      if (inserted) setPortfolio(p => [...p, inserted])
+      const form = new FormData()
+      form.append('file', file)
+      form.append('sort_order', String(portfolio.length))
+      const res = await fetch('/api/portfolio', { method: 'POST', body: form })
+      const json = await res.json()
+      if (!res.ok) { alert(`Erro: ${json.error}`); continue }
+      setPortfolio(p => [...p, json.item])
     }
     setUploadingPortfolio(false)
   }
 
   async function deletePortfolioItem(item: any) {
-    await supabase.from('professional_portfolio').delete().eq('id', item.id)
+    await fetch('/api/portfolio', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) })
     setPortfolio(p => p.filter(i => i.id !== item.id))
   }
 
