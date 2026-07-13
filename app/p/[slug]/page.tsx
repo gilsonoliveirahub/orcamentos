@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2 } from 'lucide-react'
+import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, calcPaintingAreas, type Question, type ProfessionConfig } from '@/lib/professions'
 
@@ -13,8 +13,11 @@ export default function ProfessionalPublicPage() {
   const source = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('ref') === 'marketplace' ? 'marketplace' : 'pessoal'
   const [professional, setProfessional] = useState<any>(null)
   const [profession, setProfession] = useState<ProfessionConfig | null>(null)
+  const [portfolio, setPortfolio] = useState<any[]>([])
+  const [reviews, setReviews] = useState<any[]>([])
+  const [lightbox, setLightbox] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
-  const [step, setStep] = useState(0) // 0 = intro, 1..N = perguntas, N+1 = media, N+2 = contacto
+  const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [name, setName] = useState('')
@@ -50,9 +53,15 @@ export default function ProfessionalPublicPage() {
       .then(async ({ data: prof }) => {
         if (!prof) { setLoading(false); return }
         setProfessional(prof)
+        const [{ data: portfolioData }, { data: reviewsData }] = await Promise.all([
+          supabase.from('professional_portfolio').select('*').eq('professional_id', prof.id).order('sort_order').order('created_at'),
+          supabase.from('reviews').select('*').eq('professional_id', prof.id).order('created_at', { ascending: false }),
+        ])
+        setPortfolio(portfolioData || [])
+        setReviews(reviewsData || [])
         const specs: string[] = prof.specialties?.length ? prof.specialties : [prof.specialty]
         if (specs.length > 1) {
-          setLoading(false) // show service picker
+          setLoading(false)
         } else {
           setSelectedSpecialty(specs[0])
           await loadSpecialtyConfig(specs[0])
@@ -79,10 +88,7 @@ export default function ProfessionalPublicPage() {
         <div style={{ background: 'linear-gradient(135deg, #0d0f1e, #13152a)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="max-w-lg mx-auto px-6 py-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
-                💼
-              </div>
+              <Avatar prof={professional} size={14} emoji="💼" />
               <div>
                 <h1 className="text-xl font-black text-white">{professional.name}</h1>
                 {professional.zone && (
@@ -128,6 +134,7 @@ export default function ProfessionalPublicPage() {
       </div>
     </div>
   )
+
   const allQuestions = profession.questions
   function filterQuestions(ans: Record<string, any>) {
     return allQuestions.filter(q => {
@@ -137,7 +144,7 @@ export default function ProfessionalPublicPage() {
     })
   }
   const questions = filterQuestions(answers)
-  const totalSteps = questions.length + 2 // +1 media, +1 contacto
+  const totalSteps = questions.length + 2
   const isMediaStep = step === questions.length + 1
   const isContactStep = step === totalSteps
 
@@ -151,7 +158,6 @@ export default function ProfessionalPublicPage() {
     if (submitting) return
     setSubmitting(true)
 
-    // Verificar limite de leads para plano Starter
     if (professional.plan === 'starter') {
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
@@ -227,7 +233,6 @@ export default function ProfessionalPublicPage() {
         })
       }
 
-      // Auto-generate estimate for non-paint professions
       if (selectedSpecialty !== 'Pintura') {
         fetch('/api/quote/estimate', {
           method: 'POST',
@@ -277,68 +282,193 @@ export default function ProfessionalPublicPage() {
     </div>
   )
 
+  const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
+
+  // ── Perfil público (step 0) ────────────────────────────────────────────────
+  if (step === 0) {
+    return (
+      <div className="min-h-screen pb-10" style={{ background: '#0a0c1a' }}>
+
+        {/* Hero */}
+        <div style={{ background: 'linear-gradient(180deg, #13152a 0%, #0d0f1e 100%)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="max-w-lg mx-auto px-6 pt-10 pb-8 flex flex-col items-center text-center">
+            {professional.avatar_url ? (
+              <img src={professional.avatar_url} alt={professional.name}
+                className="w-24 h-24 rounded-full object-cover mb-4"
+                style={{ border: '3px solid rgba(99,102,241,0.5)', boxShadow: '0 4px 24px rgba(99,102,241,0.35)' }} />
+            ) : (
+              <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-black text-white mb-4"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 24px rgba(99,102,241,0.4)', border: '3px solid rgba(99,102,241,0.3)' }}>
+                {professional.name?.[0]}
+              </div>
+            )}
+            <h1 className="text-2xl font-black text-white">{professional.name}</h1>
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
+              {(professional.specialties?.length ? professional.specialties : [professional.specialty]).map((s: string) => (
+                <span key={s} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg"
+                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                  {PROFESSIONS[s]?.emoji} {PROFESSIONS[s]?.label || s}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center justify-center gap-4 mt-3 flex-wrap">
+              {professional.zone && (
+                <span className="flex items-center gap-1 text-sm text-gray-500">
+                  <MapPin size={13} /> {professional.zone}
+                </span>
+              )}
+              {reviews.length > 0 ? (
+                <span className="flex items-center gap-1 text-sm font-bold text-amber-400">
+                  <Star size={13} fill="currentColor" />
+                  {avgRating.toFixed(1)}
+                  <span className="text-gray-500 font-normal text-xs">({reviews.length} avaliações)</span>
+                </span>
+              ) : (
+                <span className="text-xs text-gray-600">Novo profissional</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-lg mx-auto px-6 pt-6 space-y-8">
+
+          {/* Sobre mim */}
+          {professional.description && (
+            <div>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider mb-2" style={{ color: '#818cf8' }}>Sobre mim</h2>
+              <p className="text-gray-300 text-sm leading-relaxed">{professional.description}</p>
+            </div>
+          )}
+
+          {/* Portfolio */}
+          {portfolio.length > 0 && (
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider mb-3" style={{ color: '#818cf8' }}>
+                Trabalhos realizados
+              </h2>
+              <div className="grid grid-cols-3 gap-2">
+                {portfolio.map(item => (
+                  <button key={item.id} onClick={() => setLightbox(item)}
+                    className="relative aspect-square rounded-xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {item.type === 'video' ? (
+                      <>
+                        <video src={item.url} className="w-full h-full object-cover" muted playsInline />
+                        <div className="absolute inset-0 flex items-center justify-center"
+                          style={{ background: 'rgba(0,0,0,0.45)' }}>
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center"
+                            style={{ background: 'rgba(255,255,255,0.9)' }}>
+                            <Play size={16} className="text-black ml-0.5" fill="currentColor" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <img src={item.url} alt={item.caption || ''} className="w-full h-full object-cover" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Avaliações */}
+          {reviews.length > 0 && (
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wider mb-3" style={{ color: '#818cf8' }}>
+                O que dizem os clientes
+              </h2>
+              <div className="space-y-3">
+                {reviews.map(r => (
+                  <div key={r.id} className="p-4 rounded-2xl"
+                    style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <Star key={n} size={13} fill={n <= r.rating ? '#fbbf24' : 'none'}
+                            className={n <= r.rating ? 'text-amber-400' : 'text-gray-700'} />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-600">
+                        {new Date(r.created_at).toLocaleDateString('pt-PT', { month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    {r.comment && <p className="text-sm text-gray-300 leading-relaxed">{r.comment}</p>}
+                    <p className="text-xs text-gray-500 mt-2 font-semibold">— {r.client_name}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CTA */}
+          <div>
+            <button
+              onClick={() => setStep(1)}
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white text-lg"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 32px rgba(99,102,241,0.45)' }}
+            >
+              {profession.emoji} Pedir Orçamento <ChevronRight size={20} />
+            </button>
+            <p className="text-center text-gray-600 text-xs mt-3">⚡ Menos de 2 minutos · Sem compromisso</p>
+          </div>
+
+        </div>
+
+        {/* Lightbox */}
+        {lightbox && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.95)' }}
+            onClick={() => setLightbox(null)}
+          >
+            <button
+              className="absolute top-4 right-4 z-10 text-white/60 hover:text-white transition-colors"
+              onClick={() => setLightbox(null)}
+            >
+              <X size={28} />
+            </button>
+            <div onClick={e => e.stopPropagation()} className="flex flex-col items-center max-w-full">
+              {lightbox.type === 'video' ? (
+                <video src={lightbox.url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
+              ) : (
+                <img src={lightbox.url} alt={lightbox.caption || ''} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
+              )}
+              {lightbox.caption && (
+                <p className="text-white/60 text-sm text-center mt-3">{lightbox.caption}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Wizard (steps 1+) ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
-
-      {/* Cabeçalho do profissional */}
       <div style={{ background: 'linear-gradient(135deg, #0d0f1e, #13152a)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-lg mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}
-            >
-              {profession.emoji}
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-white">{professional.name}</h1>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
+        <div className="max-w-lg mx-auto px-6 py-5">
+          <button onClick={() => setStep(0)} className="flex items-center gap-3 text-left w-full group">
+            <Avatar prof={professional} size={12} emoji={profession.emoji} />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-black text-white leading-tight">{professional.name}</h1>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className="flex items-center gap-1 text-xs" style={{ color: '#818cf8' }}>
-                  <Briefcase size={11} /> {profession.label}
+                  <Briefcase size={10} /> {profession.label}
                 </span>
                 {professional.zone && (
                   <span className="flex items-center gap-1 text-xs text-gray-500">
-                    <MapPin size={11} /> {professional.zone}
+                    <MapPin size={10} /> {professional.zone}
                   </span>
                 )}
-                <span className="flex items-center gap-1 text-xs text-amber-400">
-                  <Star size={11} fill="currentColor" /> 5.0
-                </span>
               </div>
             </div>
-          </div>
+            <span className="text-xs text-gray-600 group-hover:text-gray-400 transition-colors flex-shrink-0">Ver perfil</span>
+          </button>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-6 py-8">
-
-        {/* Intro */}
-        {step === 0 && (
-          <div>
-            <h2 className="text-2xl font-black text-white mb-2">Pedir Orçamento</h2>
-            <p className="text-gray-400 mb-8">
-              Responda a algumas perguntas rápidas e receba um orçamento em segundos.
-            </p>
-            <div className="space-y-3 mb-8">
-              {[
-                `${profession.emoji} ${profession.label} — especialista verificado`,
-                '⚡ Menos de 2 minutos',
-                '📱 Contacto direto via WhatsApp',
-              ].map(item => (
-                <div key={item} className="flex items-center gap-3 text-sm text-gray-300">{item}</div>
-              ))}
-            </div>
-            <button
-              onClick={() => setStep(1)}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}
-            >
-              Começar <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
-
-        {/* Perguntas */}
         {step >= 1 && step <= questions.length && (
           <QuestionStep
             question={questions[step - 1]}
@@ -350,8 +480,6 @@ export default function ProfessionalPublicPage() {
             onBack={() => setStep(s => s - 1)}
           />
         )}
-
-        {/* Media */}
         {isMediaStep && (
           <MediaStep
             current={questions.length + 1}
@@ -362,8 +490,6 @@ export default function ProfessionalPublicPage() {
             onBack={() => setStep(s => s - 1)}
           />
         )}
-
-        {/* Contacto */}
         {isContactStep && (
           <ContactStep
             name={name}
@@ -378,8 +504,22 @@ export default function ProfessionalPublicPage() {
             onSubmit={handleSubmit}
           />
         )}
-
       </div>
+    </div>
+  )
+}
+
+// ── Avatar helper ─────────────────────────────────────────────────────────────
+
+function Avatar({ prof, size, emoji }: { prof: any; size: number; emoji: string }) {
+  const cls = `w-${size} h-${size} rounded-2xl flex-shrink-0`
+  if (prof?.avatar_url) {
+    return <img src={prof.avatar_url} alt={prof.name} className={`${cls} object-cover`} />
+  }
+  return (
+    <div className={`${cls} flex items-center justify-center font-black text-white`}
+      style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)', fontSize: size > 12 ? '1.5rem' : '1rem' }}>
+      {emoji}
     </div>
   )
 }
@@ -434,7 +574,6 @@ function MediaStep({
       <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
       <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a preparar um orçamento mais preciso.</p>
 
-      {/* Prévia de ficheiros */}
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           {mediaUrls.map(url => (
@@ -457,7 +596,6 @@ function MediaStep({
         </div>
       )}
 
-      {/* Botão de upload */}
       <input
         ref={inputRef}
         type="file"
@@ -563,11 +701,9 @@ function QuestionStep({
           }}>
           Continuar ({selected.length} selecionado{selected.length !== 1 ? 's' : ''}) <ChevronRight size={18} />
         </button>
-        {current > 1 && (
-          <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
-            <ChevronLeft size={15} /> Voltar
-          </button>
-        )}
+        <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+          <ChevronLeft size={15} /> Voltar
+        </button>
       </div>
     )
   }
@@ -627,11 +763,9 @@ function QuestionStep({
             </button>
           </div>
         )}
-        {current > 1 && (
-          <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
-            <ChevronLeft size={15} /> Voltar
-          </button>
-        )}
+        <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+          <ChevronLeft size={15} /> Voltar
+        </button>
       </div>
     )
   }
@@ -683,11 +817,9 @@ function QuestionStep({
       >
         {question.optional && !text ? 'Saltar' : 'Continuar'} <ChevronRight size={18} />
       </button>
-      {current > 1 && (
-        <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
-          <ChevronLeft size={15} /> Voltar
-        </button>
-      )}
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
     </div>
   )
 }
