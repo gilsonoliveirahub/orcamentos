@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
             name: prof.name,
             email: prof.email,
             outroNome: lead.name || 'cliente',
+            lead_id,
           }).catch(() => {})
         }
         if (lead.email) {
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
             name: lead.name || 'Cliente',
             email: lead.email,
             outroNome: prof?.name || 'profissional',
+            lead_id,
           }).catch(() => {})
         }
       }

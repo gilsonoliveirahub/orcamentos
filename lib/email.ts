@@ -264,15 +264,19 @@ export async function emailNovoPagamento({
 
 // ── Pedido de depoimento após trabalho fechado ────────────────────────────────
 export async function emailPedidoDepoimento({
-  tipo, name, email, outroNome,
+  tipo, name, email, outroNome, lead_id,
 }: {
   tipo: 'profissional' | 'cliente'
-  name: string; email: string; outroNome: string
+  name: string; email: string; outroNome: string; lead_id?: string
 }) {
   const isPro = tipo === 'profissional'
   const subject = isPro
     ? `Como correu o trabalho com ${outroNome}? Deixa a tua opinião`
     : `Como foi a experiência com ${outroNome}? Partilha a tua opinião`
+
+  const reviewLink = lead_id && !isPro
+    ? `${APP_URL}/avaliar/${lead_id}`
+    : null
 
   await sendEmail(email, subject, wrap(`
     <div style="background:linear-gradient(135deg,#c9a84c,#e0bf6a);padding:24px 32px">
@@ -288,11 +292,14 @@ export async function emailPedidoDepoimento({
         }
       </p>
       <p style="color:#94a3b8;margin:0 0 24px">
-        Podes deixar o teu depoimento respondendo diretamente a este email — a tua opinião sobre o <strong style="color:#fff">FaçoPorTi</strong> ajuda-nos a melhorar e aparece na nossa página para outros ${isPro ? 'profissionais' : 'clientes'}.
+        ${reviewLink
+          ? `A tua avaliação aparece no perfil público de <strong style="color:#fff">${outroNome}</strong> e ajuda outros clientes a escolher bem. Demora menos de 1 minuto!`
+          : `Podes deixar o teu depoimento respondendo diretamente a este email — a tua opinião sobre o <strong style="color:#fff">FaçoPorTi</strong> ajuda-nos a melhorar.`
+        }
       </p>
-      <a href="mailto:gilsongomesoliveira1@hotmail.com?subject=Depoimento%20FaçoPorTi&body=Olá%2C%20quero%20partilhar%20a%20minha%20experiência%20com%20o%20FaçoPorTi%3A%0A%0A"
+      <a href="${reviewLink || `mailto:gilsongomesoliveira1@hotmail.com?subject=Depoimento%20FaçoPorTi`}"
         style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e0bf6a);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
-        Deixar depoimento →
+        ⭐ Deixar avaliação →
       </a>
     </div>
   `))
