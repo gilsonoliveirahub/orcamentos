@@ -5,6 +5,12 @@ import { cookies } from 'next/headers'
 
 export const runtime = 'nodejs'
 
+const PLAN_LIMITS: Record<string, { photos: number; videos: number }> = {
+  free:    { photos: 5,  videos: 0 },
+  starter: { photos: 10, videos: 2 },
+  pro:     { photos: 50, videos: 5 },
+}
+
 async function getAuthenticatedProfessional() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -16,7 +22,7 @@ async function getAuthenticatedProfessional() {
   if (!user) return null
   const { data: prof } = await supabaseAdmin
     .from('professionals')
-    .select('id')
+    .select('id, plan')
     .eq('user_id', user.id)
     .maybeSingle()
   return prof
@@ -37,6 +43,34 @@ export async function POST(req: NextRequest) {
   if (file.size > 100 * 1024 * 1024) return NextResponse.json({ error: 'Ficheiro demasiado grande (máx 100MB)' }, { status: 400 })
 
   const uploadType = form.get('type') as string | null
+
+  // Verificar limites do plano (não se aplica ao avatar)
+  if (uploadType !== 'avatar') {
+    const plan = (prof as any).plan || 'free'
+    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free
+
+    const { data: existing } = await supabaseAdmin
+      .from('professional_portfolio')
+      .select('type')
+      .eq('professional_id', (prof as any).id)
+
+    const currentPhotos = (existing || []).filter(i => i.type !== 'video').length
+    const currentVideos = (existing || []).filter(i => i.type === 'video').length
+
+    if (isVideo && currentVideos >= limits.videos) {
+      return NextResponse.json({
+        error: `Limite de vídeos atingido para o teu plano (${limits.videos}). Faz upgrade para adicionar mais.`,
+        limit_reached: true,
+      }, { status: 403 })
+    }
+    if (isImage && currentPhotos >= limits.photos) {
+      return NextResponse.json({
+        error: `Limite de fotos atingido para o teu plano (${limits.photos}). Faz upgrade para adicionar mais.`,
+        limit_reached: true,
+      }, { status: 403 })
+    }
+  }
+
   const ext = file.name.split('.').pop()
   const folder = uploadType === 'avatar' ? 'avatars' : 'portfolio'
   const path = `${folder}/${prof.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`

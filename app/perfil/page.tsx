@@ -128,6 +128,16 @@ export default function PerfilPage() {
 
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
 
+  const PLAN_LIMITS: Record<string, { photos: number; videos: number }> = {
+    free:    { photos: 5,  videos: 0 },
+    starter: { photos: 10, videos: 2 },
+    pro:     { photos: 50, videos: 5 },
+  }
+  const plan = professional?.plan || 'free'
+  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free
+  const photoCount = portfolio.filter(i => i.type !== 'video').length
+  const videoCount = portfolio.filter(i => i.type === 'video').length
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
       <Loader2 className="animate-spin text-indigo-500" size={28} />
@@ -327,7 +337,19 @@ export default function PerfilPage() {
               <h2 className="font-black text-white">Portfólio</h2>
               <p className="text-xs text-gray-500 mt-0.5">Aparece no teu perfil público</p>
             </div>
-            <span className="text-xs text-gray-600 font-semibold">{portfolio.length} {portfolio.length === 1 ? 'item' : 'itens'}</span>
+            <div className="text-right">
+              <div className="text-xs font-semibold" style={{ color: photoCount >= limits.photos ? '#f87171' : '#64748b' }}>
+                📷 {photoCount}/{limits.photos} fotos
+              </div>
+              {limits.videos > 0 && (
+                <div className="text-xs font-semibold mt-0.5" style={{ color: videoCount >= limits.videos ? '#f87171' : '#64748b' }}>
+                  🎬 {videoCount}/{limits.videos} vídeos
+                </div>
+              )}
+              {limits.videos === 0 && (
+                <div className="text-xs mt-0.5" style={{ color: '#475569' }}>vídeos: plano free</div>
+              )}
+            </div>
           </div>
 
           {portfolio.length > 0 && (
