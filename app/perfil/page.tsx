@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Trash2 } from 'lucide-react'
+import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
+import Cropper from 'react-easy-crop'
+import type { Area } from 'react-easy-crop'
 
 export default function PerfilPage() {
   const router = useRouter()
@@ -20,6 +22,11 @@ export default function PerfilPage() {
   const [reviews, setReviews] = useState<any[]>([])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
+  const [avatarLightbox, setAvatarLightbox] = useState(false)
   const avatarRef = useRef<HTMLInputElement>(null)
   const portfolioRef = useRef<HTMLInputElement>(null)
 
@@ -68,14 +75,26 @@ export default function PerfilPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  async function handleAvatarUpload(file: File) {
+  function handleAvatarFileSelected(file: File) {
+    const reader = new FileReader()
+    reader.onload = () => setCropSrc(reader.result as string)
+    reader.readAsDataURL(file)
+    setZoom(1)
+    setCrop({ x: 0, y: 0 })
+  }
+
+  async function handleCropConfirm() {
+    if (!cropSrc || !croppedAreaPixels) return
     setUploadingAvatar(true)
+    setCropSrc(null)
+    const blob = await getCroppedImg(cropSrc, croppedAreaPixels)
+    const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
     const form = new FormData()
     form.append('file', file)
     form.append('type', 'avatar')
     const res = await fetch('/api/portfolio', { method: 'POST', body: form })
     const json = await res.json()
-    if (!res.ok) { alert(`Erro avatar: ${json.error}`); setUploadingAvatar(false); return }
+    if (!res.ok) { alert(`Erro: ${json.error}`); setUploadingAvatar(false); return }
     await supabase.from('professionals').update({ avatar_url: json.item.url }).eq('id', professional.id)
     setProfessional((p: any) => ({ ...p, avatar_url: json.item.url }))
     setUploadingAvatar(false)
@@ -117,6 +136,65 @@ export default function PerfilPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
+
+      {/* Crop modal */}
+      {cropSrc && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#000' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <button onClick={() => setCropSrc(null)} className="text-gray-400 hover:text-white transition-colors text-sm font-semibold">
+              Cancelar
+            </button>
+            <span className="text-white font-black text-sm">Ajustar foto</span>
+            <button onClick={handleCropConfirm}
+              className="font-black text-sm px-4 py-1.5 rounded-xl"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}>
+              Confirmar
+            </button>
+          </div>
+          <div className="relative flex-1">
+            <Cropper
+              image={cropSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              showGrid={false}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(_, area) => setCroppedAreaPixels(area)}
+            />
+          </div>
+          <div className="px-6 py-5" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="flex items-center gap-3">
+              <ZoomOut size={18} className="text-gray-400 flex-shrink-0" />
+              <input
+                type="range" min={1} max={3} step={0.05}
+                value={zoom}
+                onChange={e => setZoom(Number(e.target.value))}
+                className="flex-1 accent-indigo-500"
+              />
+              <ZoomIn size={18} className="text-gray-400 flex-shrink-0" />
+            </div>
+            <p className="text-center text-gray-600 text-xs mt-2">Faz zoom e arrasta para ajustar</p>
+          </div>
+        </div>
+      )}
+
+      {/* Avatar lightbox */}
+      {avatarLightbox && professional.avatar_url && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.95)' }}
+          onClick={() => setAvatarLightbox(false)}>
+          <button className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors">
+            <X size={28} />
+          </button>
+          <img src={professional.avatar_url} alt={form.name}
+            className="max-w-full max-h-[85vh] rounded-3xl object-contain"
+            style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.8)' }}
+            onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="max-w-lg mx-auto px-6 py-4 flex items-center gap-3">
@@ -135,23 +213,31 @@ export default function PerfilPage() {
         {/* Avatar + link público */}
         <div className="rounded-2xl p-6 flex items-center gap-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
           <input ref={avatarRef} type="file" accept="image/*" className="hidden"
-            onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])} />
+            onChange={e => { if (e.target.files?.[0]) { handleAvatarFileSelected(e.target.files[0]); e.target.value = '' } }} />
           <div className="flex flex-col items-center gap-2 flex-shrink-0">
             <div className="relative">
               {professional.avatar_url ? (
-                <img src={professional.avatar_url} alt={form.name}
-                  className="w-16 h-16 rounded-2xl object-cover" />
+                <button onClick={() => setAvatarLightbox(true)} className="block">
+                  <img src={professional.avatar_url} alt={form.name}
+                    className="w-16 h-16 rounded-2xl object-cover hover:opacity-90 transition-opacity" />
+                </button>
               ) : (
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black text-white"
                   style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
                   {form.name?.[0] || '?'}
                 </div>
               )}
+              {uploadingAvatar && (
+                <div className="absolute inset-0 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.6)' }}>
+                  <Loader2 size={20} className="animate-spin text-white" />
+                </div>
+              )}
             </div>
             <button onClick={() => avatarRef.current?.click()} disabled={uploadingAvatar}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all"
               style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
-              {uploadingAvatar ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+              <Camera size={11} />
               {uploadingAvatar ? 'A carregar...' : professional.avatar_url ? 'Alterar' : 'Adicionar foto'}
             </button>
           </div>
@@ -351,4 +437,25 @@ export default function PerfilPage() {
       </div>
     </div>
   )
+}
+
+// ── Helpers de crop ───────────────────────────────────────────────────────────
+
+function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.addEventListener('load', () => resolve(img))
+    img.addEventListener('error', reject)
+    img.src = url
+  })
+}
+
+async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
+  const image = await createImage(imageSrc)
+  const canvas = document.createElement('canvas')
+  canvas.width = pixelCrop.width
+  canvas.height = pixelCrop.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height)
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob!), 'image/jpeg', 0.92))
 }
