@@ -119,8 +119,14 @@ export default function PerfilPage() {
   }
 
   async function deletePortfolioItem(item: any) {
-    await fetch('/api/portfolio', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) })
+    if (!confirm('Apagar este item do portfólio?')) return
     setPortfolio(p => p.filter(i => i.id !== item.id))
+    const res = await fetch('/api/portfolio', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item.id }) })
+    if (!res.ok) {
+      const json = await res.json()
+      alert(`Erro ao apagar: ${json.error}`)
+      setPortfolio(p => [...p, item])
+    }
   }
 
   const inp = "w-full rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
@@ -370,9 +376,9 @@ export default function PerfilPage() {
                   )}
                   <button
                     onClick={() => deletePortfolioItem(item)}
-                    className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ background: 'rgba(239,68,68,0.9)' }}>
-                    <X size={12} className="text-white" />
+                    className="absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center transition-opacity"
+                    style={{ background: 'rgba(239,68,68,0.85)', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }}>
+                    <X size={13} className="text-white" />
                   </button>
                 </div>
               ))}
