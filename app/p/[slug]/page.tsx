@@ -15,7 +15,7 @@ export default function ProfessionalPublicPage() {
   const [profession, setProfession] = useState<ProfessionConfig | null>(null)
   const [portfolio, setPortfolio] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
-  const [lightbox, setLightbox] = useState<any | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -347,8 +347,8 @@ export default function ProfessionalPublicPage() {
                 Trabalhos realizados
               </h2>
               <div className="grid grid-cols-3 gap-2">
-                {portfolio.map(item => (
-                  <button key={item.id} onClick={() => setLightbox(item)}
+                {portfolio.map((item, idx) => (
+                  <button key={item.id} onClick={() => setLightboxIndex(idx)}
                     className="relative aspect-square rounded-xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
                     style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     {item.type === 'video' ? (
@@ -415,26 +415,42 @@ export default function ProfessionalPublicPage() {
         </div>
 
         {/* Lightbox */}
-        {lightbox && (
+        {lightboxIndex !== null && portfolio[lightboxIndex] && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.95)' }}
-            onClick={() => setLightbox(null)}
+            onClick={() => setLightboxIndex(null)}
           >
             <button
               className="absolute top-4 right-4 z-10 text-white/60 hover:text-white transition-colors"
-              onClick={() => setLightbox(null)}
+              onClick={() => setLightboxIndex(null)}
             >
               <X size={28} />
             </button>
+            {lightboxIndex > 0 && (
+              <button
+                className="absolute left-2 sm:left-4 z-10 text-white/60 hover:text-white transition-colors p-2"
+                onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) - 1) }}
+              >
+                <ChevronLeft size={32} />
+              </button>
+            )}
+            {lightboxIndex < portfolio.length - 1 && (
+              <button
+                className="absolute right-2 sm:right-4 z-10 text-white/60 hover:text-white transition-colors p-2"
+                onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) + 1) }}
+              >
+                <ChevronRight size={32} />
+              </button>
+            )}
             <div onClick={e => e.stopPropagation()} className="flex flex-col items-center max-w-full">
-              {lightbox.type === 'video' ? (
-                <video src={lightbox.url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
+              {portfolio[lightboxIndex].type === 'video' ? (
+                <video src={portfolio[lightboxIndex].url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
               ) : (
-                <img src={lightbox.url} alt={lightbox.caption || ''} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
+                <img src={portfolio[lightboxIndex].url} alt={portfolio[lightboxIndex].caption || ''} className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
               )}
-              {lightbox.caption && (
-                <p className="text-white/60 text-sm text-center mt-3">{lightbox.caption}</p>
+              {portfolio[lightboxIndex].caption && (
+                <p className="text-white/60 text-sm text-center mt-3">{portfolio[lightboxIndex].caption}</p>
               )}
             </div>
           </div>
