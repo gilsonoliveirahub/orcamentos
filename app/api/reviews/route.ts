@@ -3,6 +3,38 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export const runtime = 'nodejs'
 
+// GET — busca info do lead para a página de avaliação
+export async function GET(req: NextRequest) {
+  const lead_id = req.nextUrl.searchParams.get('lead_id')
+  if (!lead_id) return NextResponse.json({ error: 'lead_id em falta' }, { status: 400 })
+
+  const { data: lead } = await supabaseAdmin
+    .from('leads')
+    .select('id, name, professional_id, status')
+    .eq('id', lead_id)
+    .maybeSingle()
+
+  if (!lead) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
+
+  const { data: prof } = await supabaseAdmin
+    .from('professionals')
+    .select('name, slug, avatar_url, specialty')
+    .eq('id', lead.professional_id)
+    .maybeSingle()
+
+  const { data: existing } = await supabaseAdmin
+    .from('reviews')
+    .select('id')
+    .eq('lead_id', lead_id)
+    .maybeSingle()
+
+  return NextResponse.json({
+    lead: { id: lead.id, name: lead.name },
+    professional: prof,
+    already_reviewed: !!existing,
+  })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { lead_id, rating, comment, client_name } = await req.json()

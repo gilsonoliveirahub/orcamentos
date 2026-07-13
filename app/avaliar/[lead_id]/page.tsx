@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Star, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
 
 export default function AvaliarPage() {
   const { lead_id } = useParams()
@@ -22,30 +21,13 @@ export default function AvaliarPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select('id, name, professional_id, status')
-        .eq('id', lead_id as string)
-        .maybeSingle()
-
-      if (!leadData) { setLoading(false); return }
-      setLead(leadData)
-      setName(leadData.name || '')
-
-      const { data: prof } = await supabase
-        .from('professionals')
-        .select('name, slug, avatar_url, specialty')
-        .eq('id', leadData.professional_id)
-        .maybeSingle()
-      setProfessional(prof)
-
-      const { data: existing } = await supabase
-        .from('reviews')
-        .select('id')
-        .eq('lead_id', lead_id as string)
-        .maybeSingle()
-      if (existing) setAlreadyReviewed(true)
-
+      const res = await fetch(`/api/reviews?lead_id=${lead_id}`)
+      if (!res.ok) { setLoading(false); return }
+      const json = await res.json()
+      setLead(json.lead)
+      setProfessional(json.professional)
+      setAlreadyReviewed(json.already_reviewed)
+      setName(json.lead?.name || '')
       setLoading(false)
     }
     load()
