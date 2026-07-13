@@ -93,12 +93,13 @@ export default function PerfilPage() {
       const { data, error } = await supabase.storage.from('lead-media').upload(path, file, { upsert: false })
       if (error) continue
       const { data: { publicUrl } } = supabase.storage.from('lead-media').getPublicUrl(data.path)
-      const { data: inserted } = await supabase.from('professional_portfolio').insert({
+      const { data: inserted, error: dbError } = await supabase.from('professional_portfolio').insert({
         professional_id: professional.id,
         url: publicUrl,
         type: isVideo ? 'video' : 'image',
         sort_order: portfolio.length,
       }).select().single()
+      if (dbError) { alert(`Erro ao guardar ficheiro: ${dbError.message}`); continue }
       if (inserted) setPortfolio(p => [...p, inserted])
     }
     setUploadingPortfolio(false)
