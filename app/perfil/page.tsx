@@ -27,6 +27,7 @@ export default function PerfilPage() {
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarLightbox, setAvatarLightbox] = useState(false)
+  const [portfolioLightbox, setPortfolioLightbox] = useState<any | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const portfolioRef = useRef<HTMLInputElement>(null)
 
@@ -211,6 +212,25 @@ export default function PerfilPage() {
         </div>
       )}
 
+      {/* Portfolio lightbox */}
+      {portfolioLightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.95)' }}
+          onClick={() => setPortfolioLightbox(null)}>
+          <button className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+            onClick={() => setPortfolioLightbox(null)}>
+            <X size={28} />
+          </button>
+          <div onClick={e => e.stopPropagation()} className="flex flex-col items-center max-w-full">
+            {portfolioLightbox.type === 'video' ? (
+              <video src={portfolioLightbox.url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
+            ) : (
+              <img src={portfolioLightbox.url} alt="" className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="max-w-lg mx-auto px-6 py-4 flex items-center gap-3">
@@ -361,8 +381,9 @@ export default function PerfilPage() {
           {portfolio.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {portfolio.map(item => (
-                <div key={item.id} className="relative aspect-square rounded-xl overflow-hidden group"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div key={item.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  onClick={() => setPortfolioLightbox(item)}>
                   {item.type === 'video' ? (
                     <>
                       <video src={item.url} className="w-full h-full object-cover" muted playsInline />
@@ -375,7 +396,7 @@ export default function PerfilPage() {
                     <img src={item.url} alt="" className="w-full h-full object-cover" />
                   )}
                   <button
-                    onClick={() => deletePortfolioItem(item)}
+                    onClick={e => { e.stopPropagation(); deletePortfolioItem(item) }}
                     className="absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center transition-opacity"
                     style={{ background: 'rgba(239,68,68,0.85)', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' }}>
                     <X size={13} className="text-white" />
