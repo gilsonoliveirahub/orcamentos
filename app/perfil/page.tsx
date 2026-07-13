@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, ZoomIn, ZoomOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import Cropper from 'react-easy-crop'
@@ -27,7 +27,8 @@ export default function PerfilPage() {
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarLightbox, setAvatarLightbox] = useState(false)
-  const [portfolioLightbox, setPortfolioLightbox] = useState<any | null>(null)
+  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<number | null>(null)
+  const touchStartX = useRef<number | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const portfolioRef = useRef<HTMLInputElement>(null)
 
@@ -213,19 +214,45 @@ export default function PerfilPage() {
       )}
 
       {/* Portfolio lightbox */}
-      {portfolioLightbox && (
+      {portfolioLightboxIndex !== null && portfolio[portfolioLightboxIndex] && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.95)' }}
-          onClick={() => setPortfolioLightbox(null)}>
+          onClick={() => setPortfolioLightboxIndex(null)}
+          onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+          onTouchEnd={e => {
+            if (touchStartX.current === null) return
+            const diff = e.changedTouches[0].clientX - touchStartX.current
+            touchStartX.current = null
+            if (Math.abs(diff) < 50) return
+            setPortfolioLightboxIndex(i => {
+              if (i === null) return i
+              if (diff < 0) return i < portfolio.length - 1 ? i + 1 : i
+              return i > 0 ? i - 1 : i
+            })
+          }}>
           <button className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
-            onClick={() => setPortfolioLightbox(null)}>
+            onClick={() => setPortfolioLightboxIndex(null)}>
             <X size={28} />
           </button>
+          {portfolioLightboxIndex > 0 && (
+            <button
+              className="absolute left-3 sm:left-4 text-white/60 hover:text-white transition-colors p-2"
+              onClick={e => { e.stopPropagation(); setPortfolioLightboxIndex(i => (i as number) - 1) }}>
+              <ChevronLeft size={32} />
+            </button>
+          )}
+          {portfolioLightboxIndex < portfolio.length - 1 && (
+            <button
+              className="absolute right-3 sm:right-4 text-white/60 hover:text-white transition-colors p-2"
+              onClick={e => { e.stopPropagation(); setPortfolioLightboxIndex(i => (i as number) + 1) }}>
+              <ChevronRight size={32} />
+            </button>
+          )}
           <div onClick={e => e.stopPropagation()} className="flex flex-col items-center max-w-full">
-            {portfolioLightbox.type === 'video' ? (
-              <video src={portfolioLightbox.url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
+            {portfolio[portfolioLightboxIndex].type === 'video' ? (
+              <video src={portfolio[portfolioLightboxIndex].url} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '80vh' }} />
             ) : (
-              <img src={portfolioLightbox.url} alt="" className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
+              <img src={portfolio[portfolioLightboxIndex].url} alt="" className="max-w-full rounded-xl object-contain" style={{ maxHeight: '80vh' }} />
             )}
           </div>
         </div>
@@ -383,7 +410,7 @@ export default function PerfilPage() {
               {portfolio.map(item => (
                 <div key={item.id} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                  onClick={() => setPortfolioLightbox(item)}>
+                  onClick={() => setPortfolioLightboxIndex(portfolio.indexOf(item))}>
                   {item.type === 'video' ? (
                     <>
                       <video src={item.url} className="w-full h-full object-cover" muted playsInline />

@@ -16,6 +16,7 @@ export default function ProfessionalPublicPage() {
   const [portfolio, setPortfolio] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const touchStartX = useRef<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -420,6 +421,18 @@ export default function ProfessionalPublicPage() {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.95)' }}
             onClick={() => setLightboxIndex(null)}
+            onTouchStart={e => { touchStartX.current = e.touches[0].clientX }}
+            onTouchEnd={e => {
+              if (touchStartX.current === null) return
+              const diff = e.changedTouches[0].clientX - touchStartX.current
+              touchStartX.current = null
+              if (Math.abs(diff) < 50) return
+              setLightboxIndex(i => {
+                if (i === null) return i
+                if (diff < 0) return i < portfolio.length - 1 ? i + 1 : i
+                return i > 0 ? i - 1 : i
+              })
+            }}
           >
             <button
               className="absolute top-4 right-4 z-10 text-white/60 hover:text-white transition-colors"
@@ -429,7 +442,7 @@ export default function ProfessionalPublicPage() {
             </button>
             {lightboxIndex > 0 && (
               <button
-                className="absolute left-2 sm:left-4 z-10 text-white/60 hover:text-white transition-colors p-2"
+                className="absolute left-3 sm:left-4 z-10 text-white/60 hover:text-white transition-colors p-2"
                 onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) - 1) }}
               >
                 <ChevronLeft size={32} />
@@ -437,7 +450,7 @@ export default function ProfessionalPublicPage() {
             )}
             {lightboxIndex < portfolio.length - 1 && (
               <button
-                className="absolute right-2 sm:right-4 z-10 text-white/60 hover:text-white transition-colors p-2"
+                className="absolute right-3 sm:right-4 z-10 text-white/60 hover:text-white transition-colors p-2"
                 onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) + 1) }}
               >
                 <ChevronRight size={32} />
