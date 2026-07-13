@@ -136,23 +136,25 @@ export default function PerfilPage() {
         <div className="rounded-2xl p-6 flex items-center gap-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
           <input ref={avatarRef} type="file" accept="image/*" className="hidden"
             onChange={e => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])} />
-          <button onClick={() => avatarRef.current?.click()} className="relative flex-shrink-0 group">
-            {professional.avatar_url ? (
-              <img src={professional.avatar_url} alt={form.name}
-                className="w-16 h-16 rounded-2xl object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black text-white"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
-                {form.name?.[0] || '?'}
-              </div>
-            )}
-            <div className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: 'rgba(0,0,0,0.55)' }}>
-              {uploadingAvatar
-                ? <Loader2 size={18} className="animate-spin text-white" />
-                : <Camera size={18} className="text-white" />}
+          <div className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="relative">
+              {professional.avatar_url ? (
+                <img src={professional.avatar_url} alt={form.name}
+                  className="w-16 h-16 rounded-2xl object-cover" />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black text-white"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}>
+                  {form.name?.[0] || '?'}
+                </div>
+              )}
             </div>
-          </button>
+            <button onClick={() => avatarRef.current?.click()} disabled={uploadingAvatar}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all"
+              style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+              {uploadingAvatar ? <Loader2 size={11} className="animate-spin" /> : <Camera size={11} />}
+              {uploadingAvatar ? 'A carregar...' : professional.avatar_url ? 'Alterar' : 'Adicionar foto'}
+            </button>
+          </div>
           <div className="flex-1 min-w-0">
             <div className="font-black text-white text-lg">{form.name}</div>
             <div className="text-sm text-gray-500">{specialties.join(' · ')}{form.zone ? ` · ${form.zone}` : ''}</div>
