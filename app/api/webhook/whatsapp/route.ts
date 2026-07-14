@@ -4,10 +4,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { QUESTIONS, getNextQuestion, parseAnswer } from '@/lib/questions'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
+import { sendWhatsApp } from '@/lib/whatsapp'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const contentType = req.headers.get('content-type') || ''
+    const body = contentType.includes('application/json')
+      ? await req.json()
+      : Object.fromEntries((await req.formData()).entries())
 
     // Suporte Evolution API e Twilio
     const phone = body.data?.key?.remoteJid?.replace('@s.whatsapp.net', '')
@@ -139,7 +143,10 @@ export async function POST(req: NextRequest) {
         .eq('id', lead.id)
     }
 
-    // Retornar resposta (a plataforma WhatsApp envia a mensagem)
+    if (responseText) {
+      await sendWhatsApp(phone, responseText)
+    }
+
     return NextResponse.json({
       success: true,
       phone,
