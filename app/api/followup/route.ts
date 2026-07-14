@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
         body: JSON.stringify({
           from: 'FaçoPorTi <noreply@xn--faoporti-t0a.com>',
           to: [prof.email],
+          reply_to: 'gilsongomesoliveira1@hotmail.com',
           subject: isDay5
             ? `⚠️ Lead fria há 5 dias — ${lead.name || 'Cliente'}`
             : `💡 Follow-up — Já contactaste ${lead.name || 'o cliente'}?`,

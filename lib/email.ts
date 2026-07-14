@@ -1,4 +1,5 @@
 const FROM = 'FaçoPorTi <noreply@xn--faoporti-t0a.com>'
+const REPLY_TO = 'gilsongomesoliveira1@hotmail.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
 async function sendEmail(to: string, subject: string, html: string) {
@@ -8,7 +9,7 @@ async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    body: JSON.stringify({ from: FROM, to: [to], subject, html, reply_to: REPLY_TO }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
