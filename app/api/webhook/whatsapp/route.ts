@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin'
 import { QUESTIONS, getNextQuestion, parseAnswer } from '@/lib/questions'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { sendWhatsApp } from '@/lib/whatsapp'
