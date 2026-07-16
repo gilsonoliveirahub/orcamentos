@@ -17,10 +17,16 @@ import { sendWhatsApp } from '@/lib/whatsapp'
 // no fim) antes de voltar a atender pedidos reais.
 const INTAKE_ENABLED = process.env.WHATSAPP_INTAKE_ENABLED === 'true'
 
-const COMING_SOON_MESSAGE =
-  'Olá! 👋 Obrigado por contactares a *Façoporti*.\n\n' +
-  'Estamos ainda a preparar a plataforma e o atendimento automático de pedidos vai estar disponível em breve.\n\n' +
-  'Volta a escrever-nos dentro de dias. Obrigado pela paciência! 🙏'
+const INFO_MESSAGE =
+  'Olá! 👋 Obrigado por contactar o FaçoPorTi.\n\n' +
+  'A plataforma está ativa.\n\n' +
+  '🔧 Para pedir um orçamento, aceda:\n' +
+  'https://façoporti.com/pedir\n\n' +
+  '👷 Se é profissional, pode criar a sua conta ou entrar aqui:\n' +
+  'https://façoporti.com/login\n\n' +
+  '✉️ Para apoio ou dúvidas sobre a plataforma:\n' +
+  'contacto@façoporti.com\n\n' +
+  'FaçoPorTi — ligamos clientes a profissionais.'
 
 function maskPhone(phone: string) {
   const digits = phone.replace(/\D/g, '')
@@ -50,14 +56,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!INTAKE_ENABLED) {
-      const result = await sendWhatsApp(phone, COMING_SOON_MESSAGE)
+      const result = await sendWhatsApp(phone, INFO_MESSAGE)
       if (result.status !== 'sent') {
-        console.warn(`[webhook/whatsapp] mensagem "em breve" não enviada (${maskPhone(phone)}): ${result.reason}`)
+        console.warn(`[webhook/whatsapp] mensagem informativa não enviada (${maskPhone(phone)}): ${result.reason}`)
       }
       return NextResponse.json({
         success: true,
         phone,
-        response: COMING_SOON_MESSAGE,
+        response: INFO_MESSAGE,
         lead_id: null,
       })
     }

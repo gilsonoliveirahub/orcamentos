@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { MessageCircle } from 'lucide-react'
 
 export default function ContactosPage() {
   return (
@@ -24,6 +25,16 @@ export default function ContactosPage() {
             </a>
           </p>
           <p className="text-gray-500 text-base">Respondemos o mais rápido possível.</p>
+
+          <a
+            href="https://wa.me/14245872587"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 py-3 px-6 rounded-xl font-bold text-sm transition-all"
+            style={{ background: 'rgba(37,211,102,0.12)', color: '#25d366', border: '1px solid rgba(37,211,102,0.2)' }}
+          >
+            <MessageCircle size={16} /> Falar connosco pelo WhatsApp
+          </a>
         </div>
       </div>
 

@@ -26,7 +26,7 @@ describe('POST /api/webhook/whatsapp', () => {
   })
 
   describe('captação desativada (comportamento por omissão)', () => {
-    it('nunca cria lead, nunca consulta profissionais, responde sempre com a mensagem da Façoporti', async () => {
+    it('nunca cria lead, nunca consulta profissionais, responde sempre com a mensagem informativa da FaçoPorTi', async () => {
       const from = vi.fn()
       vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
       const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
@@ -39,11 +39,24 @@ describe('POST /api/webhook/whatsapp', () => {
       expect(res.status).toBe(200)
       expect(json.success).toBe(true)
       expect(json.lead_id).toBeNull()
-      expect(from).not.toHaveBeenCalled() // nunca toca na base de dados
+      expect(from).not.toHaveBeenCalled() // nunca toca na base de dados — sem lead, sem consulta a profissionais
       expect(sendWhatsApp).toHaveBeenCalledTimes(1)
       const [, sentMessage] = sendWhatsApp.mock.calls[0]
-      expect(sentMessage).toContain('Façoporti')
+
+      // A plataforma está ativa — nunca dizer que ainda está em preparação
+      expect(sentMessage).toContain('FaçoPorTi')
+      expect(sentMessage).toContain('A plataforma está ativa')
+      expect(sentMessage).not.toContain('em preparação')
+      expect(sentMessage).not.toContain('em breve')
       expect(sentMessage).not.toContain('Gilson')
+
+      // Encaminha para os sítios certos, nunca inicia o questionário nem atribui profissional
+      expect(sentMessage).toContain('https://façoporti.com/pedir')
+      expect(sentMessage).toContain('https://façoporti.com/login')
+      expect(sentMessage).toContain('contacto@façoporti.com')
+
+      // Nunca revela dados pessoais — a mensagem não depende de nenhum lead/cliente real
+      expect(sentMessage).not.toMatch(/\d{8,}/) // nenhum número de telefone embutido na resposta
     })
 
     it('responde da mesma forma a qualquer mensagem repetida — nunca entra em loop diferente', async () => {
