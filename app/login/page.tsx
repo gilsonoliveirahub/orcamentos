@@ -30,6 +30,15 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Email ou password incorrectos.'); setLoading(false); return }
 
+    // Se veio de um link protegido (ex: /admin), volta para lá em vez do dashboard normal
+    const params = new URLSearchParams(window.location.search)
+    const redirect = params.get('redirect')
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      router.push(redirect)
+      router.refresh()
+      return
+    }
+
     // Verificar se é profissional ou cliente
     const { data: prof } = await supabase.from('professionals').select('id').eq('user_id', data.user.id).maybeSingle()
     if (prof) {
