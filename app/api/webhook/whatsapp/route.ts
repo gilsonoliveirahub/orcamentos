@@ -144,7 +144,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (responseText) {
-      await sendWhatsApp(phone, responseText)
+      const result = await sendWhatsApp(phone, responseText)
+      if (result.status !== 'sent') {
+        console.warn(`[webhook/whatsapp] resposta não enviada (lead ${lead.id}): ${result.reason}`)
+      }
     }
 
     return NextResponse.json({

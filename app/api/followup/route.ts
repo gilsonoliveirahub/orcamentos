@@ -111,7 +111,11 @@ export async function GET(req: NextRequest) {
         const msg = isDay5
           ? `⚠️ *Lead sem resposta há 5 dias*\n\n👤 ${lead.name || '—'} · ${servico}\n📱 ${lead.phone || '—'}\n\nVer lead: ${appUrl}/leads/${lead.id}`
           : `💡 *Follow-up D+2*\n\nJá contactaste *${lead.name || 'o cliente'}*?\n📱 ${lead.phone || '—'} · ${servico}\n\nVer lead: ${appUrl}/leads/${lead.id}`
-        sendWhatsApp(prof.phone, msg).catch(() => {})
+        sendWhatsApp(prof.phone, msg).then(result => {
+          if (result.status !== 'sent') {
+            console.warn(`[followup] WhatsApp não enviado (lead ${lead.id}): ${result.reason}`)
+          }
+        })
       }
 
       totalSent++

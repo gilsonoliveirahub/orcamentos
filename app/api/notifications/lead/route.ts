@@ -53,13 +53,16 @@ export async function POST(req: NextRequest) {
     // WhatsApp ao profissional
     if (prof.phone) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
-      await sendWhatsApp(prof.phone,
+      const result = await sendWhatsApp(prof.phone,
         `🔔 *Novo pedido de orçamento!*\n\n` +
         `👤 *Cliente:* ${lead.name || '—'}\n` +
         `📱 *Telefone:* ${lead.phone || '—'}\n` +
         `🔧 *Serviço:* ${servico}\n\n` +
         `Ver detalhes: ${appUrl}/leads/${lead.id}`
       )
+      if (result.status !== 'sent') {
+        console.warn(`[notifications/lead] WhatsApp não enviado (lead ${lead.id}): ${result.reason}`)
+      }
     }
 
     return NextResponse.json({ ok: true })
