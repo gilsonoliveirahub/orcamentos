@@ -92,7 +92,7 @@ export default function UpgradePage() {
             <div className="text-3xl font-black text-white mb-1">€19<span className="text-base font-normal text-gray-400">/mês</span></div>
             <p className="text-xs text-gray-500 mb-5">Ideal para começar</p>
             <ul className="space-y-3 mb-8 flex-1">
-              {['Até 10 leads/mês', 'Link pessoal', 'Orçamentos automáticos', 'Dashboard kanban', 'Suporte por email'].map(f => (
+              {['Até 10 pedidos/mês via link pessoal', 'Link pessoal', 'Orçamentos automáticos', 'Dashboard kanban', 'Suporte por email'].map(f => (
                 <li key={f} className="flex items-center gap-2 text-sm text-gray-300">
                   <CheckCircle size={14} className="text-indigo-400 flex-shrink-0" /> {f}
                 </li>
@@ -134,7 +134,7 @@ export default function UpgradePage() {
               {[
                 { label: 'Até 50 pedidos/mês via link', soon: false },
                 { label: 'Follow-up automático', soon: false },
-                { label: 'Notificações WhatsApp', soon: true },
+                { label: 'Notificações de novos pedidos por WhatsApp', soon: false },
                 { label: 'PDF de orçamento', soon: true },
                 { label: 'Estatísticas avançadas', soon: false },
                 { label: 'Suporte prioritário', soon: false },

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
     const { data: leads } = await supabaseAdmin
       .from('leads')
-      .select('*, professionals(name, email, phone, specialty)')
+      .select('*, professionals(name, email, phone, specialty, plan)')
       .gte('created_at', from.toISOString())
       .lte('created_at', to.toISOString())
       .not('status', 'in', '(fechado,perdido)')
@@ -45,6 +45,11 @@ export async function GET(req: NextRequest) {
     for (const lead of leads) {
       const prof = lead.professionals
       if (!prof?.email) continue
+
+      // Nunca enviar follow-up (revela nome/telefone) para um lead que o
+      // profissional ainda não desbloqueou — plano free ou marketplace sem créditos
+      const isBlocked = !prof.plan || prof.plan === 'free' || !!lead.locked
+      if (isBlocked) continue
 
       const metadata = lead.metadata || {}
       const servico = metadata.tipo_trabalho || lead.q1_tipo_trabalho || prof.specialty || 'serviço'

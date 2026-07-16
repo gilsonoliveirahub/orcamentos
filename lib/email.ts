@@ -30,6 +30,38 @@ function wrap(content: string) {
   `
 }
 
+// ── Novo lead BLOQUEADO — nunca inclui dados de contacto do cliente ───────────
+export async function emailNovoLeadBloqueado({
+  profName, profEmail, profSpecialty, zoneApprox, isFreePlan,
+}: {
+  profName: string; profEmail: string; profSpecialty: string
+  zoneApprox?: string | null; isFreePlan: boolean
+}) {
+  const ctaText = isFreePlan ? 'Ativar plano' : 'Desbloquear pedido'
+  const ctaUrl = isFreePlan ? `${APP_URL}/upgrade` : `${APP_URL}/dashboard`
+
+  await sendEmail(profEmail, `🔔 Novo pedido — ${profSpecialty}`, wrap(`
+    <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 32px">
+      <h2 style="margin:0;color:#fff;font-size:20px">🔒 Novo pedido de orçamento!</h2>
+      <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:14px">Os detalhes ficam disponíveis depois de ${isFreePlan ? 'ativares um plano' : 'desbloqueares'}</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 20px">Olá <strong style="color:#fff">${profName}</strong>, tens um novo pedido!</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+        <tr style="background:rgba(255,255,255,0.05)">
+          <td style="padding:10px;color:#64748b;font-size:13px">Especialidade</td>
+          <td style="padding:10px;font-weight:bold;color:#fff">${profSpecialty}</td>
+        </tr>
+        ${zoneApprox ? `<tr><td style="padding:10px;color:#64748b;font-size:13px">Zona</td><td style="padding:10px;color:#fff">${zoneApprox}</td></tr>` : ''}
+      </table>
+      <a href="${ctaUrl}"
+        style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        ${ctaText} →
+      </a>
+    </div>
+  `))
+}
+
 // ── Novo lead para o profissional ─────────────────────────────────────────────
 export async function emailNovoLead({
   profName, profEmail, profSpecialty,

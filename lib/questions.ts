@@ -2,7 +2,7 @@ export const QUESTIONS = [
   {
     id: 1,
     key: 'q1_tipo_trabalho',
-    text: 'Olá! 👋 Sou o assistente do Gilson Oliveira, pintor profissional.\n\nQue tipo de trabalho precisa?\n\n1️⃣ Interior (quartos, sala, cozinha...)\n2️⃣ Exterior (fachada, garagem...)\n3️⃣ Ambos',
+    text: 'Olá! 👋 Sou o assistente da Façoporti.\n\nQue tipo de trabalho precisa?\n\n1️⃣ Interior (quartos, sala, cozinha...)\n2️⃣ Exterior (fachada, garagem...)\n3️⃣ Ambos',
     type: 'choice',
     choices: { '1': 'interior', '2': 'exterior', '3': 'ambos', 'interior': 'interior', 'exterior': 'exterior', 'ambos': 'ambos' },
   },
@@ -103,6 +103,12 @@ export function parseAnswer(question: typeof QUESTIONS[0], text: string): any {
 
   if (question.type === 'choice' && question.choices) {
     return (question.choices as Record<string, any>)[normalized] || text
+  }
+
+  // q11_fotos_url é do tipo text[] na base de dados — nunca devolver uma
+  // string aqui, ou o UPDATE falha com "malformed array literal"
+  if (question.type === 'photos') {
+    return []
   }
 
   return text

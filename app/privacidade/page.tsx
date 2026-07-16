@@ -24,7 +24,7 @@ export default function PrivacidadePage() {
             <p className="mb-1"><strong className="text-white">Responsável pelo tratamento:</strong> Gilson Gomes de Oliveira</p>
             <p className="mb-1"><strong className="text-white">NIF:</strong> 232 619 808</p>
             <p className="mb-1"><strong className="text-white">Morada:</strong> Av. Embaixador Assis Chateaubriand, n.º 21, 2.º Direito, 2780-197 Oeiras, Lisboa, Portugal</p>
-            <p className="mt-2">Contacto geral: <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a></p>
+            <p className="mt-2">Contacto geral: <a href="mailto:contacto@façoporti.com" className="text-indigo-400 hover:underline">contacto@façoporti.com</a></p>
           </section>
 
           <section>
@@ -81,7 +81,7 @@ export default function PrivacidadePage() {
               <li>Retirar o consentimento a qualquer momento, sem prejuízo da licitude do tratamento efetuado antes da retirada</li>
               <li>Apresentar reclamação à CNPD (Comissão Nacional de Proteção de Dados — <a href="https://www.cnpd.pt" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">cnpd.pt</a>)</li>
             </ul>
-            <p className="mt-3">Para exercer os seus direitos, contacte-nos em <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
+            <p className="mt-3">Para exercer os seus direitos, contacte-nos em <a href="mailto:contacto@façoporti.com" className="text-indigo-400 hover:underline">contacto@façoporti.com</a>.</p>
           </section>
 
           <section>

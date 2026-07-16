@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://façoporti.com'),
   openGraph: {
     title: "FaçoPorTi — Orçamentos Automáticos para Profissionais",
-    description: "Recebe pedidos de orçamento qualificados, sem concorrência. Starter a €19/mês.",
+    description: "Recebe pedidos de orçamento qualificados pelo teu link pessoal, sem concorrência com outros profissionais. Starter a €19/mês.",
     locale: 'pt_PT',
     type: 'website',
   },

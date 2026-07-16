@@ -4,11 +4,18 @@ import { NextRequest, NextResponse } from 'next/server'
 const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta', '/upgrade', '/creditos']
 const AUTH_ONLY = ['/login', '/admin/login']
 
+// Compara por segmento de caminho, não por prefixo de texto — "/conta" não
+// deve corresponder a "/contactos" (bug encontrado 2026-07-16: a rota pública
+// /contactos ficava presa atrás do login por causa disto).
+function matchesPath(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(prefix + '/')
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   const isAdminLogin = pathname === '/admin/login'
-  const isProtected = !isAdminLogin && PROTECTED.some(p => pathname.startsWith(p))
+  const isProtected = !isAdminLogin && PROTECTED.some(p => matchesPath(pathname, p))
   const isAuthOnly = AUTH_ONLY.some(p => pathname === p)
   if (!isProtected && !isAuthOnly) return NextResponse.next()
 
@@ -29,7 +36,7 @@ export async function proxy(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAdminArea = pathname.startsWith('/admin')
+  const isAdminArea = matchesPath(pathname, '/admin')
 
   if (isProtected && !user) {
     const loginUrl = new URL(isAdminArea ? '/admin/login' : '/login', req.url)

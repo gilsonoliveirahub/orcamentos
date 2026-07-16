@@ -6,6 +6,27 @@ import { QUESTIONS, getNextQuestion, parseAnswer } from '@/lib/questions'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { sendWhatsApp } from '@/lib/whatsapp'
 
+// Fase de captação de profissionais — atendimento automático de pedidos de
+// clientes está temporariamente desativado (por omissão, sempre desligado
+// a menos que WHATSAPP_INTAKE_ENABLED=true esteja definido no ambiente).
+// Não cria leads nem encaminha contactos para nenhum profissional enquanto
+// isto estiver desligado.
+// Quando reativar: o fluxo abaixo ainda assume "1 profissional só" e
+// precisa do redesenho descrito no diagnóstico (identificar especialidade
+// antes de associar profissional, corresponder por especialidade+zona só
+// no fim) antes de voltar a atender pedidos reais.
+const INTAKE_ENABLED = process.env.WHATSAPP_INTAKE_ENABLED === 'true'
+
+const COMING_SOON_MESSAGE =
+  'Olá! 👋 Obrigado por contactares a *Façoporti*.\n\n' +
+  'Estamos ainda a preparar a plataforma e o atendimento automático de pedidos vai estar disponível em breve.\n\n' +
+  'Volta a escrever-nos dentro de dias. Obrigado pela paciência! 🙏'
+
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  return digits.length > 4 ? `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}` : '****'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || ''
@@ -28,6 +49,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
     }
 
+    if (!INTAKE_ENABLED) {
+      const result = await sendWhatsApp(phone, COMING_SOON_MESSAGE)
+      if (result.status !== 'sent') {
+        console.warn(`[webhook/whatsapp] mensagem "em breve" não enviada (${maskPhone(phone)}): ${result.reason}`)
+      }
+      return NextResponse.json({
+        success: true,
+        phone,
+        response: COMING_SOON_MESSAGE,
+        lead_id: null,
+      })
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Fluxo completo de leads — desativado por agora (ver INTAKE_ENABLED)
+    // ────────────────────────────────────────────────────────────────
+
     // Buscar ou criar lead
     let { data: lead } = await supabase
       .from('leads')
@@ -40,20 +78,21 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!lead) {
-      // Buscar profissional padrão
-      const { data: professional } = await supabase
-        .from('professionals')
-        .select('*')
-        .limit(1)
-        .single()
-
-      const { data: newLead } = await supabase
+      // Não associar a nenhum profissional na criação — a correspondência
+      // por especialidade/zona só deve acontecer depois de o pedido estar
+      // concluído (ver diagnóstico de 2026-07-16)
+      const { data: newLead, error: insertError } = await supabase
         .from('leads')
-        .insert({ phone, professional_id: professional?.id, current_question: 0 })
+        .insert({ phone, professional_id: null, current_question: 0 })
         .select()
         .single()
 
-      lead = { ...newLead, professionals: professional }
+      if (insertError || !newLead) {
+        console.error(`[webhook/whatsapp] falha ao criar lead (${maskPhone(phone)}): ${insertError?.message}`)
+        return NextResponse.json({ error: 'Erro ao criar pedido' }, { status: 500 })
+      }
+
+      lead = { ...newLead, professionals: null }
     }
 
     const currentQ = lead.current_question || 0
@@ -64,7 +103,7 @@ export async function POST(req: NextRequest) {
 
     if (currentQ === 0) {
       // Primeiro contacto — pedir nome
-      responseText = `Olá! 👋 Bem-vindo ao serviço de orçamentos de *Gilson Oliveira*, pintor profissional em Lisboa.\n\nComo se chama?`
+      responseText = `Olá! 👋 Bem-vindo à *Façoporti*.\n\nComo se chama?`
       updates = { current_question: 0.5 }
     } else if (currentQ === 0.5) {
       // Guardar nome e começar questões
@@ -114,7 +153,7 @@ export async function POST(req: NextRequest) {
           const proposalText = generateProposalText(lead, quoteResult, professional)
 
           // Guardar orçamento
-          await supabase.from('quotes').insert({
+          const { error: quoteError } = await supabase.from('quotes').insert({
             lead_id: lead.id,
             professional_id: lead.professional_id,
             area_m2: area_paredes,
@@ -127,6 +166,9 @@ export async function POST(req: NextRequest) {
             sent_at: new Date().toISOString(),
             status: 'enviado',
           })
+          if (quoteError) {
+            console.error(`[webhook/whatsapp] falha ao guardar orçamento (lead ${lead.id}): ${quoteError.message}`)
+          }
 
           responseText = proposalText
         }
@@ -137,10 +179,15 @@ export async function POST(req: NextRequest) {
 
     // Actualizar lead
     if (Object.keys(updates).length > 0) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('leads')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', lead.id)
+
+      if (updateError) {
+        console.error(`[webhook/whatsapp] falha ao atualizar lead ${lead.id}: ${updateError.message}`)
+        return NextResponse.json({ error: 'Erro ao gravar resposta' }, { status: 500 })
+      }
     }
 
     if (responseText) {

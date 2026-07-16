@@ -100,7 +100,7 @@ export default function PedirPage() {
           <p className="text-gray-400 mb-8">
             {assigned
               ? 'O teu pedido foi atribuído a um profissional. Receberás contacto em breve.'
-              : 'Ainda não temos profissionais disponíveis na tua zona. Assim que um estiver disponível, entraremos em contacto.'}
+              : 'Recebemos o seu pedido. Neste momento ainda não temos um profissional compatível disponível na sua zona. O pedido ficou registado — vamos analisá-lo assim que houver um profissional adequado disponível.'}
           </p>
           <Link href="/" className="inline-block text-sm font-semibold px-6 py-3 rounded-2xl"
             style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>

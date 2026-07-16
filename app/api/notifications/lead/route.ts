@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { emailNovoLead } from '@/lib/email'
+import { emailNovoLead, emailNovoLeadBloqueado } from '@/lib/email'
 import { sendWhatsApp } from '@/lib/whatsapp'
 
 export const dynamic = 'force-dynamic'
@@ -11,13 +11,44 @@ export async function POST(req: NextRequest) {
 
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('*, professionals(name, email, specialty)')
+      .select('*, professionals(name, email, phone, specialty, plan, zone)')
       .eq('id', lead_id)
       .single()
 
     if (!lead || !lead.professionals?.email) return NextResponse.json({ ok: false })
 
     const prof = lead.professionals
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
+
+    // Bloqueado = plano free (nunca abre nenhum lead) OU marketplace sem
+    // créditos (lead.locked). Verificação no servidor — nunca confiar só na UI.
+    const isFreePlan = !prof.plan || prof.plan === 'free'
+    const isBlocked = isFreePlan || !!lead.locked
+
+    if (isBlocked) {
+      await emailNovoLeadBloqueado({
+        profName: prof.name,
+        profEmail: prof.email,
+        profSpecialty: prof.specialty,
+        zoneApprox: lead.zone_requested || prof.zone || null,
+        isFreePlan,
+      })
+
+      if (prof.phone) {
+        const ctaUrl = isFreePlan ? `${appUrl}/upgrade` : `${appUrl}/dashboard`
+        const result = await sendWhatsApp(prof.phone,
+          `🔒 *Novo pedido de orçamento!*\n\n` +
+          `🔧 *Especialidade:* ${prof.specialty}\n\n` +
+          `${isFreePlan ? 'Ativa o teu plano' : 'Desbloqueia'} para ver os detalhes: ${ctaUrl}`
+        )
+        if (result.status !== 'sent') {
+          console.warn(`[notifications/lead] WhatsApp (bloqueado) não enviado (lead ${lead.id}): ${result.reason}`)
+        }
+      }
+
+      return NextResponse.json({ ok: true, blocked: true })
+    }
+
     const metadata = lead.metadata || {}
     const servico = metadata.tipo_trabalho
       ? (Array.isArray(metadata.tipo_trabalho) ? metadata.tipo_trabalho.join(', ') : metadata.tipo_trabalho)
@@ -52,7 +83,6 @@ export async function POST(req: NextRequest) {
 
     // WhatsApp ao profissional
     if (prof.phone) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
       const result = await sendWhatsApp(prof.phone,
         `🔔 *Novo pedido de orçamento!*\n\n` +
         `👤 *Cliente:* ${lead.name || '—'}\n` +

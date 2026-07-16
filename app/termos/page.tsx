@@ -71,7 +71,7 @@ export default function TermosPage() {
           <section>
             <h2 className="text-lg font-bold text-white mb-3">6. Cancelamentos e reembolsos</h2>
             <p className="mb-3">O utilizador pode cancelar a sua subscrição a qualquer momento através do dashboard. O acesso à plataforma mantém-se ativo até ao fim do período faturado.</p>
-            <p className="mb-3">Reembolsos de subscrições podem ser solicitados em até 14 dias após o início do plano, desde que não tenham sido utilizadas as funcionalidades pagas. Para solicitar reembolso, contacte <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
+            <p className="mb-3">Reembolsos de subscrições podem ser solicitados em até 14 dias após o início do plano, desde que não tenham sido utilizadas as funcionalidades pagas. Para solicitar reembolso, contacte <a href="mailto:contacto@façoporti.com" className="text-indigo-400 hover:underline">contacto@façoporti.com</a>.</p>
             <p>Pacotes de créditos não são reembolsáveis após compra.</p>
           </section>
 
@@ -121,7 +121,7 @@ export default function TermosPage() {
 
           <section>
             <h2 className="text-lg font-bold text-white mb-3">13. Contacto</h2>
-            <p>Para questões relacionadas com estes termos, contacte-nos em <a href="mailto:suporte@facoporti.com" className="text-indigo-400 hover:underline">suporte@facoporti.com</a>.</p>
+            <p>Para questões relacionadas com estes termos, contacte-nos em <a href="mailto:contacto@façoporti.com" className="text-indigo-400 hover:underline">contacto@façoporti.com</a>.</p>
           </section>
 
         </div>

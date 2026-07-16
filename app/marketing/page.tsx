@@ -199,9 +199,9 @@ export default function MarketingPage() {
               <ul className="space-y-4">
                 {[
                   'O cliente entra diretamente no FaçoPorTi',
-                  'O pedido pode ficar disponível para profissionais compatíveis',
-                  'Podes desbloquear a lead se quiseres',
-                  'Pagas apenas quando queres contactar',
+                  'O pedido é encaminhado para um profissional ativo e compatível (especialidade e zona)',
+                  'Pagas com créditos para veres os dados completos',
+                  'Opcional — só compras se quiseres',
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-white/50">
                     <span className="text-white/30">→</span> {item}
@@ -256,13 +256,36 @@ export default function MarketingPage() {
 
       {/* PREÇOS */}
       <section id="precos" className="py-32 bg-white/2 border-t border-white/5">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">Preços simples</h2>
             <p className="text-white/50 text-lg">Sem surpresas. Cancelas quando quiseres.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Free */}
+            <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
+              <h3 className="text-2xl font-bold mb-2">Free</h3>
+              <div className="text-4xl font-bold mb-1">€0</div>
+              <p className="text-white/40 text-sm mb-8">Para criares o teu perfil</p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Conta e perfil profissional',
+                  'Link pessoal gratuito',
+                  'Recebes pedidos no dashboard',
+                  'Pedidos ficam visíveis mas bloqueados',
+                ].map((f) => (
+                  <li key={f} className="flex items-center gap-3 text-white/60 text-sm">
+                    <span className="text-white/30">•</span> {f}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/login" className="block text-center border border-white/20 text-white py-3 rounded-full hover:border-white/40 transition-colors">
+                Criar conta grátis
+              </Link>
+              <p className="text-center text-white/30 text-xs mt-4">Ativa o Starter ou o Pro para abrires os dados completos dos pedidos.</p>
+            </div>
+
             {/* Starter */}
             <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
               <h3 className="text-2xl font-bold mb-2">Starter</h3>
@@ -298,7 +321,7 @@ export default function MarketingPage() {
                   { label: 'Link profissional', soon: false },
                   { label: 'Até 50 pedidos por mês no teu link', soon: false },
                   { label: 'Follow-up automático', soon: false },
-                  { label: 'Notificações WhatsApp', soon: true },
+                  { label: 'Notificações de novos pedidos por WhatsApp', soon: false },
                   { label: 'PDF de orçamento', soon: true },
                   { label: 'Estatísticas avançadas', soon: false },
                   { label: 'Suporte prioritário', soon: false },
@@ -338,15 +361,15 @@ export default function MarketingPage() {
             },
             {
               q: 'O que é o marketplace?',
-              a: 'É a secção pública do FaçoPorTi onde qualquer pessoa pode pedir um orçamento sem ter o link de um profissional específico. Esses pedidos são atribuídos automaticamente a profissionais disponíveis na zona e especialidade.',
+              a: 'O marketplace reúne pedidos feitos diretamente no FaçoPorTi. Quando existe um profissional ativo e compatível com a especialidade e a zona, o pedido é encaminhado para esse profissional. Os leads do marketplace são opcionais e pagos separadamente através de créditos.',
             },
             {
               q: 'Quando pago por uma lead?',
-              a: 'Só pagas quando recebes um lead do marketplace — desde 2,50€ por lead. Pedidos que chegam pelo teu link pessoal estão totalmente incluídos no plano mensal, sem custo adicional.',
+              a: 'Pagas com créditos sempre que recebes um lead do marketplace — desde 2,50€ por lead. Pedidos que chegam pelo teu link pessoal estão incluídos no plano mensal, sem custo adicional, até ao limite mensal do teu plano.',
             },
             {
               q: 'O que está incluído no plano mensal?',
-              a: 'O teu link pessoal, a receção e gestão ilimitada de pedidos via esse link, o pipeline Kanban e os orçamentos automáticos. No plano Pro tens ainda follow-up automático, notificações WhatsApp, PDF de orçamento e estatísticas avançadas.',
+              a: 'O teu link pessoal, a receção e gestão de pedidos via esse link (até ao limite do teu plano — 10/mês no Starter, 50/mês no Pro), o pipeline Kanban e os orçamentos automáticos. No plano Pro tens ainda follow-up automático, notificações WhatsApp e estatísticas avançadas.',
             },
             {
               q: 'Posso comprar mais leads do marketplace?',
@@ -377,17 +400,18 @@ export default function MarketingPage() {
         <div className="relative">
           <div className="text-8xl text-[#c9a84c]/20 font-serif absolute -top-8 left-1/2 -translate-x-1/2">"</div>
           <blockquote className="text-2xl md:text-3xl font-light leading-relaxed text-white/80 mb-8">
-            Antes perdia 30 minutos por lead a fazer perguntas no WhatsApp. Agora recebo tudo preenchido e só tenho de confirmar o valor.
+            Antes perdia cerca de 30 minutos por pedido a fazer perguntas no WhatsApp. Agora recebo as informações organizadas e só preciso de confirmar o valor.
           </blockquote>
           <div className="flex items-center justify-center gap-4">
             <img
-              src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&q=80"
-              alt="Pintor"
-              className="w-12 h-12 rounded-full object-cover"
+              src="/gilson-depoimento.png"
+              alt="Gilson Oliveira"
+              className="w-12 h-12 rounded-full object-cover object-center"
             />
             <div className="text-left">
-              <div className="font-semibold">Profissional independente</div>
-              <div className="text-sm text-white/40">Pintor, Lisboa</div>
+              <div className="font-semibold">Gilson Oliveira</div>
+              <div className="text-sm text-white/40">Pintor profissional e fundador do FaçoPorTi</div>
+              <div className="text-sm text-white/40">Lisboa</div>
             </div>
           </div>
         </div>

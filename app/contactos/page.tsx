@@ -19,8 +19,8 @@ export default function ContactosPage() {
           <p>Se precisares de ajuda ou tiveres alguma dúvida, podes entrar em contacto connosco:</p>
           <p>
             Email:{' '}
-            <a href="mailto:suporte@facoporti.com" className="text-[#c9a84c] hover:underline">
-              suporte@facoporti.com
+            <a href="mailto:contacto@façoporti.com" className="text-[#c9a84c] hover:underline">
+              contacto@façoporti.com
             </a>
           </p>
           <p className="text-gray-500 text-base">Respondemos o mais rápido possível.</p>

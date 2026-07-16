@@ -3,7 +3,19 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield } from 'lucide-react'
+import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield, Pencil, X } from 'lucide-react'
+
+interface Professional {
+  id: string
+  name: string
+  phone?: string | null
+  specialty?: string | null
+  specialties?: string[] | null
+  zone?: string | null
+  description?: string | null
+  active: boolean
+  [key: string]: unknown
+}
 
 export default function AdminPage() {
   const router = useRouter()
@@ -11,6 +23,10 @@ export default function AdminPage() {
   const [professionals, setProfessionals] = useState<any[]>([])
   const [leads, setLeads] = useState<any[]>([])
   const [quotes, setQuotes] = useState<any[]>([])
+  const [editingProf, setEditingProf] = useState<Professional | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', phone: '', specialties: '', zone: '', description: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -34,9 +50,58 @@ export default function AdminPage() {
     })
   }, [router])
 
+  async function patchProfessional(id: string, updates: Record<string, unknown>) {
+    const res = await fetch(`/api/admin/professionals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error || 'Falha ao atualizar')
+    return json.professional
+  }
+
   async function toggleActive(id: string, current: boolean) {
-    await supabase.from('professionals').update({ active: !current }).eq('id', id)
-    setProfessionals(prev => prev.map(p => p.id === id ? { ...p, active: !current } : p))
+    try {
+      await patchProfessional(id, { active: !current })
+      setProfessionals(prev => prev.map(p => p.id === id ? { ...p, active: !current } : p))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Falha ao atualizar')
+    }
+  }
+
+  function openEdit(prof: Professional) {
+    setEditingProf(prof)
+    setEditError('')
+    setEditForm({
+      name: prof.name || '',
+      phone: prof.phone || '',
+      specialties: (prof.specialties && prof.specialties.length > 0 ? prof.specialties : [prof.specialty].filter(Boolean) as string[]).join(', '),
+      zone: prof.zone || '',
+      description: prof.description || '',
+    })
+  }
+
+  async function saveEdit() {
+    if (!editingProf) return
+    setSavingEdit(true)
+    setEditError('')
+    try {
+      const specialties = editForm.specialties.split(',').map(s => s.trim()).filter(Boolean)
+      const updated = await patchProfessional(editingProf.id, {
+        name: editForm.name.trim(),
+        phone: editForm.phone.trim() || null,
+        specialties,
+        zone: editForm.zone.trim() || null,
+        description: editForm.description.trim() || null,
+      })
+      setProfessionals(prev => prev.map(p => p.id === editingProf.id ? { ...p, ...updated } : p))
+      setEditingProf(null)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Falha ao atualizar')
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   if (loading) return (
@@ -119,6 +184,11 @@ export default function AdminPage() {
                       /p/{prof.slug} <ChevronRight size={12} />
                     </a>
                   </div>
+                  <button onClick={() => openEdit(prof)}
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
+                    style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>
+                    <Pencil size={14} /> Editar
+                  </button>
                   <button onClick={() => toggleActive(prof.id, prof.active)}
                     className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex-shrink-0"
                     style={prof.active
@@ -131,6 +201,72 @@ export default function AdminPage() {
             })}
           </div>
         </div>
+
+        {editingProf && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+            onClick={() => !savingEdit && setEditingProf(null)}>
+            <div className="w-full max-w-md rounded-2xl p-6"
+              style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.08)' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-black text-white text-lg">Editar profissional</h3>
+                <button onClick={() => !savingEdit && setEditingProf(null)} className="text-gray-500 hover:text-gray-300">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {([
+                  { key: 'name', label: 'Nome' },
+                  { key: 'phone', label: 'Telefone' },
+                  { key: 'specialties', label: 'Especialidades (separadas por vírgula)' },
+                  { key: 'zone', label: 'Zona' },
+                ] as const).map(f => (
+                  <div key={f.key}>
+                    <label className="text-xs font-semibold text-gray-500 mb-1 block uppercase tracking-wide">{f.label}</label>
+                    <input
+                      value={editForm[f.key]}
+                      onChange={e => setEditForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      className="w-full rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                      style={{ background: '#0a0c1a', border: '1px solid rgba(255,255,255,0.08)' }}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block uppercase tracking-wide">Descrição</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+                    style={{ background: '#0a0c1a', border: '1px solid rgba(255,255,255,0.08)' }}
+                  />
+                </div>
+              </div>
+
+              {editError && (
+                <div className="text-sm text-center py-2 px-4 rounded-xl mt-4"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  {editError}
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setEditingProf(null)} disabled={savingEdit}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-gray-400"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}>
+                  Cancelar
+                </button>
+                <button onClick={saveEdit} disabled={savingEdit}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', opacity: savingEdit ? 0.7 : 1 }}>
+                  {savingEdit ? 'A guardar...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Últimos leads */}
         <div>

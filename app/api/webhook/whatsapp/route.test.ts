@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { NextRequest } from 'next/server'
 
+const ORIGINAL_ENV = { ...process.env }
+
 function fakeRequest(body: unknown, contentType: 'application/json' | 'application/x-www-form-urlencoded' = 'application/json'): NextRequest {
   return {
     headers: { get: (name: string) => (name === 'content-type' ? contentType : null) },
@@ -9,138 +11,129 @@ function fakeRequest(body: unknown, contentType: 'application/json' | 'applicati
   } as unknown as NextRequest
 }
 
-interface QueryBuilder {
-  select: () => QueryBuilder
-  eq: () => QueryBuilder
-  neq: () => QueryBuilder
-  order: () => QueryBuilder
-  limit: () => QueryBuilder
-  insert: () => QueryBuilder
-  update: () => QueryBuilder
-  single: () => Promise<{ data: unknown }>
-}
-
-function chain(data: unknown): QueryBuilder {
-  const builder: QueryBuilder = {
-    select: () => builder,
-    eq: () => builder,
-    neq: () => builder,
-    order: () => builder,
-    limit: () => builder,
-    insert: () => builder,
-    update: () => builder,
-    single: async () => ({ data }),
-  }
-  return builder
-}
-
 describe('POST /api/webhook/whatsapp', () => {
   beforeEach(() => {
     vi.resetModules()
+    process.env = { ...ORIGINAL_ENV }
+    delete process.env.WHATSAPP_INTAKE_ENABLED
   })
 
   afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
     vi.restoreAllMocks()
     vi.doUnmock('@/lib/supabase-admin')
     vi.doUnmock('@/lib/whatsapp')
   })
 
-  it('rejects requests without phone or message with 400, never touching the database', async () => {
-    const from = vi.fn()
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
-    const sendWhatsApp = vi.fn()
-    vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+  describe('captação desativada (comportamento por omissão)', () => {
+    it('nunca cria lead, nunca consulta profissionais, responde sempre com a mensagem da Façoporti', async () => {
+      const from = vi.fn()
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
 
-    const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: '' }))
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'Olá, preciso de um pintor' }))
+      const json = await res.json()
 
-    expect(res.status).toBe(400)
-    expect(from).not.toHaveBeenCalled()
-    expect(sendWhatsApp).not.toHaveBeenCalled()
-  })
-
-  it('creates a new lead and asks for the name on first contact', async () => {
-    const professional = { id: 'prof-1', name: 'Gilson', price_m2_walls: 4 }
-    const newLead = { id: 'lead-new', phone: '351911111111', current_question: 0 }
-
-    const from = vi.fn((table: string) => {
-      if (table === 'leads') {
-        // primeira chamada: procurar lead existente -> nenhum encontrado
-        // segunda chamada: insert do novo lead, depois update
-        return {
-          select: () => ({
-            eq: () => ({ neq: () => ({ neq: () => ({ order: () => ({ limit: () => ({ single: async () => ({ data: null }) }) }) }) }) }),
-          }),
-          insert: () => ({ select: () => ({ single: async () => ({ data: newLead }) }) }),
-          update: () => ({ eq: async () => ({ data: null }) }),
-        }
-      }
-      if (table === 'professionals') {
-        return { select: () => ({ limit: () => ({ single: async () => ({ data: professional }) }) }) }
-      }
-      return chain(null)
+      expect(res.status).toBe(200)
+      expect(json.success).toBe(true)
+      expect(json.lead_id).toBeNull()
+      expect(from).not.toHaveBeenCalled() // nunca toca na base de dados
+      expect(sendWhatsApp).toHaveBeenCalledTimes(1)
+      const [, sentMessage] = sendWhatsApp.mock.calls[0]
+      expect(sentMessage).toContain('Façoporti')
+      expect(sentMessage).not.toContain('Gilson')
     })
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
 
-    const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
-    vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+    it('responde da mesma forma a qualquer mensagem repetida — nunca entra em loop diferente', async () => {
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
 
-    const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'Olá' }))
-    const json = await res.json()
+      const { POST } = await import('./route')
+      const res1 = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'primeira mensagem' }))
+      const res2 = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'segunda mensagem, resposta diferente' }))
+      const json1 = await res1.json()
+      const json2 = await res2.json()
 
-    expect(res.status).toBe(200)
-    expect(json.success).toBe(true)
-    expect(json.response).toContain('Como se chama?')
-    expect(sendWhatsApp).toHaveBeenCalledWith('351911111111', expect.stringContaining('Como se chama?'))
+      expect(json1.response).toBe(json2.response) // resposta estável e previsível, sem estado a acumular
+    })
+
+    it('rejeita pedidos sem telefone/mensagem antes de sequer olhar para a captação', async () => {
+      const from = vi.fn()
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+      const sendWhatsApp = vi.fn()
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: '' }))
+
+      expect(res.status).toBe(400)
+      expect(from).not.toHaveBeenCalled()
+      expect(sendWhatsApp).not.toHaveBeenCalled()
+    })
   })
 
-  it('still returns success and logs a warning when the WhatsApp reply fails to send', async () => {
-    const existingLead = { id: 'lead-1', phone: '351911111111', current_question: 0, professionals: null }
+  describe('fluxo completo (dormant — só corre com WHATSAPP_INTAKE_ENABLED=true, para travar regressões)', () => {
+    beforeEach(() => {
+      process.env.WHATSAPP_INTAKE_ENABLED = 'true'
+    })
 
-    const from = vi.fn(() => ({
-      select: () => ({
-        eq: () => ({ neq: () => ({ neq: () => ({ order: () => ({ limit: () => ({ single: async () => ({ data: existingLead }) }) }) }) }) }),
-      }),
-      update: () => ({ eq: async () => ({ data: null }) }),
-    }))
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+    it('cria lead novo sem escolher nenhum profissional aleatório (professional_id fica null)', async () => {
+      const insertedPayloads: Record<string, unknown>[] = []
+      const from = vi.fn((_table: string) => ({
+        select: () => ({
+          eq: () => ({ neq: () => ({ neq: () => ({ order: () => ({ limit: () => ({ single: async () => ({ data: null, error: { message: 'no rows' } }) }) }) }) }) }),
+        }),
+        insert: (payload: Record<string, unknown>) => {
+          insertedPayloads.push(payload)
+          return { select: () => ({ single: async () => ({ data: { id: 'lead-new', ...payload }, error: null }) }) }
+        },
+        update: () => ({ eq: async () => ({ data: null, error: null }) }),
+      }))
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
 
-    const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'failed', reason: 'twilio_500' })
-    vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { POST } = await import('./route')
+      await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'Olá' }))
 
-    const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'Olá' }))
-    const json = await res.json()
+      // "professionals" nunca é consultado ao criar o lead — não há SELECT ... LIMIT 1
+      const calledTables = from.mock.calls.map(c => c[0])
+      expect(calledTables).not.toContain('professionals')
+      expect(insertedPayloads[0]).toMatchObject({ professional_id: null })
+    })
 
-    expect(res.status).toBe(200)
-    expect(json.success).toBe(true)
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('resposta não enviada'))
-  })
+    it('uma falha ao gravar a resposta fica registada e NÃO envia a pergunta seguinte (corta a repetição infinita)', async () => {
+      const existingLead = {
+        id: 'lead-1', phone: '351911111111', current_question: 11,
+        q1_tipo_trabalho: 'interior', professionals: null,
+      }
+      const from = vi.fn(() => ({
+        select: () => ({
+          eq: () => ({ neq: () => ({ neq: () => ({ order: () => ({ limit: () => ({ single: async () => ({ data: existingLead, error: null }) }) }) }) }) }),
+        }),
+        update: () => ({ eq: async () => ({ data: null, error: { message: 'malformed array literal' } }) }),
+      }))
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-  it('parses Twilio form-encoded payloads, not just JSON', async () => {
-    const existingLead = { id: 'lead-1', phone: '351911111111', current_question: 0.5, professionals: null }
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ From: 'whatsapp:+351911111111', Body: 'saltar' }))
 
-    const from = vi.fn(() => ({
-      select: () => ({
-        eq: () => ({ neq: () => ({ neq: () => ({ order: () => ({ limit: () => ({ single: async () => ({ data: existingLead }) }) }) }) }) }),
-      }),
-      update: () => ({ eq: async () => ({ data: null }) }),
-    }))
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
-    const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
-    vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+      expect(res.status).toBe(500)
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('falha ao atualizar lead'))
+      expect(sendWhatsApp).not.toHaveBeenCalled() // não manda a "pergunta seguinte" com base num estado que não foi gravado
+    })
 
-    const { POST } = await import('./route')
-    const res = await POST(fakeRequest(
-      { From: 'whatsapp:+351911111111', Body: 'Maria Silva' },
-      'application/x-www-form-urlencoded'
-    ))
-    const json = await res.json()
-
-    expect(res.status).toBe(200)
-    expect(json.success).toBe(true)
-    expect(json.phone).toBe('351911111111')
+    it('resposta a pergunta de fotos nunca tenta gravar uma string num campo array', async () => {
+      const { parseAnswer, QUESTIONS } = await import('@/lib/questions')
+      const photosQuestion = QUESTIONS.find(q => q.key === 'q11_fotos_url')!
+      const answer = parseAnswer(photosQuestion, 'Saltar')
+      expect(Array.isArray(answer)).toBe(true)
+    })
   })
 })

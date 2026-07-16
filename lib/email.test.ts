@@ -98,6 +98,28 @@ describe('email sending (lib/email.ts)', () => {
     expect(body.subject).toContain('Lead fria há 5 dias')
   })
 
+  it('blocked-lead email never includes name/phone/notes — only specialty, zone and a CTA link', async () => {
+    process.env.RESEND_API_KEY = 'test_key'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { emailNovoLeadBloqueado } = await import('./email')
+    await emailNovoLeadBloqueado({
+      profName: 'Prof Free', profEmail: 'proffree@example.com', profSpecialty: 'Pintura',
+      zoneApprox: 'Porto', isFreePlan: true,
+    })
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+    expect(body.to).toEqual(['proffree@example.com'])
+    expect(body.html).toContain('Pintura')
+    expect(body.html).toContain('Porto')
+    expect(body.html).toContain('/upgrade')
+    // Nunca deve ter forma de incluir nome/telefone/email do cliente —
+    // a própria função não recebe esses parâmetros, mas confirma-se aqui
+    // que nada nesse género aparece no HTML gerado.
+    expect(body.html).not.toMatch(/telefone|phone/i)
+  })
+
   it('never sends the admin-only emails to anyone other than the admin address', async () => {
     process.env.RESEND_API_KEY = 'test_key'
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
