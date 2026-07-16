@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,17 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // Aguardado (não fire-and-forget): em ambiente serverless a função pode
+    // ser terminada assim que a resposta é devolvida, o que cancelaria uma
+    // promessa não aguardada antes de gravar o evento.
+    await recordRequestCompleted({
+      ip: clientIpFrom(req.headers),
+      userAgent: req.headers.get('user-agent') || '',
+      professionalId: professional_id,
+      source: isMarketplace ? 'marketplace' : 'pessoal',
+      path: '/p/[slug]',
+    })
 
     return NextResponse.json({ lead })
   } catch (err: any) {

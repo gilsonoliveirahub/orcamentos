@@ -148,6 +148,128 @@ BEGIN
   END;
 END $$;
 
+-- ============================================================
+-- TESTES 6-9 — Sistema de métricas (analytics_events,
+-- analytics_daily_summary, analytics_daily_unique_visitors)
+--
+-- Estas três tabelas não têm NENHUMA policy RLS para anon nem
+-- authenticated (nem sequer para admin) — o único acesso é via
+-- supabaseAdmin (service_role) dentro das rotas /api/track,
+-- /api/admin/metrics, /api/professional/metrics e
+-- /api/cron/analytics, que aplicam a sua própria autorização no
+-- código. Estes testes confirmam que a porta de RLS está mesmo
+-- fechada, incluindo para quem está autenticado como admin.
+--
+-- Teste 6 insere uma linha sintética em analytics_events (via o
+-- próprio contexto privilegiado do SQL Editor, que corre como
+-- postgres e ignora RLS) só para confirmar que os papéis
+-- restritos não a conseguem ver — a linha é apagada de imediato
+-- a seguir, nunca fica dado sintético na tabela.
+-- ============================================================
+
+DO $$
+DECLARE
+  admin_uuid uuid;
+  prof_uuid uuid;
+  synthetic_id uuid;
+  anon_count int;
+  authenticated_prof_count int;
+  authenticated_admin_count int;
+BEGIN
+  SELECT a.user_id INTO admin_uuid FROM admins a LIMIT 1;
+  SELECT p.user_id INTO prof_uuid
+    FROM professionals p
+    WHERE p.user_id NOT IN (SELECT user_id FROM admins)
+    LIMIT 1;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'analytics_events') THEN
+    INSERT INTO rls_test_results VALUES (6, 'analytics_events: RLS fecha SELECT a anon/authenticated/admin', 'n/a', 'tabela analytics_events ainda não existe', '⚠ IGNORADO');
+    RETURN;
+  END IF;
+
+  -- Linha sintética, inserida no contexto privilegiado do próprio script (não via anon/authenticated)
+  INSERT INTO analytics_events (event_type, visitor_hash, path)
+  VALUES ('page_view', 'hash-sintetico-teste-rls', '/')
+  RETURNING id INTO synthetic_id;
+
+  -- Anon não vê nada
+  SET LOCAL role anon;
+  SELECT count(*) INTO anon_count FROM analytics_events WHERE id = synthetic_id;
+  RESET role;
+  RESET request.jwt.claims;
+
+  INSERT INTO rls_test_results VALUES (
+    6, 'analytics_events: anon não consegue SELECT',
+    '0 linhas', anon_count::text || ' linhas',
+    CASE WHEN anon_count = 0 THEN '✅ OK' ELSE '❌ FALHOU' END
+  );
+
+  -- Profissional autenticado não vê nada (nem os seus próprios eventos, se os tivesse)
+  IF prof_uuid IS NOT NULL THEN
+    SET LOCAL role authenticated;
+    EXECUTE format('SET LOCAL request.jwt.claims = ''{"sub":"%s","role":"authenticated"}''', prof_uuid);
+    SELECT count(*) INTO authenticated_prof_count FROM analytics_events WHERE id = synthetic_id;
+    RESET role;
+    RESET request.jwt.claims;
+
+    INSERT INTO rls_test_results VALUES (
+      7, 'analytics_events: profissional autenticado não consegue SELECT (sem policy, mesmo para os próprios eventos)',
+      '0 linhas', authenticated_prof_count::text || ' linhas',
+      CASE WHEN authenticated_prof_count = 0 THEN '✅ OK' ELSE '❌ FALHOU' END
+    );
+  ELSE
+    INSERT INTO rls_test_results VALUES (7, 'analytics_events: profissional autenticado não consegue SELECT', 'n/a', 'nenhum profissional não-admin encontrado', '⚠ IGNORADO');
+  END IF;
+
+  -- Admin autenticado também não vê nada por RLS — a autorização de admin
+  -- só existe dentro das rotas server-side (service_role), nunca em RLS
+  IF admin_uuid IS NOT NULL THEN
+    SET LOCAL role authenticated;
+    EXECUTE format('SET LOCAL request.jwt.claims = ''{"sub":"%s","role":"authenticated"}''', admin_uuid);
+    SELECT count(*) INTO authenticated_admin_count FROM analytics_events WHERE id = synthetic_id;
+    RESET role;
+    RESET request.jwt.claims;
+
+    INSERT INTO rls_test_results VALUES (
+      8, 'analytics_events: admin autenticado também não consegue SELECT via RLS (só via rota com service_role)',
+      '0 linhas', authenticated_admin_count::text || ' linhas',
+      CASE WHEN authenticated_admin_count = 0 THEN '✅ OK' ELSE '❌ FALHOU — RLS não deveria ter exceção para admin'  END
+    );
+  ELSE
+    INSERT INTO rls_test_results VALUES (8, 'analytics_events: admin autenticado não consegue SELECT via RLS', 'n/a', 'nenhum admin encontrado', '⚠ IGNORADO');
+  END IF;
+
+  -- Limpeza: remove a linha sintética
+  DELETE FROM analytics_events WHERE id = synthetic_id;
+END $$;
+
+-- TESTE 9 — anon não consegue fazer INSERT diretamente em analytics_events
+-- (escrita só é permitida a service_role, usado só dentro de /api/track)
+DO $$
+DECLARE
+  insert_rejected boolean := false;
+  error_message text := '';
+BEGIN
+  BEGIN
+    SET LOCAL role anon;
+    INSERT INTO analytics_events (event_type, visitor_hash, path)
+    VALUES ('page_view', 'hash-tentativa-insercao-direta', '/');
+    RESET role;
+    -- Se chegou aqui, o INSERT foi aceite (mau sinal) — remove já a linha
+    DELETE FROM analytics_events WHERE visitor_hash = 'hash-tentativa-insercao-direta';
+  EXCEPTION WHEN insufficient_privilege OR others THEN
+    RESET role;
+    insert_rejected := true;
+    error_message := SQLERRM;
+  END;
+
+  INSERT INTO rls_test_results VALUES (
+    9, 'analytics_events: anon não consegue INSERT diretamente',
+    'rejeitado', CASE WHEN insert_rejected THEN 'rejeitado (' || error_message || ')' ELSE 'INSERT foi aceite! linha removida a seguir' END,
+    CASE WHEN insert_rejected THEN '✅ OK' ELSE '❌ FALHOU GRAVEMENTE' END
+  );
+END $$;
+
 SELECT ordem, teste, esperado, obtido, resultado
 FROM rls_test_results
 ORDER BY ordem;

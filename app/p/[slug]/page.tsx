@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, calcPaintingAreas, type Question, type ProfessionConfig } from '@/lib/professions'
+import { track } from '@/lib/track-client'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -17,6 +18,7 @@ export default function ProfessionalPublicPage() {
   const [reviews, setReviews] = useState<any[]>([])
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
+  const requestStartedTracked = useRef(false)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -54,6 +56,7 @@ export default function ProfessionalPublicPage() {
       .then(async ({ data: prof }) => {
         if (!prof) { setLoading(false); return }
         setProfessional(prof)
+        track({ event_type: 'page_view', path: '/p/[slug]', professional_slug: String(slug), source })
         const [{ data: portfolioData }, { data: reviewsData }] = await Promise.all([
           supabase.from('professional_portfolio').select('*').eq('professional_id', prof.id).order('sort_order').order('created_at'),
           supabase.from('reviews').select('*').eq('professional_id', prof.id).order('created_at', { ascending: false }),
@@ -150,6 +153,10 @@ export default function ProfessionalPublicPage() {
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
+    if (!requestStartedTracked.current) {
+      requestStartedTracked.current = true
+      track({ event_type: 'request_started', path: '/p/[slug]', professional_slug: String(slug), source })
+    }
     const next = { ...answers, [key]: value }
     setAnswers(next)
     setStep(s => s + 1)
@@ -273,6 +280,7 @@ export default function ProfessionalPublicPage() {
         <a
           href={`https://wa.me/${professional.phone}?text=${waText}`}
           target="_blank" rel="noopener noreferrer"
+          onClick={() => track({ event_type: 'whatsapp_click', path: '/p/[slug]', professional_slug: String(slug), source })}
           className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl text-black font-black text-lg"
           style={{ background: '#25d366', boxShadow: '0 8px 24px rgba(37,211,102,0.4)' }}
         >
@@ -404,7 +412,10 @@ export default function ProfessionalPublicPage() {
           {/* CTA */}
           <div>
             <button
-              onClick={() => setStep(1)}
+              onClick={() => {
+                track({ event_type: 'quote_cta_click', path: '/p/[slug]', professional_slug: String(slug), source })
+                setStep(1)
+              }}
               className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white text-lg"
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 32px rgba(99,102,241,0.45)' }}
             >

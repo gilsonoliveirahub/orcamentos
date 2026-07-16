@@ -1,10 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { track } from '@/lib/track-client'
 
 export default function MarketingPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    track({ event_type: 'page_view', path: '/' })
+  }, [])
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white font-sans">

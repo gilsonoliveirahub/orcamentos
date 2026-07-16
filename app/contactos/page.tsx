@@ -1,7 +1,15 @@
+'use client'
+
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
+import { track } from '@/lib/track-client'
 
 export default function ContactosPage() {
+  useEffect(() => {
+    track({ event_type: 'page_view', path: '/contactos' })
+  }, [])
+
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -20,7 +28,11 @@ export default function ContactosPage() {
           <p>Se precisares de ajuda ou tiveres alguma dúvida, podes entrar em contacto connosco:</p>
           <p>
             Email:{' '}
-            <a href="mailto:contacto@façoporti.com" className="text-[#c9a84c] hover:underline">
+            <a
+              href="mailto:contacto@façoporti.com"
+              onClick={() => track({ event_type: 'email_click', path: '/contactos' })}
+              className="text-[#c9a84c] hover:underline"
+            >
               contacto@façoporti.com
             </a>
           </p>
@@ -30,6 +42,7 @@ export default function ContactosPage() {
             href="https://wa.me/14245872587"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => track({ event_type: 'whatsapp_click', path: '/contactos' })}
             className="inline-flex items-center gap-2 py-3 px-6 rounded-xl font-bold text-sm transition-all"
             style={{ background: 'rgba(37,211,102,0.12)', color: '#25d366', border: '1px solid rgba(37,211,102,0.2)' }}
           >

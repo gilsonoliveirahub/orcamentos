@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield, Pencil, X } from 'lucide-react'
+import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield, Pencil, X, BarChart3 } from 'lucide-react'
 
 interface Professional {
   id: string
@@ -129,10 +129,17 @@ export default function AdminPage() {
               <p className="text-xs text-gray-600">FaçoPorTi — Painel de controlo</p>
             </div>
           </div>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors">
-            <LogOut size={14} /> Sair
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.push('/admin/metricas')}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+              style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>
+              <BarChart3 size={14} /> Métricas
+            </button>
+            <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+              <LogOut size={14} /> Sair
+            </button>
+          </div>
         </div>
       </div>
 

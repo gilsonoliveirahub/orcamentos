@@ -1,10 +1,11 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
+import { track } from '@/lib/track-client'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', 'Outra / Toda Portugal']
 
@@ -22,6 +23,11 @@ export default function PedirPage() {
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [assigned, setAssigned] = useState(false)
+  const requestStartedTracked = useRef(false)
+
+  useEffect(() => {
+    track({ event_type: 'page_view', path: '/pedir', source: 'marketplace' })
+  }, [])
 
   const profession = specialty ? getProfession(specialty) : null
   const allQuestions = profession?.questions || []
@@ -35,7 +41,14 @@ export default function PedirPage() {
   const questions = filterQuestions(answers)
   const totalSteps = questions.length
 
-  function selectProfissao(s: string) { setSpecialty(s); setPhase('zona') }
+  function selectProfissao(s: string) {
+    if (!requestStartedTracked.current) {
+      requestStartedTracked.current = true
+      track({ event_type: 'request_started', path: '/pedir', source: 'marketplace' })
+    }
+    setSpecialty(s)
+    setPhase('zona')
+  }
   function selectZona(z: string) { setZona(z); setPhase('perguntas'); setStep(1) }
 
   function answerAndAdvance(key: string, value: any) {

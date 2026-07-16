@@ -2,14 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
+type FunnelData = {
+  totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
+  conversion: { view_to_completed: number }
+  unique_visitors: { by_day: Array<{ day: string; unique_visitors: number }>; daily_sum: number }
+}
 
 export default function StatsPage() {
   const router = useRouter()
   const [leads, setLeads] = useState<any[]>([])
   const [quotes, setQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [funnel, setFunnel] = useState<FunnelData | null>(null)
+  const [funnelLoading, setFunnelLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
@@ -20,6 +28,12 @@ export default function StatsPage() {
       setQuotes(q || [])
       setLoading(false)
     })
+
+    fetch('/api/professional/metrics')
+      .then(res => res.ok ? res.json() : null)
+      .then(json => setFunnel(json))
+      .catch(() => setFunnel(null))
+      .finally(() => setFunnelLoading(false))
   }, [])
 
   if (loading) return (
@@ -182,6 +196,30 @@ export default function StatsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Funil de visitas e cliques do link pessoal */}
+        {!funnelLoading && funnel && (
+          <div className="rounded-2xl p-5" style={kpiStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-4">Visitas e cliques (últimos 30 dias)</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: <Eye size={14} className="text-indigo-400" />, label: 'Visitas', value: funnel.totals.page_view },
+                { icon: <MousePointerClick size={14} className="text-purple-400" />, label: 'Pedidos iniciados', value: funnel.totals.request_started },
+                { icon: <CheckCircle size={14} className="text-emerald-400" />, label: 'Pedidos concluídos', value: funnel.totals.request_completed },
+                { icon: <MessageCircle size={14} className="text-[#25d366]" />, label: 'Cliques WhatsApp', value: funnel.totals.whatsapp_click },
+              ].map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {f.icon}
+                  <span className="text-xs text-gray-500">{f.label}</span>
+                  <span className="text-sm font-black text-white ml-auto">{f.value}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-600 mt-4">
+              Visitantes únicos aproximados por dia — soma do período: {funnel.unique_visitors.daily_sum} (pode contar a mesma pessoa em dias diferentes). Conversão visita → pedido: {Math.round(funnel.conversion.view_to_completed * 100)}%. &quot;Clique no WhatsApp&quot; é abertura do link, não confirma envio da mensagem.
+            </p>
           </div>
         )}
 

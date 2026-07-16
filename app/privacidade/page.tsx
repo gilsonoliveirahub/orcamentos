@@ -14,7 +14,7 @@ export default function PrivacidadePage() {
 
       <div className="max-w-3xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-black text-white mb-2">Política de Privacidade</h1>
-        <p className="text-gray-500 text-sm mb-10">Última atualização: 21 de abril de 2026</p>
+        <p className="text-gray-500 text-sm mb-10">Última atualização: 16 de julho de 2026</p>
 
         <div className="space-y-8 text-gray-300 leading-relaxed">
 
@@ -90,12 +90,23 @@ export default function PrivacidadePage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">9. Segurança</h2>
+            <h2 className="text-lg font-bold text-white mb-3">9. Estatísticas de utilização</h2>
+            <p className="mb-3">Recolhemos estatísticas técnicas de utilização da plataforma — por exemplo, visitas às páginas, cliques nos botões de contacto (WhatsApp, email) e início/conclusão de pedidos de orçamento. Esta recolha não usa cookies de analítica nem de publicidade.</p>
+            <p className="mb-3">Para calcular um número aproximado de visitantes únicos por dia, o endereço IP e o tipo de navegador (User-Agent) são processados temporariamente, em memória, no momento do pedido, para gerar um identificador técnico através de uma função criptográfica unidirecional (HMAC-SHA256) com uma chave secreta permanente do servidor. Como a data entra no cálculo, o identificador resultante é diferente todos os dias, mesmo sendo a mesma chave secreta a gerá-lo. <strong className="text-white">O IP e o User-Agent não são guardados nas tabelas de analítica</strong> — apenas o identificador diário resultante, que não permite reconstruir o IP original nem seguir a mesma pessoa entre dias diferentes.</p>
+            <p className="mb-3">O FaçoPorTi não guarda deliberadamente o IP ou o User-Agent nas tabelas de analítica nem nos logs criados pela aplicação. Não podemos garantir o mesmo sobre os registos técnicos gerados automaticamente pela infraestrutura de alojamento (Vercel), que podem conter estes dados por curtos períodos, fora do nosso controlo direto, para fins de operação e segurança da própria infraestrutura.</p>
+            <p className="mb-3">Este processo é uma pseudonimização, não uma anonimização absoluta — os dados continuam sujeitos às garantias do RGPD como qualquer outro tratamento de dados pessoais. A ausência de cookies não elimina, por si só, as obrigações do RGPD aplicáveis a este tratamento.</p>
+            <p className="mb-1"><strong className="text-white">Finalidade:</strong> medir o desempenho da plataforma e apoiar os profissionais a entender a origem e conversão dos seus pedidos.</p>
+            <p className="mb-1"><strong className="text-white">Base legal:</strong> interesse legítimo (art. 6.º, n.º 1, al. f) do RGPD). Esta base foi adotada após uma avaliação de interesse legítimo que pondera a finalidade (melhoria do serviço e do desempenho comercial dos profissionais), a necessidade (não existe forma menos intrusiva de medir visitas e conversão sem processar, ainda que temporariamente, IP e User-Agent) e o impacto nos direitos dos visitantes (mínimo: sem identificação direta, sem cookies persistentes, sem partilha com terceiros, sem publicidade, retenção limitada).</p>
+            <p><strong className="text-white">Prazo de retenção:</strong> os registos individuais de eventos são conservados por 90 dias; findo esse prazo, ficam resumidos em estatísticas agregadas por dia (sem qualquer identificador de visitante) e conservadas por até 24 meses.</p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-white mb-3">10. Segurança</h2>
             <p>Os dados são transmitidos por HTTPS e armazenados em servidores seguros na União Europeia. As passwords são armazenadas de forma encriptada (bcrypt) e nunca em texto simples.</p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-3">10. Alterações a esta política</h2>
+            <h2 className="text-lg font-bold text-white mb-3">11. Alterações a esta política</h2>
             <p>Em caso de alterações relevantes, notificaremos os utilizadores por email com 30 dias de antecedência.</p>
           </section>
 

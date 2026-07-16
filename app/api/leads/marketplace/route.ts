@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,17 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ lead_id: lead.id }),
       }).catch(() => {})
     }
+
+    // Sem profissional atribuído: professional_id fica null — conta nas
+    // métricas globais da plataforma, mas não entra nas métricas de nenhum
+    // profissional específico (decisão confirmada 2026-07-16).
+    await recordRequestCompleted({
+      ip: clientIpFrom(req.headers),
+      userAgent: req.headers.get('user-agent') || '',
+      professionalId: professional?.id ?? null,
+      source: 'marketplace',
+      path: '/pedir',
+    })
 
     return NextResponse.json({ lead, assigned: !!professional })
   } catch (err: any) {
