@@ -1,3 +1,6 @@
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { generateClientOptOutToken, generateProfessionalOptOutToken } from '@/lib/optout'
+
 const FROM = 'FaçoPorTi <noreply@xn--faoporti-t0a.com>'
 const REPLY_TO = 'gilsongomesoliveira1@hotmail.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
@@ -24,6 +27,25 @@ function wrap(content: string) {
       <div style="padding:16px 32px;background:rgba(255,255,255,0.03);text-align:center">
         <p style="color:#334155;font-size:12px;margin:0">
           FaçoPorTi · <a href="${APP_URL}/privacidade" style="color:#334155">Privacidade</a> · <a href="${APP_URL}/termos" style="color:#334155">Termos</a>
+        </p>
+      </div>
+    </div>
+  `
+}
+
+// Rodapé só para emails PROMOCIONAIS — inclui o link de cancelamento. Nunca
+// usado nos emails transacionais acima (pedido de orçamento, notificações),
+// que não dependem de nenhum consentimento de marketing.
+function wrapPromotional(content: string, unsubscribeUrl: string) {
+  return `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#0a0c1a;color:#fff;border-radius:16px;overflow:hidden">
+      ${content}
+      <div style="padding:16px 32px;background:rgba(255,255,255,0.03);text-align:center">
+        <p style="color:#334155;font-size:12px;margin:0">
+          FaçoPorTi · <a href="${APP_URL}/privacidade" style="color:#334155">Privacidade</a> · <a href="${APP_URL}/termos" style="color:#334155">Termos</a>
+        </p>
+        <p style="color:#334155;font-size:12px;margin:8px 0 0">
+          <a href="${unsubscribeUrl}" style="color:#334155">Cancelar emails promocionais</a>
         </p>
       </div>
     </div>
@@ -457,4 +479,66 @@ export async function emailLeadDesbloqueado({
       </a>` : ''}
     </div>
   `))
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Emails PROMOCIONAIS — dois públicos separados, cada um com a sua própria
+// fonte de verdade de consentimento e o seu próprio link de cancelamento.
+// Nenhuma campanha automática é criada por estas funções — só a
+// infraestrutura de envio, sempre condicionada ao consentimento verificado
+// aqui dentro (nunca confiado ao chamador).
+// ══════════════════════════════════════════════════════════════════════════
+
+// ── Promocional para CLIENTES — verifica marketing_consents por email ────────
+export async function emailPromocionalCliente({
+  email, subject, contentHtml,
+}: {
+  email: string; subject: string; contentHtml: string
+}) {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  const { data: consent } = await supabaseAdmin
+    .from('marketing_consents')
+    .select('opted_in')
+    .eq('email', normalizedEmail)
+    .maybeSingle()
+
+  if (!consent?.opted_in) {
+    console.warn(`[email] emailPromocionalCliente bloqueado — sem consentimento (${normalizedEmail})`)
+    return
+  }
+
+  const secret = process.env.EMAIL_OPTOUT_SECRET
+  if (!secret) throw new Error('EMAIL_OPTOUT_SECRET não configurado')
+
+  const token = generateClientOptOutToken(normalizedEmail, secret)
+  const unsubscribeUrl = `${APP_URL}/cancelar-emails?email=${encodeURIComponent(normalizedEmail)}&token=${token}`
+
+  await sendEmail(normalizedEmail, subject, wrapPromotional(contentHtml, unsubscribeUrl))
+}
+
+// ── Promocional para PROFISSIONAIS — verifica professionals.marketing_opt_in ─
+export async function emailPromocionalProfissional({
+  profId, profEmail, subject, contentHtml,
+}: {
+  profId: string; profEmail: string; subject: string; contentHtml: string
+}) {
+  const { data: prof } = await supabaseAdmin
+    .from('professionals')
+    .select('marketing_opt_in')
+    .eq('id', profId)
+    .maybeSingle()
+
+  if (!prof?.marketing_opt_in) {
+    console.warn(`[email] emailPromocionalProfissional bloqueado — sem opt-in (${profId})`)
+    return
+  }
+
+  const secret = process.env.EMAIL_OPTOUT_SECRET
+  if (!secret) throw new Error('EMAIL_OPTOUT_SECRET não configurado')
+
+  const token = generateProfessionalOptOutToken(profId, secret)
+  const unsubscribeUrl = `${APP_URL}/opt-out?id=${profId}&token=${token}`
+
+  await sendEmail(profEmail, subject, wrapPromotional(contentHtml, unsubscribeUrl))
 }

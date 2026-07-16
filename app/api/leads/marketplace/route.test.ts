@@ -98,3 +98,65 @@ describe('POST /api/leads/marketplace — registo de request_completed', () => {
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain('/api/notifications/lead')
   })
 })
+
+describe('POST /api/leads/marketplace — consentimento de marketing do CLIENTE', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+  })
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    vi.doUnmock('@/lib/supabase-admin')
+  })
+
+  function mockSupabase() {
+    const leadInserts: Record<string, unknown>[] = []
+    const consentUpserts: Array<[Record<string, unknown>, Record<string, unknown>]> = []
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return { select: () => professionalQuery({ id: 'prof-1', marketplace_credits: 0 }) }
+      if (table === 'leads') {
+        return {
+          insert: (payload: Record<string, unknown>) => {
+            leadInserts.push(payload)
+            return { select: () => ({ single: async () => ({ data: { id: 'lead-1', ...payload }, error: null }) }) }
+          },
+        }
+      }
+      if (table === 'marketing_consents') {
+        return { upsert: (payload: Record<string, unknown>, opts: Record<string, unknown>) => { consentUpserts.push([payload, opts]); return Promise.resolve({ error: null }) } }
+      }
+      if (table === 'analytics_events') return { insert: async () => ({ error: null }) }
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+    return { leadInserts, consentUpserts }
+  }
+
+  it('checkbox marcada + email: grava no lead e regista em marketing_consents com origem pedir', async () => {
+    const { leadInserts, consentUpserts } = mockSupabase()
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({
+      specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111',
+      email: 'cliente@example.com', marketing_opt_in: true,
+    }))
+
+    expect(res.status).toBe(200)
+    expect(leadInserts[0]).toMatchObject({ marketing_opt_in: true, marketing_consent_version: 'v1', marketing_consent_source: 'pedir' })
+    expect(consentUpserts).toHaveLength(1)
+    expect(consentUpserts[0][0]).toMatchObject({ email: 'cliente@example.com', opted_in: true })
+  })
+
+  it('checkbox desmarcada: grava false no lead e não toca em marketing_consents', async () => {
+    const { leadInserts, consentUpserts } = mockSupabase()
+    const { POST } = await import('./route')
+    await POST(fakeRequest({
+      specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111', email: 'cliente@example.com',
+    }))
+
+    expect(leadInserts[0]).toMatchObject({ marketing_opt_in: false, marketing_consent_version: null, marketing_consent_source: null })
+    expect(consentUpserts).toHaveLength(0)
+  })
+})

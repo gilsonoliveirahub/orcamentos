@@ -21,6 +21,7 @@ export default function PedirPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [assigned, setAssigned] = useState(false)
   const requestStartedTracked = useRef(false)
@@ -90,6 +91,7 @@ export default function PedirPage() {
         phone,
         email: email || null,
         status: 'novo',
+        marketing_opt_in: marketingOptIn,
         ...legacyFields,
         metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
       }),
@@ -232,11 +234,12 @@ export default function PedirPage() {
         {/* Contacto */}
         {phase === 'contacto' && (
           <ContactStep
-            name={name} phone={phone} email={email}
+            name={name} phone={phone} email={email} marketingOptIn={marketingOptIn}
             submitting={submitting}
             onNameChange={setName}
             onPhoneChange={setPhone}
             onEmailChange={setEmail}
+            onMarketingOptInChange={setMarketingOptIn}
             onBack={goBack}
             onSubmit={handleSubmit}
           />
@@ -491,7 +494,7 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
 }
 
 // ── Contacto ──────────────────────────────────────────────────────────────────
-function ContactStep({ name, phone, email, submitting, onNameChange, onPhoneChange, onEmailChange, onBack, onSubmit }: any) {
+function ContactStep({ name, phone, email, marketingOptIn, submitting, onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit }: any) {
   const [rgpd, setRgpd] = useState(false)
   const ready = name.trim().length > 1 && phone.trim().length >= 9 && rgpd
   return (
@@ -526,6 +529,15 @@ function ContactStep({ name, phone, email, submitting, onNameChange, onPhoneChan
               Política de Privacidade
             </Link>
             {' '}e consinto o tratamento dos meus dados pessoais para receber um orçamento.
+          </span>
+        </label>
+        {/* Consentimento de marketing — facultativo, desmarcado por omissão,
+            nunca condiciona o envio do pedido (não entra em "ready") */}
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={marketingOptIn} onChange={e => onMarketingOptInChange(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+          <span className="text-xs text-gray-400">
+            Quero receber por email novidades, lembretes e informações sobre serviços do FaçoPorTi. Posso cancelar a qualquer momento.
           </span>
         </label>
       </div>

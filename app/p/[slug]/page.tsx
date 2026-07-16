@@ -26,6 +26,7 @@ export default function ProfessionalPublicPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null)
@@ -194,6 +195,7 @@ export default function ProfessionalPublicPage() {
         email: email || null,
         status: 'novo',
         source,
+        marketing_opt_in: marketingOptIn,
         ...legacyFields,
         metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
       }),
@@ -535,11 +537,13 @@ export default function ProfessionalPublicPage() {
             name={name}
             phone={phone}
             email={email}
+            marketingOptIn={marketingOptIn}
             total={totalSteps}
             submitting={submitting}
             onNameChange={setName}
             onPhoneChange={setPhone}
             onEmailChange={setEmail}
+            onMarketingOptInChange={setMarketingOptIn}
             onBack={() => setStep(s => s - 1)}
             onSubmit={handleSubmit}
           />
@@ -867,16 +871,19 @@ function QuestionStep({
 // ── Dados de contacto ─────────────────────────────────────────────────────────
 
 function ContactStep({
-  name, phone, email, total, submitting, onNameChange, onPhoneChange, onEmailChange, onBack, onSubmit,
+  name, phone, email, marketingOptIn, total, submitting,
+  onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit,
 }: {
   name: string
   phone: string
   email: string
+  marketingOptIn: boolean
   total: number
   submitting: boolean
   onNameChange: (v: string) => void
   onPhoneChange: (v: string) => void
   onEmailChange: (v: string) => void
+  onMarketingOptInChange: (v: boolean) => void
   onBack: () => void
   onSubmit: () => void
 }) {
@@ -930,6 +937,15 @@ function ContactStep({
               Política de Privacidade
             </Link>
             {' '}e consinto o tratamento dos meus dados pessoais para receber um orçamento.
+          </span>
+        </label>
+        {/* Consentimento de marketing — facultativo, desmarcado por omissão,
+            nunca condiciona o envio do pedido de orçamento (não entra em "ready") */}
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={marketingOptIn} onChange={e => onMarketingOptInChange(e.target.checked)}
+            className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+          <span className="text-xs text-gray-400">
+            Quero receber por email novidades, lembretes e informações sobre serviços do FaçoPorTi. Posso cancelar a qualquer momento.
           </span>
         </label>
       </div>

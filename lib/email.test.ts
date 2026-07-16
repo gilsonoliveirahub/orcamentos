@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// lib/email.ts agora importa @/lib/supabase-admin no topo (para as funções
+// promocionais verificarem consentimento). Sem isto, o import estático
+// falharia com "supabaseUrl is required" em ambiente de teste. Os testes de
+// emailPromocionalCliente/Profissional substituem este mock com vi.doMock.
+vi.mock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
+
 const ORIGINAL_ENV = { ...process.env }
 
 describe('email sending (lib/email.ts)', () => {
@@ -132,5 +138,131 @@ describe('email sending (lib/email.ts)', () => {
 
     const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
     expect(body.to).toEqual(['gilsongomesoliveira1@hotmail.com'])
+  })
+
+  it('transactional emails never include an unsubscribe link — only promotional emails do', async () => {
+    process.env.RESEND_API_KEY = 'test_key'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { emailBoasVindas } = await import('./email')
+    await emailBoasVindas({ name: 'Teste', email: 'teste@example.com', slug: 'teste' })
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+    expect(body.html).not.toContain('Cancelar emails promocionais')
+    expect(body.html).not.toContain('/cancelar-emails')
+    expect(body.html).not.toContain('/opt-out')
+  })
+
+  describe('emailPromocionalCliente (marketing — clientes)', () => {
+    afterEach(() => vi.doUnmock('@/lib/supabase-admin'))
+
+    it('never sends when the email has no recorded opt-in', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.EMAIL_OPTOUT_SECRET = 'segredo-teste'
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { opted_in: false } }) }) }) }) },
+      }))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const { emailPromocionalCliente } = await import('./email')
+      await emailPromocionalCliente({ email: 'cliente@example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bloqueado'))
+    })
+
+    it('never sends when the email has no consent record at all (no row found)', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.EMAIL_OPTOUT_SECRET = 'segredo-teste'
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }) },
+      }))
+
+      const { emailPromocionalCliente } = await import('./email')
+      await emailPromocionalCliente({ email: 'desconhecido@example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('sends with an unsubscribe link when opted in, checking the normalized email', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.EMAIL_OPTOUT_SECRET = 'segredo-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+      const eqSpy = vi.fn((_col: string, value: string) => ({ maybeSingle: async () => ({ data: value === 'cliente@example.com' ? { opted_in: true } : null }) }))
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: eqSpy }) }) },
+      }))
+
+      const { emailPromocionalCliente } = await import('./email')
+      await emailPromocionalCliente({ email: 'Cliente@Example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.to).toEqual(['cliente@example.com'])
+      expect(body.html).toContain('/cancelar-emails')
+      expect(body.html).toContain('email=cliente%40example.com')
+      expect(body.html).toContain('Cancelar emails promocionais')
+    })
+
+    it('throws instead of sending silently when EMAIL_OPTOUT_SECRET is missing', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      delete process.env.EMAIL_OPTOUT_SECRET
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { opted_in: true } }) }) }) }) },
+      }))
+
+      const { emailPromocionalCliente } = await import('./email')
+      await expect(
+        emailPromocionalCliente({ email: 'cliente@example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+      ).rejects.toThrow('EMAIL_OPTOUT_SECRET não configurado')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('emailPromocionalProfissional (marketing — profissionais)', () => {
+    afterEach(() => vi.doUnmock('@/lib/supabase-admin'))
+
+    it('never sends when the professional has not opted in', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.EMAIL_OPTOUT_SECRET = 'segredo-teste'
+      const fetchSpy = vi.fn()
+      vi.stubGlobal('fetch', fetchSpy)
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketing_opt_in: false } }) }) }) }) },
+      }))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const { emailPromocionalProfissional } = await import('./email')
+      await emailPromocionalProfissional({ profId: 'prof-1', profEmail: 'prof@example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('bloqueado'))
+    })
+
+    it('sends with an unsubscribe link (professional namespace, not the client one) when opted in', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.EMAIL_OPTOUT_SECRET = 'segredo-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketing_opt_in: true } }) }) }) }) },
+      }))
+
+      const { emailPromocionalProfissional } = await import('./email')
+      await emailPromocionalProfissional({ profId: 'prof-1', profEmail: 'prof@example.com', subject: 'Promo', contentHtml: '<p>oi</p>' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.to).toEqual(['prof@example.com'])
+      expect(body.html).toContain('/opt-out?id=prof-1')
+      expect(body.html).not.toContain('/cancelar-emails')
+    })
   })
 })

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Eye, EyeOff, CheckCircle, LogOut, CreditCard } from 'lucide-react'
+import { ChevronLeft, Eye, EyeOff, CheckCircle, LogOut, CreditCard, Mail } from 'lucide-react'
 
 export default function ContaPage() {
   const router = useRouter()
@@ -15,14 +15,24 @@ export default function ContaPage() {
   const [openingPortal, setOpeningPortal] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [savingMarketing, setSavingMarketing] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      const { data } = await supabase.from('professionals').select('id, stripe_customer_id, plan').eq('user_id', user.id).maybeSingle()
+      const { data } = await supabase.from('professionals').select('id, stripe_customer_id, plan, marketing_opt_in').eq('user_id', user.id).maybeSingle()
       if (data) setProfessional(data)
     })
   }, [])
+
+  async function toggleMarketingOptIn() {
+    if (!professional) return
+    setSavingMarketing(true)
+    const next = !professional.marketing_opt_in
+    const { error } = await supabase.from('professionals').update({ marketing_opt_in: next }).eq('id', professional.id)
+    if (!error) setProfessional((p: any) => ({ ...p, marketing_opt_in: next }))
+    setSavingMarketing(false)
+  }
 
   async function handlePortal() {
     setOpeningPortal(true)
@@ -120,6 +130,22 @@ export default function ContaPage() {
               style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)', opacity: openingPortal ? 0.6 : 1 }}>
               <CreditCard size={15} /> {openingPortal ? 'A abrir...' : 'Gerir subscrição · Faturas · Cancelar'}
             </button>
+          </div>
+        )}
+
+        {/* Comunicações */}
+        {professional && (
+          <div className="rounded-2xl p-6" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <h2 className="font-black text-white mb-4">Comunicações</h2>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={!!professional.marketing_opt_in} onChange={toggleMarketingOptIn}
+                disabled={savingMarketing}
+                className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+              <span className="text-sm text-gray-400 flex items-center gap-2">
+                <Mail size={14} className="text-gray-500 flex-shrink-0" />
+                Quero receber emails ocasionais com dicas e novidades da FaçoPorTi. Posso cancelar a qualquer momento.
+              </span>
+            </label>
           </div>
         )}
 

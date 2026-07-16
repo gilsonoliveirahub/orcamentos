@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
+import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { specialty, zone_requested, ...fields } = body
+    const { specialty, zone_requested, marketing_opt_in, ...fields } = body
+    // consent_version/consent_source nunca vêm do cliente — só o booleano da
+    // checkbox; esta rota é usada por /pedir, por isso a origem é sempre 'pedir'.
+    const consentFields = computeClientConsentFields(marketing_opt_in, 'pedir')
 
     // Encontrar melhor profissional: mesma especialidade + zona, depois só especialidade
     let professional = null
@@ -63,11 +67,17 @@ export async function POST(req: NextRequest) {
         source: 'marketplace',
         locked,
         status: professional ? 'novo' : 'pendente',
+        ...consentFields,
       })
       .select()
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // O contacto relacionado com o orçamento pedido nunca depende disto —
+    // isto só atualiza a fonte de verdade de consentimento por email para
+    // eventuais campanhas futuras (que ainda não existem).
+    await upsertClientMarketingConsent({ email: fields.email, leadId: lead.id, fields: consentFields })
 
     // Notificar profissional se atribuído
     if (professional && lead) {

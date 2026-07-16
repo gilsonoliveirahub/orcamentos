@@ -15,6 +15,7 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState('')
   const [zone, setZone] = useState('')
   const [description, setDescription] = useState('')
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -36,8 +37,8 @@ export default function OnboardingPage() {
     e.preventDefault()
     if (!phone) return
     setSaving(true)
-    await supabase.from('professionals').update({ phone, zone, description: description || null }).eq('id', professional.id)
-    setProfessional((p: any) => ({ ...p, phone, zone, description }))
+    await supabase.from('professionals').update({ phone, zone, description: description || null, marketing_opt_in: marketingOptIn }).eq('id', professional.id)
+    setProfessional((p: any) => ({ ...p, phone, zone, description, marketing_opt_in: marketingOptIn }))
     setSaving(false)
     setStep(2)
   }
@@ -147,6 +148,14 @@ export default function OnboardingPage() {
                   placeholder="ex: Pintor profissional com 10 anos de experiência em interiores e exteriores..."
                   rows={3} className={`${inp} resize-none`} style={ist} />
               </div>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={marketingOptIn} onChange={e => setMarketingOptIn(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded accent-indigo-500 flex-shrink-0" />
+                <span className="text-xs text-gray-400">
+                  Quero receber emails ocasionais com dicas e novidades da FaçoPorTi. Posso cancelar a qualquer momento.
+                </span>
+              </label>
 
               <button type="submit" disabled={saving || !phone}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-white transition-all mt-2"

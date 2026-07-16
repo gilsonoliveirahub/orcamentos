@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
+import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { professional_id, source, ...fields } = body
+    const { professional_id, source, marketing_opt_in, ...fields } = body
+    // consent_version/consent_source nunca vêm do cliente — só o booleano da
+    // checkbox; a versão e a origem ('p_slug', esta rota é usada por /p/[slug])
+    // são sempre definidas aqui, no servidor.
+    const consentFields = computeClientConsentFields(marketing_opt_in, 'p_slug')
 
     const { data: prof } = await supabaseAdmin
       .from('professionals')
@@ -34,11 +39,16 @@ export async function POST(req: NextRequest) {
 
     const { data: lead, error } = await supabaseAdmin
       .from('leads')
-      .insert({ ...fields, professional_id, source: source || 'pessoal', locked })
+      .insert({ ...fields, professional_id, source: source || 'pessoal', locked, ...consentFields })
       .select()
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // O contacto relacionado com o orçamento pedido nunca depende disto —
+    // isto só atualiza a fonte de verdade de consentimento por email para
+    // eventuais campanhas futuras (que ainda não existem).
+    await upsertClientMarketingConsent({ email: fields.email, leadId: lead.id, fields: consentFields })
 
     // Aguardado (não fire-and-forget): em ambiente serverless a função pode
     // ser terminada assim que a resposta é devolvida, o que cancelaria uma
