@@ -35,9 +35,12 @@ describe('email sending (lib/email.ts)', () => {
     const body = JSON.parse(options.body)
     // Regressão do bug de 2026-04-27: "façoporti.com" não está verificado no
     // Resend, só o domínio punycode — isto trava se alguém trocar outra vez.
-    expect(body.from).toContain('xn--faoporti-t0a.com')
+    expect(body.from).toBe('FaçoPorTi <contacto@xn--faoporti-t0a.com>')
     expect(body.from).not.toContain('façoporti.com')
-    expect(body.reply_to).toBe('gilsongomesoliveira1@hotmail.com')
+    // Reply-To aponta para a caixa real contacto@façoporti.com (via punycode,
+    // mesma justificação — nunca o "ç" literal no campo técnico do Resend).
+    expect(body.reply_to).toBe('contacto@xn--faoporti-t0a.com')
+    expect(body.reply_to).not.toContain('façoporti.com')
     expect(body.to).toEqual(['teste@example.com'])
   })
 
