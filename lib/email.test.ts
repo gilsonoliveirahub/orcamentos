@@ -37,10 +37,11 @@ describe('email sending (lib/email.ts)', () => {
     // Resend, só o domínio punycode — isto trava se alguém trocar outra vez.
     expect(body.from).toBe('FaçoPorTi <contacto@xn--faoporti-t0a.com>')
     expect(body.from).not.toContain('façoporti.com')
-    // Reply-To aponta para a caixa real contacto@façoporti.com (via punycode,
-    // mesma justificação — nunca o "ç" literal no campo técnico do Resend).
-    expect(body.reply_to).toBe('contacto@xn--faoporti-t0a.com')
-    expect(body.reply_to).not.toContain('façoporti.com')
+    // Reply-To revertido para o email pessoal em 2026-07-16: um teste real
+    // confirmou que contacto@xn--faoporti-t0a.com faz bounce ao receber
+    // (servidor do Hostinger não reconhece a forma punycode para entrega).
+    // Repor só depois de confirmar que essa caixa aceita a forma punycode.
+    expect(body.reply_to).toBe('gilsongomesoliveira1@hotmail.com')
     expect(body.to).toEqual(['teste@example.com'])
   })
 
