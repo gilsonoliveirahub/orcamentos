@@ -62,6 +62,42 @@ describe('email sending (lib/email.ts)', () => {
     ).rejects.toThrow(/Resend error 422/)
   })
 
+  it('follow-up email throws instead of failing silently, and never blocks other leads by itself', async () => {
+    process.env.RESEND_API_KEY = 'test_key'
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: false, status: 429, json: async () => ({ message: 'rate limited' }),
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { emailFollowup } = await import('./email')
+
+    await expect(
+      emailFollowup({
+        profName: 'Prof', profEmail: 'prof@example.com', leadId: 'lead-1',
+        leadName: 'Cliente', leadPhone: '351911111111', leadStatus: 'novo',
+        servico: 'Pintura', days: 2,
+      })
+    ).rejects.toThrow(/Resend error 429/)
+  })
+
+  it('follow-up email uses the verified domain and reaches the professional, not the admin', async () => {
+    process.env.RESEND_API_KEY = 'test_key'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { emailFollowup } = await import('./email')
+    await emailFollowup({
+      profName: 'Prof', profEmail: 'prof@example.com', leadId: 'lead-1',
+      leadName: 'Cliente', leadPhone: '351911111111', leadStatus: 'novo',
+      servico: 'Pintura', days: 5,
+    })
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+    expect(body.from).toContain('xn--faoporti-t0a.com')
+    expect(body.to).toEqual(['prof@example.com'])
+    expect(body.subject).toContain('Lead fria há 5 dias')
+  })
+
   it('never sends the admin-only emails to anyone other than the admin address', async () => {
     process.env.RESEND_API_KEY = 'test_key'
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })

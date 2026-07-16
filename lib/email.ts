@@ -306,6 +306,53 @@ export async function emailPedidoDepoimento({
   `))
 }
 
+// ── Follow-up automático (D+2 / D+5) ──────────────────────────────────────────
+export async function emailFollowup({
+  profName, profEmail, leadId, leadName, leadPhone, leadStatus, servico, days,
+}: {
+  profName: string; profEmail: string; leadId: string
+  leadName?: string; leadPhone?: string; leadStatus: string; servico: string; days: number
+}) {
+  const isDay5 = days === 5
+  const subject = isDay5
+    ? `⚠️ Lead fria há 5 dias — ${leadName || 'Cliente'}`
+    : `💡 Follow-up — Já contactaste ${leadName || 'o cliente'}?`
+
+  await sendEmail(profEmail, subject, wrap(`
+    <div style="background:${isDay5 ? 'linear-gradient(135deg,#ef4444,#f97316)' : 'linear-gradient(135deg,#f59e0b,#eab308)'};padding:20px 32px">
+      <h2 style="margin:0;color:#fff;font-size:18px">
+        ${isDay5 ? '⚠️ Lead sem resposta há 5 dias' : '💡 Já contactaste este cliente?'}
+      </h2>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${profName}</strong>,</p>
+      <p style="color:#94a3b8;margin:0 0 20px">
+        ${isDay5
+          ? `O lead de <strong style="color:#fff">${leadName || 'um cliente'}</strong> ainda está sem resposta há 5 dias. Considera fechar ou marcar como perdido.`
+          : `Há 2 dias recebeste um pedido de <strong style="color:#fff">${leadName || 'um cliente'}</strong> para <strong style="color:#fff">${servico}</strong>. Já estabeleceste contacto?`
+        }
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden">
+        <tr><td style="padding:10px;color:#64748b;font-size:13px">Cliente</td><td style="padding:10px;color:#fff;font-weight:bold">${leadName || '—'}</td></tr>
+        <tr><td style="padding:10px;color:#64748b;font-size:13px">Telefone</td><td style="padding:10px;color:#818cf8">${leadPhone || '—'}</td></tr>
+        <tr><td style="padding:10px;color:#64748b;font-size:13px">Serviço</td><td style="padding:10px;color:#fff">${servico}</td></tr>
+        <tr><td style="padding:10px;color:#64748b;font-size:13px">Estado</td><td style="padding:10px;color:#fbbf24">${leadStatus}</td></tr>
+      </table>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a href="${APP_URL}/leads/${leadId}"
+          style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px">
+          Abrir lead →
+        </a>
+        ${leadPhone ? `
+        <a href="https://wa.me/${leadPhone.replace(/\D/g, '')}"
+          style="display:inline-block;background:#25d366;color:#000;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px">
+          💬 WhatsApp
+        </a>` : ''}
+      </div>
+    </div>
+  `))
+}
+
 // ── Nudge para upgradar plano ─────────────────────────────────────────────────
 export async function emailUpgradeNudge({
   name, email, totalLeads, dia,
