@@ -2,13 +2,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateClientOptOutToken, generateProfessionalOptOutToken } from '@/lib/optout'
 
 const FROM = 'FaçoPorTi <contacto@xn--faoporti-t0a.com>'
-// Reply-To temporariamente revertido para o email pessoal — o teste real de
-// 2026-07-16 confirmou que contacto@xn--faoporti-t0a.com faz bounce (o
-// servidor de correio do Hostinger parece não reconhecer a forma punycode
-// como equivalente a façoporti.com para entrega). Repor
-// 'contacto@xn--faoporti-t0a.com' só depois de confirmar que essa caixa
-// aceita mail endereçado à forma punycode.
-const REPLY_TO = 'gilsongomesoliveira1@hotmail.com'
+// Confirmado com teste real em 2026-07-16: a caixa contacto@ no Hostinger
+// aceita mail endereçado à forma punycode (o bounce inicial era config
+// desatualizada, corrigida do lado do Hostinger e reconfirmada via teste
+// direto ao Resend antes desta alteração).
+const REPLY_TO = 'contacto@xn--faoporti-t0a.com'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
 async function sendEmail(to: string, subject: string, html: string) {
