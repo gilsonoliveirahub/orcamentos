@@ -1,42 +1,14 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { PERSONAL_LINK_PLAN_LIMITS, getCycleWindow, type SubscriptionPeriod } from '@/lib/personal-link-limits-shared'
 
-// Limites de leads do link pessoal que podem ser ABERTOS por ciclo — nunca
-// por leads recebidos. Um lead nunca deixa de ser criado; só a abertura
-// (visualização completa) consome quota. Fonte de verdade da APLICAÇÃO da
-// regra é a função SQL personal_link_plan_limit() (ver
-// supabase/migration_marketplace_v3_atomic.sql); esta constante existe só
-// para leituras informativas em JS (UI, notificações) — mantém os números
-// sincronizados manualmente com a função SQL se algum dia mudarem.
-export const PERSONAL_LINK_PLAN_LIMITS: Record<string, number> = {
-  free: 0, // vê os pedidos na lista, mas nunca consegue abrir nenhum
-  starter: 10,
-  pro: 30,
-}
-
-export type SubscriptionPeriod = {
-  current_period_start: string | null
-  current_period_end: string | null
-}
-
-/**
- * Início/fim do ciclo atual: período de subscrição Stripe quando existir,
- * caso contrário mês calendário (UTC) — fallback claro só para contas sem
- * subscrição Stripe associada (ex: ativadas manualmente, como a do
- * fundador). Espelha personal_link_cycle_window() em SQL.
- */
-export function getCycleWindow(prof: SubscriptionPeriod, referenceDate: Date = new Date()): { start: Date; end: Date } {
-  if (prof.current_period_start && prof.current_period_end) {
-    return { start: new Date(prof.current_period_start), end: new Date(prof.current_period_end) }
-  }
-  const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0))
-  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1, 0, 0, 0))
-  return { start, end }
-}
-
-/** @deprecated usa getCycleWindow(prof) — mantido só até todos os chamadores serem migrados. */
-export function getCycleStart(referenceDate: Date = new Date()): Date {
-  return new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0))
-}
+// As constantes/cálculos puros (sem dependência de supabaseAdmin) vivem em
+// lib/personal-link-limits-shared.ts — esse ficheiro é seguro de importar
+// a partir de componentes cliente (app/dashboard/page.tsx). Este ficheiro
+// (com supabaseAdmin) NUNCA pode ser importado por um componente 'use
+// client': o bundle do browser rebentaria com "supabaseKey is required",
+// porque supabaseAdmin inicializa-se de forma eager com a chave de
+// service role, que nunca está disponível no browser.
+export { PERSONAL_LINK_PLAN_LIMITS, getCycleWindow, type SubscriptionPeriod }
 
 export type OpenLeadResult =
   | { ok: true; alreadyOpen: boolean }

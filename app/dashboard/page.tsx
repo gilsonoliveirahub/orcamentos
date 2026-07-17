@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits'
+import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
 
 const COLUMNS = [
   { id: 'novo',        label: 'Novo',       color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
