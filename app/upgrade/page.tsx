@@ -153,7 +153,7 @@ export default function UpgradePage() {
             <p className="text-xs text-gray-500 mb-5">Para quem quer crescer a sério</p>
             <ul className="space-y-3 mb-8 flex-1">
               {[
-                { label: 'Até 50 pedidos/mês via link', soon: false },
+                { label: 'Até 30 pedidos/mês via link', soon: false },
                 { label: 'Follow-up automático', soon: false },
                 { label: 'Notificações de novos pedidos por WhatsApp', soon: false },
                 { label: 'PDF de orçamento', soon: true },

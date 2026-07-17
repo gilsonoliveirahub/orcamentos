@@ -254,7 +254,7 @@ export default function OnboardingPage() {
                   </div>
                   <span className="font-black text-white">€39<span className="text-gray-500 font-normal text-xs">/mês</span></span>
                 </div>
-                <p className="text-xs text-gray-400">Até 50 leads/mês · Follow-up automático · Estatísticas avançadas</p>
+                <p className="text-xs text-gray-400">Até 30 leads/mês · Follow-up automático · Estatísticas avançadas</p>
               </button>
             </div>
 

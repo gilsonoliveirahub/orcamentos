@@ -324,7 +324,7 @@ export default function MarketingPage() {
               <ul className="space-y-3 mb-8">
                 {[
                   { label: 'Link profissional', soon: false },
-                  { label: 'Até 50 pedidos por mês no teu link', soon: false },
+                  { label: 'Até 30 pedidos por mês no teu link', soon: false },
                   { label: 'Follow-up automático', soon: false },
                   { label: 'Notificações de novos pedidos por WhatsApp', soon: false },
                   { label: 'PDF de orçamento', soon: true },
@@ -382,7 +382,7 @@ export default function MarketingPage() {
             },
             {
               q: 'Os pedidos do meu link contam para algum limite?',
-              a: 'Sim. No plano Starter o máximo é 10 pedidos/mês via link pessoal. No plano Pro o máximo é 50 pedidos/mês.',
+              a: 'Sim. No plano Starter o máximo é 10 pedidos/mês via link pessoal. No plano Pro o máximo é 30 pedidos/mês.',
             },
             {
               q: 'Posso cancelar a qualquer momento?',
