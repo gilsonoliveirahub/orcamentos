@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendWhatsApp } from '@/lib/whatsapp'
 import { emailFollowup, emailUpgradeNudge } from '@/lib/email'
+import { isPersonalLinkQuotaExhausted } from '@/lib/personal-link-limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,8 +48,15 @@ export async function GET(req: NextRequest) {
       if (!prof?.email) continue
 
       // Nunca enviar follow-up (revela nome/telefone) para um lead que o
-      // profissional ainda não desbloqueou — plano free ou marketplace sem créditos
-      const isBlocked = !prof.plan || prof.plan === 'free' || !!lead.locked
+      // profissional ainda não desbloqueou — plano free, marketplace sem
+      // créditos, ou link pessoal ainda não aberto com a quota do ciclo já
+      // esgotada (não seria autorizado a abri-lo agora, por isso o
+      // follow-up também não pode revelar nem processar os dados).
+      const isFreePlan = !prof.plan || prof.plan === 'free'
+      const quotaExhausted = !isFreePlan && lead.source !== 'marketplace' && !lead.opened_at
+        ? await isPersonalLinkQuotaExhausted(lead.professional_id)
+        : false
+      const isBlocked = isFreePlan || !!lead.locked || quotaExhausted
       if (isBlocked) continue
 
       const metadata = lead.metadata || {}

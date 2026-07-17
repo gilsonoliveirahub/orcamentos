@@ -44,9 +44,30 @@ export default function UpgradePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ professional_id: professional.id, plan }),
     })
-    const { url, error } = await res.json()
-    if (url) window.location.href = url
-    else { alert(error || 'Erro ao iniciar pagamento'); setPaying(null) }
+    const { url, ok, deferred, error } = await res.json()
+    if (url) {
+      // Primeira subscrição — só aqui há um checkout do Stripe para onde ir.
+      window.location.href = url
+      return
+    }
+    if (ok) {
+      // Já tinha subscrição: upgrade aplicado de imediato com proration (o
+      // Stripe já confirmou o pagamento da diferença), ou downgrade
+      // registado para entrar em vigor só na próxima renovação — em
+      // nenhum dos casos há um checkout para onde redirecionar.
+      alert(deferred
+        ? 'Pedido registado — o novo plano entra em vigor na próxima renovação.'
+        : 'Plano atualizado com sucesso!')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase.from('professionals').select('*').eq('user_id', user.id).maybeSingle()
+        if (data) setProfessional(data)
+      }
+      setPaying(null)
+      return
+    }
+    alert(error || 'Erro ao iniciar pagamento')
+    setPaying(null)
   }
 
   if (loading) return (

@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
 import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
+import { geocodeZone } from '@/lib/geo'
 
 export const dynamic = 'force-dynamic'
 
+// Sem atribuição automática (removida em 2026-07-16 — decisão confirmada).
+// Todo lead do marketplace nasce sem dono (professional_id null) e fica
+// visível na área Marketplace do dashboard para profissionais compatíveis
+// (mesma especialidade, ~50km). Só passa a ter professional_id quando um
+// profissional o adquire ativamente com 1 crédito (ver lib/marketplace.ts).
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -13,60 +19,23 @@ export async function POST(req: NextRequest) {
     // checkbox; esta rota é usada por /pedir, por isso a origem é sempre 'pedir'.
     const consentFields = computeClientConsentFields(marketing_opt_in, 'pedir')
 
-    // Encontrar melhor profissional: mesma especialidade + zona, depois só especialidade
-    let professional = null
-
-    if (zone_requested) {
-      const { data } = await supabaseAdmin
-        .from('professionals')
-        .select('id, marketplace_credits')
-        .eq('specialty', specialty)
-        .eq('active', true)
-        .ilike('zone', `%${zone_requested}%`)
-        .in('plan', ['starter', 'pro'])
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      professional = data
-    }
-
-    if (!professional) {
-      const { data } = await supabaseAdmin
-        .from('professionals')
-        .select('id, marketplace_credits')
-        .eq('specialty', specialty)
-        .eq('active', true)
-        .in('plan', ['starter', 'pro'])
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-      professional = data
-    }
-
-    // Atomic decrement: só actualiza se marketplace_credits ainda for o valor lido (optimistic lock)
-    let hasCredits = false
-    if (professional && (professional.marketplace_credits ?? 0) > 0) {
-      const { data: deducted } = await supabaseAdmin
-        .from('professionals')
-        .update({ marketplace_credits: professional.marketplace_credits - 1 })
-        .eq('id', professional.id)
-        .eq('marketplace_credits', professional.marketplace_credits)
-        .select('id')
-        .maybeSingle()
-      hasCredits = !!deducted
-    }
-    const locked = professional ? !hasCredits : false
+    // Coordenadas aproximadas da zona pedida, para a correspondência por
+    // distância na área Marketplace. Null se a zona não for reconhecida —
+    // nesse caso o fallback por texto de zona continua a aplicar-se.
+    const coords = geocodeZone(zone_requested)
 
     const { data: lead, error } = await supabaseAdmin
       .from('leads')
       .insert({
         ...fields,
-        professional_id: professional?.id ?? null,
+        professional_id: null,
         specialty,
         zone_requested: zone_requested || null,
         source: 'marketplace',
-        locked,
-        status: professional ? 'novo' : 'pendente',
+        locked: true,
+        status: 'pendente',
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
         ...consentFields,
       })
       .select()
@@ -79,27 +48,17 @@ export async function POST(req: NextRequest) {
     // eventuais campanhas futuras (que ainda não existem).
     await upsertClientMarketingConsent({ email: fields.email, leadId: lead.id, fields: consentFields })
 
-    // Notificar profissional se atribuído
-    if (professional && lead) {
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'}/api/notifications/lead`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id }),
-      }).catch(() => {})
-    }
-
-    // Sem profissional atribuído: professional_id fica null — conta nas
-    // métricas globais da plataforma, mas não entra nas métricas de nenhum
-    // profissional específico (decisão confirmada 2026-07-16).
+    // Sem profissional atribuído na criação — conta nas métricas globais da
+    // plataforma, nunca nas métricas de nenhum profissional específico.
     await recordRequestCompleted({
       ip: clientIpFrom(req.headers),
       userAgent: req.headers.get('user-agent') || '',
-      professionalId: professional?.id ?? null,
+      professionalId: null,
       source: 'marketplace',
       path: '/pedir',
     })
 
-    return NextResponse.json({ lead, assigned: !!professional })
+    return NextResponse.json({ lead, assigned: false })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

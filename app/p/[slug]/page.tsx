@@ -167,22 +167,9 @@ export default function ProfessionalPublicPage() {
     if (submitting) return
     setSubmitting(true)
 
-    if (professional.plan === 'starter') {
-      const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-      const { count } = await supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('professional_id', professional.id)
-        .gte('created_at', startOfMonth.toISOString())
-      if ((count ?? 0) >= 10) {
-        setSubmitting(false)
-        alert('Este profissional atingiu o limite de pedidos para este mês. Tente mais tarde.')
-        return
-      }
-    }
-
+    // O pedido nunca é bloqueado na submissão — o limite do plano (10
+    // Starter / 30 Pro por ciclo) só se aplica à ABERTURA do lead pelo
+    // profissional, não à criação (ver lib/personal-link-limits.ts).
     const legacyFields = mapAnswersToLeadFields(answers)
 
     const res = await fetch('/api/leads/public', {

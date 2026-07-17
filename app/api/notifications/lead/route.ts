@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailNovoLead, emailNovoLeadBloqueado } from '@/lib/email'
 import { sendWhatsApp } from '@/lib/whatsapp'
+import { isPersonalLinkQuotaExhausted } from '@/lib/personal-link-limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,15 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
     // Bloqueado = plano free (nunca abre nenhum lead) OU marketplace sem
-    // créditos (lead.locked). Verificação no servidor — nunca confiar só na UI.
+    // créditos (lead.locked) OU lead do link pessoal cuja quota do ciclo já
+    // está esgotada (abri-lo agora não seria autorizado, por isso a
+    // notificação também não pode revelar os dados). Verificação no
+    // servidor — nunca confiar só na UI.
     const isFreePlan = !prof.plan || prof.plan === 'free'
-    const isBlocked = isFreePlan || !!lead.locked
+    const quotaExhausted = !isFreePlan && lead.source !== 'marketplace' && !lead.opened_at
+      ? await isPersonalLinkQuotaExhausted(lead.professional_id)
+      : false
+    const isBlocked = isFreePlan || !!lead.locked || quotaExhausted
 
     if (isBlocked) {
       await emailNovoLeadBloqueado({

@@ -10,92 +10,95 @@ function fakeRequest(body: unknown): NextRequest {
   } as unknown as NextRequest
 }
 
-// Encadeamento genérico: eq/ilike/in/order/limit devolvem sempre o mesmo
-// objeto (independentemente da ordem/combinação chamada pela rota), e
-// maybeSingle resolve para o resultado fixo — cobre tanto a pesquisa com zona
-// (eq.eq.ilike.in.order.limit) como a pesquisa de recurso sem zona (eq.eq.in.order.limit).
-function professionalQuery(result: { id: string; marketplace_credits: number } | null) {
-  const obj: Record<string, unknown> = {
-    eq: () => obj,
-    ilike: () => obj,
-    in: () => obj,
-    order: () => obj,
-    limit: () => obj,
-    maybeSingle: async () => ({ data: result }),
-  }
-  return obj
+function mockSupabase() {
+  const leadInserts: Record<string, unknown>[] = []
+  const analyticsInserts: Record<string, unknown>[] = []
+  const consentUpserts: Array<[Record<string, unknown>, Record<string, unknown>]> = []
+  const from = vi.fn((table: string) => {
+    if (table === 'leads') {
+      return {
+        insert: (payload: Record<string, unknown>) => {
+          leadInserts.push(payload)
+          return { select: () => ({ single: async () => ({ data: { id: 'lead-1', ...payload }, error: null }) }) }
+        },
+      }
+    }
+    if (table === 'marketing_consents') {
+      return { upsert: (payload: Record<string, unknown>, opts: Record<string, unknown>) => { consentUpserts.push([payload, opts]); return Promise.resolve({ error: null }) } }
+    }
+    if (table === 'analytics_events') {
+      return { insert: (row: Record<string, unknown>) => { analyticsInserts.push(row); return Promise.resolve({ error: null }) } }
+    }
+    throw new Error(`tabela inesperada: ${table} — a rota já não deve consultar 'professionals' (atribuição automática removida)`)
+  })
+  vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+  return { leadInserts, analyticsInserts, consentUpserts }
 }
 
-describe('POST /api/leads/marketplace — registo de request_completed', () => {
+describe('POST /api/leads/marketplace — sem atribuição automática (removida 2026-07-16)', () => {
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
-    // A rota dispara uma notificação fetch() fire-and-forget quando atribui um
-    // profissional — nunca deve fazer um pedido de rede real durante os testes.
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
   })
-
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
     vi.restoreAllMocks()
-    vi.unstubAllGlobals()
     vi.doUnmock('@/lib/supabase-admin')
   })
 
-  it('regista request_completed com o profissional atribuído quando existe correspondência', async () => {
-    const analyticsInserts: Record<string, unknown>[] = []
+  it('cria sempre o lead com professional_id null, locked true, status pendente — nunca consulta a tabela professionals', async () => {
+    const { leadInserts } = mockSupabase()
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.assigned).toBe(false)
+    expect(leadInserts[0]).toMatchObject({ professional_id: null, locked: true, status: 'pendente', source: 'marketplace' })
+  })
+
+  it('geocodifica a zona pedida e grava lat/lng quando reconhecida', async () => {
+    const { leadInserts } = mockSupabase()
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111' }))
+
+    expect(leadInserts[0].lat).toBeCloseTo(38.7223, 2)
+    expect(leadInserts[0].lng).toBeCloseTo(-9.1393, 2)
+  })
+
+  it('zona não reconhecida: grava lat/lng null, sem falhar a criação do lead', async () => {
+    const { leadInserts } = mockSupabase()
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ specialty: 'Pintura', zone_requested: 'Nárnia', name: 'Cliente', phone: '351911111111' }))
+
+    expect(res.status).toBe(200)
+    expect(leadInserts[0].lat).toBeNull()
+    expect(leadInserts[0].lng).toBeNull()
+  })
+
+  it('regista request_completed sempre com professional_id null (conta na plataforma, não em nenhum profissional)', async () => {
+    const { analyticsInserts } = mockSupabase()
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ specialty: 'Canalização', zone_requested: null, name: 'Cliente', phone: '351922222222' }))
+
+    expect(analyticsInserts).toHaveLength(1)
+    expect(analyticsInserts[0]).toMatchObject({ event_type: 'request_completed', professional_id: null, source: 'marketplace' })
+  })
+
+  it('não regista request_completed quando a criação do lead falha', async () => {
+    const analyticsInsert = vi.fn()
     const from = vi.fn((table: string) => {
-      if (table === 'professionals') return { select: () => professionalQuery({ id: 'prof-1', marketplace_credits: 0 }) }
-      if (table === 'leads') return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'lead-1' }, error: null }) }) }) }
-      if (table === 'analytics_events') return { insert: (row: Record<string, unknown>) => { analyticsInserts.push(row); return Promise.resolve({ error: null }) } }
+      if (table === 'leads') return { insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { message: 'falha' } }) }) }) }
+      if (table === 'analytics_events') return { insert: analyticsInsert }
       throw new Error(`tabela inesperada: ${table}`)
     })
     vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
 
     const { POST } = await import('./route')
     const res = await POST(fakeRequest({ specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111' }))
-    const json = await res.json()
 
-    expect(res.status).toBe(200)
-    expect(json.assigned).toBe(true)
-    expect(analyticsInserts).toHaveLength(1)
-    expect(analyticsInserts[0]).toMatchObject({ event_type: 'request_completed', professional_id: 'prof-1', source: 'marketplace' })
-  })
-
-  it('sem profissional disponível: request_completed é registado com professional_id null — conta na plataforma, não em nenhum profissional', async () => {
-    const analyticsInserts: Record<string, unknown>[] = []
-    const from = vi.fn((table: string) => {
-      if (table === 'professionals') return { select: () => professionalQuery(null) }
-      if (table === 'leads') return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'lead-2' }, error: null }) }) }) }
-      if (table === 'analytics_events') return { insert: (row: Record<string, unknown>) => { analyticsInserts.push(row); return Promise.resolve({ error: null }) } }
-      throw new Error(`tabela inesperada: ${table}`)
-    })
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
-
-    const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ specialty: 'Canalização', zone_requested: null, name: 'Cliente', phone: '351922222222' }))
-    const json = await res.json()
-
-    expect(res.status).toBe(200)
-    expect(json.assigned).toBe(false)
-    expect(analyticsInserts).toHaveLength(1)
-    expect(analyticsInserts[0]).toMatchObject({ event_type: 'request_completed', professional_id: null, source: 'marketplace' })
-  })
-
-  it('nunca faz um pedido de rede real — a notificação de novo lead é sempre interceptada pelo mock de fetch', async () => {
-    const from = vi.fn((table: string) => {
-      if (table === 'professionals') return { select: () => professionalQuery({ id: 'prof-1', marketplace_credits: 0 }) }
-      if (table === 'leads') return { insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'lead-3' }, error: null }) }) }) }
-      if (table === 'analytics_events') return { insert: async () => ({ error: null }) }
-      throw new Error(`tabela inesperada: ${table}`)
-    })
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
-
-    const { POST } = await import('./route')
-    await POST(fakeRequest({ specialty: 'Pintura', zone_requested: 'Porto', name: 'Cliente', phone: '351933333333' }))
-
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain('/api/notifications/lead')
+    expect(res.status).toBe(400)
+    expect(analyticsInsert).not.toHaveBeenCalled()
   })
 })
 
@@ -103,37 +106,12 @@ describe('POST /api/leads/marketplace — consentimento de marketing do CLIENTE'
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
   })
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
     vi.restoreAllMocks()
-    vi.unstubAllGlobals()
     vi.doUnmock('@/lib/supabase-admin')
   })
-
-  function mockSupabase() {
-    const leadInserts: Record<string, unknown>[] = []
-    const consentUpserts: Array<[Record<string, unknown>, Record<string, unknown>]> = []
-    const from = vi.fn((table: string) => {
-      if (table === 'professionals') return { select: () => professionalQuery({ id: 'prof-1', marketplace_credits: 0 }) }
-      if (table === 'leads') {
-        return {
-          insert: (payload: Record<string, unknown>) => {
-            leadInserts.push(payload)
-            return { select: () => ({ single: async () => ({ data: { id: 'lead-1', ...payload }, error: null }) }) }
-          },
-        }
-      }
-      if (table === 'marketing_consents') {
-        return { upsert: (payload: Record<string, unknown>, opts: Record<string, unknown>) => { consentUpserts.push([payload, opts]); return Promise.resolve({ error: null }) } }
-      }
-      if (table === 'analytics_events') return { insert: async () => ({ error: null }) }
-      throw new Error(`tabela inesperada: ${table}`)
-    })
-    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
-    return { leadInserts, consentUpserts }
-  }
 
   it('checkbox marcada + email: grava no lead e regista em marketing_consents com origem pedir', async () => {
     const { leadInserts, consentUpserts } = mockSupabase()

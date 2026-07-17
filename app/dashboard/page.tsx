@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   DndContext,
@@ -12,8 +12,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits'
 
 const COLUMNS = [
   { id: 'novo',        label: 'Novo',       color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
@@ -24,12 +25,17 @@ const COLUMNS = [
   { id: 'perdido',     label: 'Perdido',     color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
 
-function LeadCard({ lead, quote, onClick, onUnlock, isPaid }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; isPaid: boolean }) {
+function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhausted }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; isPaid: boolean; personalQuotaExhausted?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
   const router = useRouter()
   const isPlanLocked = !isPaid
   const isMarketplaceLocked = !isPlanLocked && lead.locked && lead.source === 'marketplace'
-  const isLocked = isPlanLocked || isMarketplaceLocked
+  // Lead do link pessoal ainda não aberto, com a quota do ciclo esgotada —
+  // fica visível mas bloqueado até ao próximo ciclo (a decisão real é
+  // sempre feita no servidor no momento de abrir, isto é só a indicação
+  // visual antecipada).
+  const isQuotaLocked = !isPlanLocked && lead.source !== 'marketplace' && !lead.opened_at && !!personalQuotaExhausted
+  const isLocked = isPlanLocked || isMarketplaceLocked || isQuotaLocked
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 999, opacity: 0.9 }
@@ -118,6 +124,12 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid }: { lead: any; quote
             >
               <Lock size={11} /> Ativar plano para ver
             </button>
+          ) : isQuotaLocked ? (
+            <div className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl"
+              style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.2)' }}
+            >
+              <Lock size={11} /> Limite do ciclo atingido
+            </div>
           ) : (
           <button
             onClick={e => { e.stopPropagation(); onUnlock() }}
@@ -172,7 +184,7 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid }: { lead: any; quote
   )
 }
 
-function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, isPaid }: any) {
+function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, isPaid, personalQuotaExhausted }: any) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const colLeads = leads.filter((l: any) => l.status === id)
 
@@ -208,6 +220,7 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, is
             onClick={() => onCardClick(lead.id)}
             onUnlock={() => onUnlock(lead.id)}
             isPaid={isPaid}
+            personalQuotaExhausted={personalQuotaExhausted}
           />
         ))}
         {colLeads.length === 0 && (
@@ -363,6 +376,7 @@ export default function Dashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const [, startTransition] = useTransition()
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -370,20 +384,26 @@ export default function Dashboard() {
     router.refresh()
   }
 
-  useEffect(() => { loadData() }, [])
-
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
+    // dashboard_leads() (RPC) devolve só o resumo — nome/telefone/email/
+    // notas/fotos só vêm preenchidos para leads já autorizados (abertos, ou
+    // adquiridos no marketplace). O cliente Supabase já nem consegue pedir
+    // essas colunas diretamente a leads (ver REVOKE em
+    // supabase/migration_marketplace_v3_atomic.sql).
     const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
-      supabase.from('leads').select('*').order('created_at', { ascending: false }),
+      supabase.rpc('dashboard_leads'),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
-      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
-    setLeads(leadsData || [])
+    const sortedLeads = [...(leadsData || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    setLeads(sortedLeads)
     setQuotes(quotesData || [])
     setProfessional(profData)
     setLoading(false)
   }
+
+  useEffect(() => { startTransition(() => { loadData() }) }, [])
 
   function copyLink() {
     if (!professional?.slug) return
@@ -426,6 +446,21 @@ export default function Dashboard() {
   const totalFechado = leads.filter(l => l.status === 'fechado').length
   const totalLeads = leads.length
   const totalOrcamentos = quotes.length
+
+  // Quota de abertura de leads do link pessoal (10 Starter / 30 Pro por
+  // ciclo, alinhado com o período de subscrição Stripe — fallback de mês
+  // calendário só para contas sem subscrição, ex: ativadas manualmente) —
+  // cálculo aproximado para a badge do card; a decisão real e atómica é
+  // sempre feita no servidor em /api/leads/open no momento da abertura.
+  const { start: cycleStart } = getCycleWindow({
+    current_period_start: professional?.current_period_start ?? null,
+    current_period_end: professional?.current_period_end ?? null,
+  })
+  const personalOpenedThisCycle = leads.filter(l =>
+    l.source !== 'marketplace' && l.opened_at && new Date(l.opened_at) >= cycleStart
+  ).length
+  const personalLimit = PERSONAL_LINK_PLAN_LIMITS[professional?.plan as string] ?? 0
+  const personalQuotaExhausted = personalOpenedThisCycle >= personalLimit
   const faturacao = quotes
     .filter(q => leads.find(l => l.id === q.lead_id && l.status === 'fechado'))
     .reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
@@ -487,6 +522,11 @@ export default function Dashboard() {
               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}>
               <Plus size={15} /> Novo Lead
             </button>
+            <a href="/marketplace"
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <ShoppingCart size={14} /> Marketplace
+            </a>
             <a href="/acordos"
               className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
               style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -573,6 +613,10 @@ export default function Dashboard() {
               </button>
             )}
             <div className="grid grid-cols-2 gap-2">
+              <a href="/marketplace" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <ShoppingCart size={14} /> Marketplace
+              </a>
               <a href="/acordos" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
                 style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
                 📋 Acordos
@@ -661,7 +705,8 @@ export default function Dashboard() {
                 <Column key={col.id} {...col} leads={leads} quotes={quotes}
                   onCardClick={(id: string) => router.push(`/leads/${id}`)}
                   onUnlock={handleUnlock}
-                  isPaid={professional?.plan === 'starter' || professional?.plan === 'pro'} />
+                  isPaid={professional?.plan === 'starter' || professional?.plan === 'pro'}
+                  personalQuotaExhausted={personalQuotaExhausted} />
               ))}
             </div>
           </DndContext>

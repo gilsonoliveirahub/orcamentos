@@ -20,11 +20,18 @@ export default function StatsPage() {
   const [funnelLoading, setFunnelLoading] = useState(true)
 
   useEffect(() => {
+    // dashboard_leads() (RPC) — nunca select direto: um lead do link
+    // pessoal ainda não aberto pelo profissional ficou invisível para
+    // select('*') direto (RLS exige lead_is_authorized), mas esta função
+    // devolve sempre o resumo de TODOS os leads do profissional (aberto ou
+    // não), o que é o que as métricas agregadas aqui precisam — nenhum dos
+    // cálculos nesta página usa nome/telefone/notas.
     Promise.all([
-      supabase.from('leads').select('*').order('created_at', { ascending: true }),
+      supabase.rpc('dashboard_leads'),
       supabase.from('quotes').select('*'),
     ]).then(([{ data: l }, { data: q }]) => {
-      setLeads(l || [])
+      const sorted = [...(l || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      setLeads(sorted)
       setQuotes(q || [])
       setLoading(false)
     })

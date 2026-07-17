@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
+import { isLeadAuthorized } from '@/lib/lead-authorization'
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,12 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
+
+    // Nunca gerar um orçamento (que embute nome/telefone no texto da
+    // proposta) para um lead que o profissional ainda não abriu — evita
+    // contornar a proteção de dados pessoais chamando esta rota
+    // diretamente, sem passar pelo gate de /api/leads/open.
+    if (!isLeadAuthorized(lead)) return NextResponse.json({ error: 'Pedido ainda bloqueado' }, { status: 403 })
 
     const professional = lead.professionals || {}
 

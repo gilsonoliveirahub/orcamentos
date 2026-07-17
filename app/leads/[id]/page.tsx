@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
@@ -38,8 +38,8 @@ export default function LeadDetail() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  useEffect(() => { loadData() }, [id])
+  const [quotaBlocked, setQuotaBlocked] = useState(false)
+  const [, startTransition] = useTransition()
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -51,14 +51,32 @@ export default function LeadDetail() {
       }
     }
 
-    const [{ data: leadData }, { data: quoteData }] = await Promise.all([
-      supabase.from('leads').select('*, professionals(*)').eq('id', id).single(),
-      supabase.from('quotes').select('*').eq('lead_id', id).maybeSingle(),
-    ])
+    // Única fonte de dados completos do lead: o cliente Supabase já não
+    // consegue pedir nome/telefone/email/notas diretamente (colunas
+    // revogadas para o papel authenticated — ver
+    // supabase/migration_marketplace_v3_atomic.sql), e a decisão de
+    // autorizar (abrir quota do ciclo do link pessoal, ou confirmar
+    // aquisição do marketplace) é sempre tomada no servidor, nunca na
+    // interface. Se bloqueado, os dados completos nem chegam a entrar no
+    // estado da página.
+    const res = await fetch('/api/leads/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: id }),
+    })
+    if (!res.ok) {
+      setQuotaBlocked(true)
+      setLoading(false)
+      return
+    }
+
+    const { lead: leadData, quote: quoteData } = await res.json()
     setLead(leadData)
     setQuote(quoteData)
     setLoading(false)
   }
+
+  useEffect(() => { startTransition(() => { loadData() }) }, [id])
 
   async function handleGenerateQuote() {
     setGenerating(true)
@@ -93,6 +111,21 @@ export default function LeadDetail() {
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
       <div className="w-8 h-8 border-4 border-indigo-900 border-t-indigo-500 rounded-full animate-spin" />
+    </div>
+  )
+
+  if (quotaBlocked) return (
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0a0c1a' }}>
+      <div className="text-center max-w-sm">
+        <div className="text-5xl mb-4">🔒</div>
+        <h1 className="text-white text-xl font-bold mb-2">Limite do ciclo atingido</h1>
+        <p className="text-gray-500 mb-6">Já abriste o número de pedidos do link pessoal incluídos no teu plano para este ciclo. Os pedidos já abertos continuam acessíveis normalmente.</p>
+        <button onClick={() => router.push('/dashboard')}
+          className="inline-block text-sm font-semibold px-6 py-3 rounded-2xl"
+          style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+          Voltar ao dashboard
+        </button>
+      </div>
     </div>
   )
 
