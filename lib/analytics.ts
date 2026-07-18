@@ -20,7 +20,7 @@ export type OriginChannel = typeof ORIGIN_CHANNELS[number]
 export const SOURCES = ['pessoal', 'marketplace'] as const
 export type AnalyticsSource = typeof SOURCES[number]
 
-const FIXED_PATHS = ['/', '/contactos', '/pedir'] as const
+const FIXED_PATHS = ['/', '/contactos', '/pedir', '/comecar'] as const
 const SLUG_PATH_RE = /^\/p\/[a-z0-9-]{1,80}$/
 
 export function isAllowedPath(path: string): boolean {

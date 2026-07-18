@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Briefcase, Eye, EyeOff } from 'lucide-react'
@@ -21,6 +21,14 @@ export default function LoginPage() {
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  // Permite chegar já com "Criar Conta" + "Sou Profissional" pré-selecionados
+  // (usado pela página de aterragem /comecar, vinda de posts/DM em grupos).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') === 'register') setTab('register')
+    if (params.get('role') === 'professional') setRole('professional')
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
