@@ -124,10 +124,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Sem subscrição ativa — primeira assinatura, fluxo de Checkout normal.
+    // Sem subscrição ativa — primeira assinatura OU reassinatura depois de
+    // um cancelamento. Se já existir stripe_customer_id (reassinatura),
+    // reutiliza-o em vez de customer_email — evita criar um segundo
+    // Customer Stripe para a mesma pessoa (o Checkout cria sempre um
+    // Customer novo a partir de customer_email).
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      customer_email: prof.email,
+      ...(prof.stripe_customer_id
+        ? { customer: prof.stripe_customer_id }
+        : { customer_email: prof.email }),
       metadata: { professional_id: prof.id, plan },
       line_items: [{ price: selectedPlan.priceId, quantity: 1 }],
       success_url: `${appUrl}/upgrade?success=1`,

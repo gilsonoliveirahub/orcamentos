@@ -69,6 +69,30 @@ describe('POST /api/stripe/checkout', () => {
 
     expect(json.url).toBe('https://checkout.stripe.com/session-1')
     expect(sessionsCreate).toHaveBeenCalledTimes(1)
+    expect(sessionsCreate).toHaveBeenCalledWith(expect.objectContaining({ customer_email: 'prof@example.com' }))
+    expect(sessionsCreate.mock.calls[0][0]).not.toHaveProperty('customer')
+  })
+
+  it('reassinatura depois de um cancelamento (stripe_subscription_id limpo mas stripe_customer_id mantido): reutiliza o Customer existente, sem criar um duplicado', async () => {
+    const retrieve = vi.fn()
+    const update = vi.fn()
+    const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session-2' })
+    mockStripe({ retrieve, update, sessionsCreate })
+    // Estado depois de customer.subscription.deleted: plan inactive,
+    // stripe_subscription_id limpo, stripe_customer_id preservado.
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: 'inactive', stripe_customer_id: 'cus_1', stripe_subscription_id: null })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter' }))
+    const json = await res.json()
+
+    expect(json.url).toBe('https://checkout.stripe.com/session-2')
+    // Nunca tenta atualizar uma subscrição já cancelada — vai direto para um novo Checkout.
+    expect(retrieve).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+    // Reutiliza o customer existente (nunca customer_email, que criaria um segundo Customer no Stripe).
+    expect(sessionsCreate).toHaveBeenCalledWith(expect.objectContaining({ customer: 'cus_1' }))
+    expect(sessionsCreate.mock.calls[0][0]).not.toHaveProperty('customer_email')
   })
 
   it('já tem este plano ativo: recusa sem chamar o Stripe (evita subscrições/pedidos duplicados)', async () => {

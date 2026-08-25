@@ -257,5 +257,24 @@ describe('POST /api/stripe/webhook', () => {
         current_period_end: new Date(1757980800 * 1000).toISOString(),
       })
     })
+
+    it('customer.subscription.deleted: limpa stripe_subscription_id mas NUNCA stripe_customer_id (reassinatura futura reutiliza o mesmo Customer)', async () => {
+      const retrieve = vi.fn()
+      mockStripe({ retrieve })
+      const db = mockDb({})
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from } }))
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn() }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({
+        id: 'evt_sub_deleted',
+        type: 'customer.subscription.deleted',
+        data: { object: { id: 'sub_1' } },
+      }))
+
+      expect(db.updatesByTable.professionals).toContainEqual({ plan: 'inactive', stripe_subscription_id: null })
+      // Nunca deve tocar em stripe_customer_id — nem sequer aparece no payload do update.
+      expect(db.updatesByTable.professionals[0]).not.toHaveProperty('stripe_customer_id')
+    })
   })
 })

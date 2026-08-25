@@ -25,6 +25,14 @@ export async function POST(req: NextRequest) {
         name: body.name || null,
         phone: body.phone || null,
         status: 'novo',
+        // Lead inserido manualmente pelo próprio profissional — nunca deve
+        // consumir nem ficar bloqueado pela quota do link pessoal (essa
+        // conta só leads com source='pessoal', que é o DEFAULT da coluna;
+        // por isso é preciso sobrepor explicitamente para null) nem exigir
+        // abertura via /api/leads/open (opened_at já vem preenchido, fica
+        // imediatamente autorizado).
+        source: null,
+        opened_at: new Date().toISOString(),
         q1_tipo_trabalho: body.q1_tipo_trabalho || null,
         q2_divisoes: body.q2_divisoes || null,
         q3_area_m2: body.q3_area_m2 ? parseFloat(body.q3_area_m2) : null,

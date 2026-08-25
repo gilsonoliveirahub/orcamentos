@@ -149,11 +149,17 @@ export async function POST(req: NextRequest) {
       .eq('stripe_subscription_id', sub.id)
   }
 
+  // Limpa stripe_subscription_id (nunca stripe_customer_id — o cliente
+  // Stripe continua válido e é reutilizado numa reassinatura futura, para
+  // nunca criar um segundo Customer para a mesma pessoa). Sem isto,
+  // /api/stripe/checkout via prof.stripe_subscription_id ainda preenchido
+  // tentava sempre atualizar uma subscrição já cancelada no Stripe (falha
+  // sempre), impedindo o profissional de voltar a assinar.
   if (event.type === 'customer.subscription.deleted') {
     const sub = event.data.object as Stripe.Subscription
     await supabaseAdmin
       .from('professionals')
-      .update({ plan: 'inactive' })
+      .update({ plan: 'inactive', stripe_subscription_id: null })
       .eq('stripe_subscription_id', sub.id)
   }
 

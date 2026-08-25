@@ -18,7 +18,6 @@ describe('POST /api/notifications/lead', () => {
     vi.doUnmock('@/lib/supabase-admin')
     vi.doUnmock('@/lib/email')
     vi.doUnmock('@/lib/whatsapp')
-    vi.doUnmock('@/lib/personal-link-limits')
   })
 
   it('still returns ok:true and logs a warning when WhatsApp fails — never hides the failure', async () => {
@@ -28,7 +27,7 @@ describe('POST /api/notifications/lead', () => {
       phone: '351911111111',
       email: null,
       locked: false,
-      opened_at: null,
+      opened_at: '2026-07-17T00:00:00Z',
       professional_id: 'prof-1',
       q1_tipo_trabalho: 'Pintura',
       metadata: {},
@@ -41,7 +40,6 @@ describe('POST /api/notifications/lead', () => {
         from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }),
       },
     }))
-    vi.doMock('@/lib/personal-link-limits', () => ({ isPersonalLinkQuotaExhausted: vi.fn().mockResolvedValue(false) }))
 
     const emailNovoLead = vi.fn().mockResolvedValue(undefined)
     const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -66,14 +64,13 @@ describe('POST /api/notifications/lead', () => {
   it('skips WhatsApp entirely (no crash, no call) when the professional has no phone', async () => {
     const lead = {
       id: 'lead-2', name: 'Cliente', phone: '351911111111', email: null, locked: false,
-      opened_at: null, professional_id: 'prof-1',
+      opened_at: '2026-07-17T00:00:00Z', professional_id: 'prof-1',
       q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal',
       professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: null, plan: 'pro', zone: 'Lisboa' },
     }
     vi.doMock('@/lib/supabase-admin', () => ({
       supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
     }))
-    vi.doMock('@/lib/personal-link-limits', () => ({ isPersonalLinkQuotaExhausted: vi.fn().mockResolvedValue(false) }))
     const emailNovoLead = vi.fn().mockResolvedValue(undefined)
     const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
     vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
@@ -168,17 +165,16 @@ describe('POST /api/notifications/lead', () => {
       expect(whatsappMessage).toContain('/dashboard')
     })
 
-    it('profissional pago e lead desbloqueado continua a receber os dados completos', async () => {
+    it('profissional pago e lead já aberto (opened_at gravado) continua a receber os dados completos', async () => {
       const lead = {
         id: 'lead-5', name: 'Cliente Normal', phone: '351977777777', email: null, locked: false,
-        opened_at: null, professional_id: 'prof-1',
+        opened_at: '2026-07-17T00:00:00Z', professional_id: 'prof-1',
         q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal',
         professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'starter', zone: 'Lisboa' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
         supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
       }))
-      vi.doMock('@/lib/personal-link-limits', () => ({ isPersonalLinkQuotaExhausted: vi.fn().mockResolvedValue(false) }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
       vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
@@ -198,9 +194,9 @@ describe('POST /api/notifications/lead', () => {
       expect(whatsappMessage).toContain('351977777777')
     })
 
-    it('lead do link pessoal com a quota do ciclo esgotada recebe só notificação redigida, mesmo com plano pago e locked=false', async () => {
+    it('lead do link pessoal ainda não aberto recebe só notificação redigida, mesmo com plano pago e locked=false (a quota só é consumida ao abrir, nunca antes)', async () => {
       const lead = {
-        id: 'lead-6', name: 'Cliente Com Quota Esgotada', phone: '351999999999', email: null, locked: false,
+        id: 'lead-6', name: 'Cliente Ainda Não Aberto', phone: '351999999999', email: null, locked: false,
         opened_at: null, professional_id: 'prof-1',
         q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal', zone_requested: 'Braga',
         professionals: { name: 'Prof Starter', email: 'profstarter@example.com', specialty: 'Pintura', phone: '351900000000', plan: 'starter', zone: 'Braga' },
@@ -208,8 +204,6 @@ describe('POST /api/notifications/lead', () => {
       vi.doMock('@/lib/supabase-admin', () => ({
         supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
       }))
-      const isPersonalLinkQuotaExhausted = vi.fn().mockResolvedValue(true)
-      vi.doMock('@/lib/personal-link-limits', () => ({ isPersonalLinkQuotaExhausted }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
       vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
@@ -221,12 +215,11 @@ describe('POST /api/notifications/lead', () => {
       const json = await res.json()
 
       expect(json).toEqual({ ok: true, blocked: true })
-      expect(isPersonalLinkQuotaExhausted).toHaveBeenCalledWith('prof-1')
       expect(emailNovoLead).not.toHaveBeenCalled()
       expect(emailNovoLeadBloqueado).toHaveBeenCalledWith(expect.objectContaining({ isFreePlan: false }))
 
       const [, whatsappMessage] = sendWhatsApp.mock.calls[0]
-      expect(whatsappMessage).not.toContain('Cliente Com Quota Esgotada')
+      expect(whatsappMessage).not.toContain('Cliente Ainda Não Aberto')
       expect(whatsappMessage).not.toContain('351999999999')
     })
   })

@@ -110,6 +110,65 @@ describe('POST /api/leads/open', () => {
     expect(json.quote).toBeNull()
   })
 
+  it('lead manual (source: null, opened_at já preenchido na criação): profissional Free consegue abrir sem passar por openPersonalLead nem pela quota', async () => {
+    mockAuth('user-1')
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            // opened_at já vem preenchido desde a criação (ver /api/leads/create)
+            // — nunca chega a precisar de consultar o plano do profissional.
+            const row = { id: 'lead-1', professional_id: 'prof-1', source: null, opened_at: '2026-08-25T10:00:00Z', locked: false }
+            return {
+              select: () => ({ eq: () => ({
+                maybeSingle: async () => ({ data: row }),
+                single: async () => ({ data: { ...row, name: 'Cliente Manual', phone: '351900000000' } }),
+              }) }),
+            }
+          }
+          if (table === 'quotes') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    const openPersonalLead = vi.fn()
+    vi.doMock('@/lib/personal-link-limits', () => ({ openPersonalLead }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.lead.name).toBe('Cliente Manual')
+    // Nunca tenta abrir (já estava aberto desde a criação) — por isso um
+    // profissional Free (que teria 'plan' bloqueado num lead do link
+    // pessoal real) consegue sempre ver o lead que ele próprio inseriu.
+    expect(openPersonalLead).not.toHaveBeenCalled()
+  })
+
+  it('contraste — lead REAL do link pessoal (source: pessoal, ainda não aberto): profissional Free continua bloqueado (\'plan\'), a quota nunca é contornada', async () => {
+    mockAuth('user-1')
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', source: 'pessoal', opened_at: null, locked: false } }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/personal-link-limits', () => ({ openPersonalLead: vi.fn().mockResolvedValue({ ok: false, error: 'plan' }) }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(403)
+    expect(json.reason).toBe('plan')
+    expect(json.lead).toBeUndefined()
+  })
+
   it('lead do marketplace ainda bloqueado (locked=true): não tenta abrir, devolve 403 sem dados', async () => {
     mockAuth('user-1')
     let leadsCallCount = 0

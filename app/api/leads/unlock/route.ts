@@ -5,6 +5,11 @@ import { emailLeadDesbloqueado } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
+const ERROR_MESSAGES: Record<string, string> = {
+  not_found: 'Pedido não encontrado.',
+  credits: 'Sem créditos.',
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { lead_id } = await req.json()
@@ -15,32 +20,34 @@ export async function POST(req: NextRequest) {
 
     const { data: prof } = await supabaseAdmin
       .from('professionals')
-      .select('id, marketplace_credits')
+      .select('id')
       .eq('user_id', user.id)
       .single()
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
 
-    if ((prof.marketplace_credits ?? 0) < 1) {
-      return NextResponse.json({ error: 'Sem créditos' }, { status: 402 })
+    // Desconto do crédito e desbloqueio do lead numa única transação SQL
+    // (unlock_marketplace_lead_by_credit) — nunca duas operações
+    // independentes: dois cliques simultâneos nunca descontam 2 créditos.
+    const { data: result } = await supabaseAdmin.rpc('unlock_marketplace_lead_by_credit', {
+      p_lead_id: lead_id,
+      p_professional_id: prof.id,
+    })
+
+    if (!result?.ok) {
+      const reason = result?.error ?? 'not_found'
+      const status = reason === 'credits' ? 402 : 404
+      return NextResponse.json({ error: ERROR_MESSAGES[reason] ?? 'Falha ao desbloquear.', reason }, { status })
     }
 
-    // Descontar 1 crédito e desbloquear lead
-    const [, { data: lead }] = await Promise.all([
-      supabaseAdmin
-        .from('professionals')
-        .update({ marketplace_credits: prof.marketplace_credits - 1 })
-        .eq('id', prof.id),
-      supabaseAdmin
-        .from('leads')
-        .update({ locked: false })
-        .eq('id', lead_id)
-        .eq('professional_id', prof.id)
-        .select()
-        .single(),
-    ])
+    // Email de confirmação — o lead já está desbloqueado (autorizado),
+    // seguro ler os dados de contacto aqui.
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('id, name, phone, email')
+      .eq('id', lead_id)
+      .single()
 
-    // Email de confirmação
     if (lead) {
       const { data: profFull } = await supabaseAdmin
         .from('professionals')

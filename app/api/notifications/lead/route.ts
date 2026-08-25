@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailNovoLead, emailNovoLeadBloqueado } from '@/lib/email'
 import { sendWhatsApp } from '@/lib/whatsapp'
-import { isPersonalLinkQuotaExhausted } from '@/lib/personal-link-limits'
+import { isLeadAuthorized } from '@/lib/lead-authorization'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,18 +21,14 @@ export async function POST(req: NextRequest) {
     const prof = lead.professionals
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
 
-    // Bloqueado = plano free (nunca abre nenhum lead) OU marketplace sem
-    // créditos (lead.locked) OU lead do link pessoal cuja quota do ciclo já
-    // está esgotada (abri-lo agora não seria autorizado, por isso a
-    // notificação também não pode revelar os dados). Verificação no
-    // servidor — nunca confiar só na UI.
+    // Usa a mesma regra oficial de autorização que o resto do sistema
+    // (dashboard, /api/leads/open, /api/leads/status): só revela dados de
+    // contacto depois do lead estar realmente aberto (link pessoal) ou
+    // adquirido (marketplace). Nunca reimplementar esta condição aqui.
     const isFreePlan = !prof.plan || prof.plan === 'free'
-    const quotaExhausted = !isFreePlan && lead.source !== 'marketplace' && !lead.opened_at
-      ? await isPersonalLinkQuotaExhausted(lead.professional_id)
-      : false
-    const isBlocked = isFreePlan || !!lead.locked || quotaExhausted
+    const authorized = isLeadAuthorized(lead)
 
-    if (isBlocked) {
+    if (!authorized) {
       await emailNovoLeadBloqueado({
         profName: prof.name,
         profEmail: prof.email,
