@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { specialtyToSlug } from '@/lib/specialty-slug'
 
 const BASE = 'https://façoporti.com'
 
@@ -37,7 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // sem nenhum profissional, sem erro visível.
   const { data: professionals } = await supabaseAdmin
     .from('professionals')
-    .select('slug')
+    .select('slug, specialty, specialties')
     .eq('active', true)
     .not('slug', 'is', null)
 
@@ -47,5 +48,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  return [...staticEntries, ...professionalEntries]
+  // Uma página por especialidade só quando há mesmo pelo menos um
+  // profissional ativo nela — nunca uma combinação artificial. Cresce
+  // sozinha à medida que existirem mais especialidades reais, sem precisar
+  // de manutenção manual desta lista.
+  const specialtiesWithOffer = new Set<string>()
+  for (const p of professionals || []) {
+    if (p.specialties?.length) p.specialties.forEach((s: string) => specialtiesWithOffer.add(s))
+    else if (p.specialty) specialtiesWithOffer.add(p.specialty)
+  }
+  const specialtyEntries: MetadataRoute.Sitemap = [...specialtiesWithOffer].map(s => ({
+    url: `${BASE}/profissionais/${specialtyToSlug(s)}`,
+    changeFrequency: 'weekly',
+    priority: 0.6,
+  }))
+
+  return [...staticEntries, ...professionalEntries, ...specialtyEntries]
 }
