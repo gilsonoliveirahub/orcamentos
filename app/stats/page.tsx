@@ -9,6 +9,7 @@ import { computeReliabilityScore } from '@/lib/reliability'
 import { computeAvgResponseHours, computeConversionRate } from '@/lib/conversion'
 import { computeProposalRate } from '@/lib/lead-funnel'
 import { groupPerformance } from '@/lib/lead-performance'
+import { comparePeriods, type Period } from '@/lib/period-balance'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -23,6 +24,7 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true)
   const [funnel, setFunnel] = useState<FunnelData | null>(null)
   const [funnelLoading, setFunnelLoading] = useState(true)
+  const [period, setPeriod] = useState<Period>('mes')
 
   useEffect(() => {
     // dashboard_leads() (RPC) — nunca select direto: um lead do link
@@ -94,6 +96,11 @@ export default function StatsPage() {
   const performanceByType = groupPerformance(leads, l => l.metadata?.tipo_trabalho || l.q1_tipo_trabalho || 'Outro')
   const performanceByOrigin = groupPerformance(leads, l => l.source === 'marketplace' ? 'Marketplace' : 'Link pessoal')
 
+  // Balanço por período — mesmos dados, só numa janela de tempo. "Fechados"
+  // conta pela data em que o lead foi marcado como tal (updated_at), por
+  // isso manter os leads atualizados afeta diretamente este balanço.
+  const periodComparison = comparePeriods(leads, period)
+
   // Tempo médio para fechar (dias)
   const tempoMedio = fechados.length > 0
     ? Math.round(fechados.reduce((sum, l) => {
@@ -155,6 +162,54 @@ export default function StatsPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-6 space-y-5">
+
+        {/* Balanço por período — mesmos dados de sempre, só numa janela de
+            tempo, com comparação ao período anterior equivalente. */}
+        <div className="rounded-2xl p-5" style={kpiStyle}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-gray-400">Balanço do Negócio</h2>
+            <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              {([
+                { id: 'semana', label: 'Semana' },
+                { id: 'mes', label: 'Mês' },
+                { id: 'ano', label: 'Ano' },
+              ] as const).map(p => (
+                <button key={p.id} onClick={() => setPeriod(p.id)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                  style={period === p.id
+                    ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }
+                    : { color: '#64748b' }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: 'Trabalhos fechados', value: periodComparison.current.fechados, delta: periodComparison.deltaPercent.fechados },
+              { label: 'Faturação real', value: `€${Math.round(periodComparison.current.faturacaoReal)}`, delta: periodComparison.deltaPercent.faturacaoReal },
+              { label: 'Ticket médio real', value: `€${periodComparison.current.ticketMedio}`, delta: periodComparison.deltaPercent.ticketMedio },
+              {
+                label: 'Conversão',
+                value: periodComparison.current.conversionRate !== null ? `${Math.round(periodComparison.current.conversionRate * 100)}%` : '—',
+                delta: null,
+              },
+            ].map((m, i) => (
+              <div key={i}>
+                <div className="text-xl font-black text-white">{m.value}</div>
+                <div className="text-xs text-gray-500 mb-1">{m.label}</div>
+                {m.delta !== null && (
+                  <span className="text-xs font-bold" style={{ color: m.delta >= 0 ? '#34d399' : '#f87171' }}>
+                    {m.delta >= 0 ? '↑' : '↓'} {Math.abs(Math.round(m.delta))}% vs período anterior
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-600 mt-4">
+            Fechados contam pela data em que marcaste o lead como fechado — mantê-los atualizados torna este balanço mais fiel ao teu negócio real.
+          </p>
+        </div>
 
         {/* KPIs principais */}
         <div className="grid grid-cols-2 gap-3">
