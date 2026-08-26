@@ -6,6 +6,7 @@ import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown
 import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
+import { computeLeadCompleteness } from '@/lib/lead-completeness'
 
 // Legacy paint fields
 const PAINT_LABELS: Record<string, string> = {
@@ -205,6 +206,10 @@ export default function LeadDetail() {
   // não trata arrays) — nunca era mostrado como fotos/vídeo navegável.
   const mediaUrls: string[] = Array.isArray(metadata.media_urls) ? metadata.media_urls : []
   const isVideoUrl = (url: string) => /\.(mp4|mov|webm)$/i.test(url)
+  // Completude do pedido — regras determinísticas (lib/lead-completeness.ts),
+  // nunca IA, só para o profissional ver de relance o que este pedido já tem
+  // de sólido antes de decidir avançar.
+  const completeness = computeLeadCompleteness(lead)
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -286,6 +291,24 @@ export default function LeadDetail() {
             ))}
           </div>
         </div>
+
+        {/* Completude do pedido — só aparece quando falta algo, nunca bloqueia nada */}
+        {completeness.missingCount > 0 && (
+          <div className="rounded-2xl p-5" style={cardStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-3">Informação do pedido</h2>
+            <div className="space-y-2">
+              {completeness.checks.map(c => (
+                <div key={c.key} className="flex items-center gap-2 text-sm">
+                  <span style={{ color: c.met ? '#34d399' : '#f59e0b' }}>{c.met ? '✓' : '○'}</span>
+                  <span className={c.met ? 'text-gray-400' : 'text-gray-300'}>{c.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-600 mt-3">
+              Pedido ainda pouco detalhado nalguns pontos — pode valer a pena confirmar com o cliente antes de orçamentar.
+            </p>
+          </div>
+        )}
 
         {/* Fotos e vídeos enviados pelo cliente */}
         {mediaUrls.length > 0 && (

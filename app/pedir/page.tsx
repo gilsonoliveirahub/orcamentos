@@ -7,8 +7,9 @@ import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
 import { estimatePriceRange } from '@/lib/quote-estimate'
 import { track } from '@/lib/track-client'
+import { GENERIC_ZONE_LABEL } from '@/lib/lead-completeness'
 
-const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', 'Outra / Toda Portugal']
+const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', GENERIC_ZONE_LABEL]
 
 // Margem adicional só na apresentação antecipada ao cliente (nunca gravada em
 // `quotes`, nunca vista pelo profissional) — reduz o risco de a proposta real
@@ -16,12 +17,13 @@ const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Far
 // público = mínimo interno; máximo público = máximo interno × 1.15.
 const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
 
-type Phase = 'profissao' | 'zona' | 'perguntas' | 'estimativa' | 'media' | 'contacto' | 'enviado'
+type Phase = 'profissao' | 'zona' | 'zona-detalhe' | 'perguntas' | 'estimativa' | 'media' | 'contacto' | 'enviado'
 
 export default function PedirPage() {
   const [phase, setPhase] = useState<Phase>('profissao')
   const [specialty, setSpecialty] = useState('')
   const [zona, setZona] = useState('')
+  const [zonaDetalhe, setZonaDetalhe] = useState('')
   const [step, setStep] = useState(1)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
@@ -57,7 +59,15 @@ export default function PedirPage() {
     setSpecialty(s)
     setPhase('zona')
   }
-  function selectZona(z: string) { setZona(z); setPhase('perguntas'); setStep(1) }
+  function selectZona(z: string) {
+    setZona(z)
+    // Zona genérica não ajuda a corresponder a profissionais próximos nem a
+    // avaliar o pedido — pede a localidade real antes de avançar, mas nunca
+    // obriga (dá sempre para saltar). Ver lib/lead-completeness.ts.
+    if (z === GENERIC_ZONE_LABEL) { setPhase('zona-detalhe'); return }
+    setPhase('perguntas')
+    setStep(1)
+  }
 
   function answerAndAdvance(key: string, value: any) {
     const next = { ...answers, [key]: value }
@@ -73,9 +83,10 @@ export default function PedirPage() {
 
   function goBack() {
     if (phase === 'zona') { setPhase('profissao'); return }
+    if (phase === 'zona-detalhe') { setPhase('zona'); return }
     if (phase === 'perguntas') {
       if (step > 1) setStep(s => s - 1)
-      else setPhase('zona')
+      else setPhase(zona === GENERIC_ZONE_LABEL ? 'zona-detalhe' : 'zona')
       return
     }
     if (phase === 'estimativa') { setPhase('perguntas'); setStep(totalSteps); return }
@@ -94,7 +105,7 @@ export default function PedirPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         specialty,
-        zone_requested: zona !== 'Outra / Toda Portugal' ? zona : null,
+        zone_requested: zona !== GENERIC_ZONE_LABEL ? zona : (zonaDetalhe.trim() || null),
         name,
         phone,
         email: email || null,
@@ -152,6 +163,7 @@ export default function PedirPage() {
             <h1 className="text-xl font-black text-white">
               {phase === 'profissao' && 'De que serviço precisa?'}
               {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
+              {phase === 'zona-detalhe' && 'Localidade'}
               {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
               {phase === 'estimativa' && 'A sua estimativa'}
               {phase === 'media' && 'Fotos e/ou vídeos'}
@@ -165,6 +177,9 @@ export default function PedirPage() {
             )}
             {phase === 'zona' && (
               <p className="text-xs text-gray-500 mt-0.5">Em que zona?</p>
+            )}
+            {phase === 'zona-detalhe' && (
+              <p className="text-xs text-gray-500 mt-0.5">Ajuda a encontrar um profissional mais próximo</p>
             )}
             {phase === 'estimativa' && (
               <p className="text-xs text-gray-500 mt-0.5">Valor indicativo com base nas suas respostas</p>
@@ -217,6 +232,32 @@ export default function PedirPage() {
                 <ChevronRight size={16} className="text-gray-600 ml-auto" />
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Localidade específica — só quando "Outra / Toda Portugal" foi
+            escolhida, nunca obrigatório. */}
+        {phase === 'zona-detalhe' && (
+          <div>
+            <h2 className="text-xl font-black text-white mb-2">Qual é a localidade?</h2>
+            <p className="text-sm text-gray-500 mb-6">Ex: Sintra, Almada, Guimarães... Ajuda-nos a encontrar um profissional mais perto de si.</p>
+            <input
+              type="text"
+              value={zonaDetalhe}
+              onChange={e => setZonaDetalhe(e.target.value)}
+              placeholder="A sua localidade"
+              className="w-full rounded-2xl px-5 py-4 text-white text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              autoFocus
+            />
+            <button onClick={() => { setPhase('perguntas'); setStep(1) }}
+              className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+              {zonaDetalhe.trim() ? 'Continuar' : 'Saltar'} <ChevronRight size={18} />
+            </button>
+            <button onClick={goBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+              <ChevronLeft size={15} /> Voltar
+            </button>
           </div>
         )}
 
