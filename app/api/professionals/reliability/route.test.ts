@@ -4,11 +4,11 @@ describe('GET /api/professionals/reliability', () => {
   beforeEach(() => vi.resetModules())
   afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('@/lib/supabase-admin') })
 
-  it('agrega por profissional e nunca devolve dados de lead (só score/total)', async () => {
+  it('agrega por profissional e nunca devolve dados de lead (score/total/active_count)', async () => {
     const leads = [
       { professional_id: 'prof-a', status: 'fechado', created_at: '2026-01-01T00:00:00Z' },
       { professional_id: 'prof-a', status: 'perdido', created_at: '2026-01-02T00:00:00Z' },
-      { professional_id: 'prof-b', status: 'novo', created_at: '2020-01-01T00:00:00Z' }, // antigo, nunca resolvido -> abandonado
+      { professional_id: 'prof-b', status: 'novo', created_at: '2020-01-01T00:00:00Z' }, // antigo, nunca resolvido -> abandonado (mas ainda "ativo" para capacidade)
     ]
     vi.doMock('@/lib/supabase-admin', () => ({
       supabaseAdmin: { from: () => ({ select: () => ({ not: async () => ({ data: leads, error: null }) }) }) },
@@ -19,8 +19,8 @@ describe('GET /api/professionals/reliability', () => {
     const json = await res.json()
 
     expect(res.status).toBe(200)
-    expect(json.scores['prof-a']).toEqual({ score: 1, total: 2 })
-    expect(json.scores['prof-b']).toEqual({ score: 0, total: 1 })
+    expect(json.scores['prof-a']).toEqual({ score: 1, total: 2, active_count: 0 })
+    expect(json.scores['prof-b']).toEqual({ score: 0, total: 1, active_count: 1 })
     // nunca deve haver nomes/telefones/status individuais na resposta
     expect(JSON.stringify(json)).not.toMatch(/status|created_at/)
   })

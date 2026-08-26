@@ -3,13 +3,14 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { computeReliabilityScore, type LeadForReliability } from '@/lib/reliability'
+import { countActiveLeads } from '@/lib/capacity'
 
 // Endpoint público (usado por /profissionais, página pública) — devolve só
-// um score agregado por profissional, nunca linhas de leads nem qualquer
-// dado pessoal de cliente. supabaseAdmin é necessário aqui porque a tabela
-// leads tem RLS que bloqueia leitura sem sessão (correto — é isto que
-// protege os dados pessoais); esta rota nunca reencaminha o que lê, só o
-// número resultante do cálculo.
+// agregados por profissional (fiabilidade de processo + volume de trabalho
+// ativo agora), nunca linhas de leads nem qualquer dado pessoal de cliente.
+// supabaseAdmin é necessário aqui porque a tabela leads tem RLS que bloqueia
+// leitura sem sessão (correto — é isto que protege os dados pessoais); esta
+// rota nunca reencaminha o que lê, só os números resultantes do cálculo.
 export async function GET() {
   try {
     const { data: leads, error } = await supabaseAdmin
@@ -26,10 +27,10 @@ export async function GET() {
       byProfessional.set(lead.professional_id as string, list)
     }
 
-    const scores: Record<string, { score: number; total: number }> = {}
+    const scores: Record<string, { score: number; total: number; active_count: number }> = {}
     for (const [professionalId, professionalLeads] of byProfessional) {
       const { score, total } = computeReliabilityScore(professionalLeads)
-      scores[professionalId] = { score, total }
+      scores[professionalId] = { score, total, active_count: countActiveLeads(professionalLeads) }
     }
 
     return NextResponse.json({ scores })

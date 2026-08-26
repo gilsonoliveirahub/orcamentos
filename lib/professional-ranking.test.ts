@@ -49,4 +49,45 @@ describe('sortProfessionalsForRanking', () => {
     const sorted = sortProfessionalsForRanking(profs, scores)
     expect(sorted.map(p => p.id)).toEqual(['sem-leads', 'com-falhas'])
   })
+
+  it('mesmo plano: quem está em pausa (accepting_leads=false) nunca fica à frente de quem está a aceitar', () => {
+    const profs = [
+      { id: 'pausado-antigo', plan: 'pro', created_at: '2020-01-01T00:00:00Z', accepting_leads: false },
+      { id: 'ativo-novo', plan: 'pro', created_at: '2026-01-01T00:00:00Z', accepting_leads: true },
+    ]
+    const sorted = sortProfessionalsForRanking(profs, {})
+    expect(sorted.map(p => p.id)).toEqual(['ativo-novo', 'pausado-antigo'])
+  })
+
+  it('accepting_leads ausente/null (coluna nunca definida): conta como disponível, não penaliza', () => {
+    const profs = [
+      { id: 'sem-campo', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'pausado', plan: 'pro', created_at: '2020-01-01T00:00:00Z', accepting_leads: false },
+    ]
+    const sorted = sortProfessionalsForRanking(profs, {})
+    expect(sorted.map(p => p.id)).toEqual(['sem-campo', 'pausado'])
+  })
+
+  it('mesmo plano, disponibilidade e fiabilidade: desempata por menos pedidos ativos agora (mais capacidade primeiro)', () => {
+    const profs = [
+      { id: 'sobrecarregado', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'com-espaco', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      sobrecarregado: { score: 1, total: 5, active_count: 8 },
+      'com-espaco': { score: 1, total: 5, active_count: 1 },
+    }
+    const sorted = sortProfessionalsForRanking(profs, scores)
+    expect(sorted.map(p => p.id)).toEqual(['com-espaco', 'sobrecarregado'])
+  })
+
+  it('sem active_count no agregado: trata como zero, não penaliza quem falta no mapa', () => {
+    const profs = [
+      { id: 'sem-dado', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'com-carga', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+    ]
+    const scores = { 'com-carga': { score: 1, total: 5, active_count: 3 } }
+    const sorted = sortProfessionalsForRanking(profs, scores)
+    expect(sorted.map(p => p.id)).toEqual(['sem-dado', 'com-carga'])
+  })
 })
