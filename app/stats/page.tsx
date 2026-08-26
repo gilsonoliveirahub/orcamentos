@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck, Timer, FileText, Trophy } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck, Timer, FileText, Trophy, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
 import { computeReliabilityScore } from '@/lib/reliability'
@@ -11,6 +11,7 @@ import { computeProposalRate } from '@/lib/lead-funnel'
 import { groupPerformance } from '@/lib/lead-performance'
 import { comparePeriods, type Period } from '@/lib/period-balance'
 import { summarizeAIVisibility } from '@/lib/ai-visibility'
+import { summarizeLeadEconomics } from '@/lib/lead-economics'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -97,6 +98,13 @@ export default function StatsPage() {
   // mínima (lib/lead-performance.ts), nunca finge precisão com 1 ou 2 leads.
   const performanceByType = groupPerformance(leads, l => l.metadata?.tipo_trabalho || l.q1_tipo_trabalho || 'Outro')
   const performanceByOrigin = groupPerformance(leads, l => l.source === 'marketplace' ? 'Marketplace' : 'Link pessoal')
+
+  // Valor económico dos leads adquiridos no marketplace — só quando o
+  // profissional realmente os usa. O custo em créditos gasto por lead não
+  // é mostrado aqui de propósito: marketplace_credits é só um saldo
+  // corrente, sem histórico do preço pago (lib/lead-economics.ts,
+  // LEAD_COST_DATA_GAP) — mostrar isso seria inventar um número.
+  const leadEconomics = summarizeLeadEconomics(leads)
 
   // Balanço por período — mesmos dados, só numa janela de tempo. "Fechados"
   // conta pela data em que o lead foi marcado como tal (updated_at), por
@@ -340,6 +348,38 @@ export default function StatsPage() {
           <div className="rounded-2xl p-5" style={kpiStyle}>
             <h2 className="text-sm font-bold text-gray-400 mb-4">Desempenho por Origem</h2>
             <PerformanceTable rows={performanceByOrigin} />
+          </div>
+        )}
+
+        {/* Valor económico dos leads adquiridos no marketplace */}
+        {leadEconomics.acquiredCount > 0 && (
+          <div className="rounded-2xl p-5" style={kpiStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
+              <ShoppingCart size={15} /> Valor dos Leads do Marketplace
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xl font-black text-white">{leadEconomics.acquiredCount}</div>
+                <div className="text-xs text-gray-500">leads adquiridos</div>
+              </div>
+              <div>
+                <div className="text-xl font-black text-white">{leadEconomics.fechadosCount}</div>
+                <div className="text-xs text-gray-500">trabalhos fechados</div>
+              </div>
+              <div>
+                <div className="text-xl font-black" style={{ color: '#4ade80' }}>€{Math.round(leadEconomics.totalValueGenerated)}</div>
+                <div className="text-xs text-gray-500">valor real gerado</div>
+              </div>
+              <div>
+                <div className="text-xl font-black" style={{ color: '#c084fc' }}>
+                  {leadEconomics.successRate !== null ? `${Math.round(leadEconomics.successRate * 100)}%` : '—'}
+                </div>
+                <div className="text-xs text-gray-500">taxa de sucesso</div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 mt-4">
+              €{leadEconomics.avgValuePerAcquired !== null ? Math.round(leadEconomics.avgValuePerAcquired) : 0} de valor médio por lead adquirido (inclui os que não fecharam). Não mostramos o custo em créditos por lead — o saldo de créditos não guarda a que preço cada crédito gasto foi comprado.
+            </p>
           </div>
         )}
 
