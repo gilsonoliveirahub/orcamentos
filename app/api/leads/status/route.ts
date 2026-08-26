@@ -13,7 +13,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { lead_id, status } = await req.json()
+    const { lead_id, status, valor_fechado, valor_fechado_decision } = await req.json()
 
     const userClient = await createClient()
     const { data: { user } } = await userClient.auth.getUser()
@@ -43,9 +43,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: ERROR_MESSAGES.locked, reason: 'locked' }, { status: 403 })
     }
 
+    // Ao fechar, exige uma decisão explícita sobre o valor final — "informado"
+    // (com valor válido) ou "nao_informar" (grava null de propósito). Nunca
+    // avança silenciosamente sem nenhuma das duas escolhas.
+    if (status === 'fechado') {
+      if (valor_fechado_decision === 'informado') {
+        if (typeof valor_fechado !== 'number' || !Number.isFinite(valor_fechado) || valor_fechado <= 0) {
+          return NextResponse.json({ error: 'Valor final inválido.' }, { status: 400 })
+        }
+      } else if (valor_fechado_decision !== 'nao_informar') {
+        return NextResponse.json({ error: 'É necessário indicar o valor final ou escolher "Prefiro não indicar".' }, { status: 400 })
+      }
+    }
+
+    // valor_fechado só é tocado nesta transição — outros estados nunca
+    // escrevem nem apagam o que já lá esteja (ex: reabrir e voltar a fechar).
+    const updatePayload: Record<string, unknown> = { status }
+    if (status === 'fechado') {
+      updatePayload.valor_fechado = valor_fechado_decision === 'informado' ? valor_fechado : null
+    }
+
     const { error } = await supabaseAdmin
       .from('leads')
-      .update({ status })
+      .update(updatePayload)
       .eq('id', lead_id)
       .eq('professional_id', professional.id)
 

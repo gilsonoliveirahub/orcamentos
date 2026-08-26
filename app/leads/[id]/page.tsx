@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS } from '@/lib/professions'
+import ClosedValueModal from '@/components/ClosedValueModal'
 
 // Legacy paint fields
 const PAINT_LABELS: Record<string, string> = {
@@ -39,6 +40,7 @@ export default function LeadDetail() {
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [quotaBlocked, setQuotaBlocked] = useState(false)
+  const [showCloseModal, setShowCloseModal] = useState(false)
   const [, startTransition] = useTransition()
 
   async function loadData() {
@@ -92,12 +94,29 @@ export default function LeadDetail() {
   }
 
   async function handleStatusChange(newStatus: string) {
+    // "Fechado" exige decidir o valor final primeiro — nunca avança direto.
+    if (newStatus === 'fechado') { setShowCloseModal(true); return }
     await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: id, status: newStatus }),
     })
     setLead((prev: any) => ({ ...prev, status: newStatus }))
+  }
+
+  async function handleConfirmClose(valor: number | null) {
+    setShowCloseModal(false)
+    await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lead_id: id,
+        status: 'fechado',
+        valor_fechado: valor,
+        valor_fechado_decision: valor === null ? 'nao_informar' : 'informado',
+      }),
+    })
+    setLead((prev: any) => ({ ...prev, status: 'fechado' }))
   }
 
   function copyProposal() {
@@ -183,6 +202,9 @@ export default function LeadDetail() {
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
+      {showCloseModal && (
+        <ClosedValueModal onConfirm={handleConfirmClose} onCancel={() => setShowCloseModal(false)} />
+      )}
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">

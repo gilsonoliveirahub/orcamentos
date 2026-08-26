@@ -15,6 +15,7 @@ import {
 import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
+import ClosedValueModal from '@/components/ClosedValueModal'
 
 const COLUMNS = [
   { id: 'novo',        label: 'Novo',       color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
@@ -374,6 +375,7 @@ export default function Dashboard() {
   const [professional, setProfessional] = useState<any>(null)
   const [copied, setCopied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [closingLeadId, setClosingLeadId] = useState<string | null>(null)
   const router = useRouter()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [, startTransition] = useTransition()
@@ -435,11 +437,31 @@ export default function Dashboard() {
     const leadId = active.id as string
     const newStatus = over.id as string
     if (!COLUMNS.find(c => c.id === newStatus)) return
+    // "Fechado" exige decidir o valor final primeiro — não move o card nem
+    // chama a API já; só depois de confirmado no modal (ver handleConfirmClose).
+    if (newStatus === 'fechado') { setClosingLeadId(leadId); return }
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
     await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: leadId, status: newStatus }),
+    })
+  }
+
+  async function handleConfirmClose(valor: number | null) {
+    const leadId = closingLeadId
+    setClosingLeadId(null)
+    if (!leadId) return
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: 'fechado' } : l))
+    await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lead_id: leadId,
+        status: 'fechado',
+        valor_fechado: valor,
+        valor_fechado_decision: valor === null ? 'nao_informar' : 'informado',
+      }),
     })
   }
 
@@ -471,6 +493,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       {showModal && <NovoLeadModal onClose={() => setShowModal(false)} onCreated={loadData} />}
+      {closingLeadId && (
+        <ClosedValueModal onConfirm={handleConfirmClose} onCancel={() => setClosingLeadId(null)} />
+      )}
 
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

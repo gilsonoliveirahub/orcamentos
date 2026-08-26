@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { calcFaturacaoReal } from '@/lib/closed-value-stats'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -55,10 +56,14 @@ export default function StatsPage() {
   const ativos = leads.filter(l => !['fechado', 'perdido'].includes(l.status))
   const conversao = totalLeads > 0 ? Math.round((fechados.length / totalLeads) * 100) : 0
 
-  const quotasFechadas = quotes.filter(q => fechados.some(l => l.id === q.lead_id))
-  const faturacaoEstimada = quotasFechadas.reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
+  // Pipeline mantém-se pela estimativa (só faz sentido para trabalho ainda
+  // não fechado). Faturação/ticket médio nunca usam esta estimativa como
+  // fallback — só leads.valor_fechado realmente informado.
   const faturacaoPotencial = quotes.reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
-  const ticketMedio = fechados.length > 0 ? Math.round(faturacaoEstimada / fechados.length) : 0
+  const { faturacaoReal, ticketMedio, comValorCount, totalFechados } = calcFaturacaoReal(fechados)
+  const coberturaValorLabel = totalFechados > 0
+    ? `${comValorCount} de ${totalFechados} trabalhos com valor registado`
+    : 'sem obras fechadas ainda'
 
   // Tempo médio para fechar (dias)
   const tempoMedio = fechados.length > 0
@@ -127,9 +132,9 @@ export default function StatsPage() {
           {[
             { icon: <Users size={15} className="text-indigo-400" />, label: 'TOTAL LEADS', value: totalLeads, sub: `${leadsUltimos30} nos últimos 30 dias`, color: '#818cf8' },
             { icon: <CheckCircle size={15} className="text-emerald-400" />, label: 'CONVERSÃO', value: `${conversao}%`, sub: `${fechados.length} fechados`, color: '#34d399' },
-            { icon: <Euro size={15} className="text-green-400" />, label: 'FATURAÇÃO EST.', value: `€${Math.round(faturacaoEstimada)}`, sub: 'obras fechadas', color: '#4ade80' },
+            { icon: <Euro size={15} className="text-green-400" />, label: 'FATURAÇÃO REAL', value: `€${Math.round(faturacaoReal)}`, sub: coberturaValorLabel, color: '#4ade80' },
             { icon: <TrendingUp size={15} className="text-amber-400" />, label: 'PIPELINE', value: `€${Math.round(faturacaoPotencial)}`, sub: `${ativos.length} ativos`, color: '#fbbf24' },
-            { icon: <Target size={15} className="text-purple-400" />, label: 'TICKET MÉDIO', value: `€${ticketMedio}`, sub: 'por obra fechada', color: '#c084fc' },
+            { icon: <Target size={15} className="text-purple-400" />, label: 'TICKET MÉDIO', value: `€${ticketMedio}`, sub: 'por obra com valor', color: '#c084fc' },
             { icon: <Clock size={15} className="text-blue-400" />, label: 'TEMPO FECHO', value: tempoMedio > 0 ? `${tempoMedio}d` : '—', sub: 'média para fechar', color: '#60a5fa' },
             { icon: <Zap size={15} className="text-red-400" />, label: 'PERDIDOS', value: perdidos.length, sub: `${totalLeads > 0 ? Math.round(perdidos.length / totalLeads * 100) : 0}% do total`, color: '#f87171' },
             { icon: <CheckCircle size={15} className="text-cyan-400" />, label: 'EM CURSO', value: ativos.length, sub: 'leads ativos', color: '#22d3ee' },

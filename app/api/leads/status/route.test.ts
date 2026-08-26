@@ -168,10 +168,144 @@ describe('POST /api/leads/status', () => {
     vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento }))
 
     const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado' }))
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado', valor_fechado_decision: 'nao_informar' }))
 
     expect(res.status).toBe(200)
     expect(emailPedidoDepoimento).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'profissional', outroNome: 'Cliente Real' }))
     expect(emailPedidoDepoimento).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'cliente', name: 'Cliente Real', email: 'cliente@example.com' }))
+  })
+
+  it('fechado sem decisão sobre o valor final: 400, nunca atualiza', async () => {
+    mockAuth('user-1')
+    const update = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false } }) }) }), update }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento: vi.fn() }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado' }))
+
+    expect(res.status).toBe(400)
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('fechado com decisão "informado" mas valor inválido (0): 400, nunca atualiza', async () => {
+    mockAuth('user-1')
+    const update = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false } }) }) }), update }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento: vi.fn() }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado', valor_fechado: 0, valor_fechado_decision: 'informado' }))
+
+    expect(res.status).toBe(400)
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('fechado com decisão "informado" e valor válido: grava valor_fechado junto do status', async () => {
+    mockAuth('user-1')
+    let updateArgs: Record<string, unknown> | null = null
+    let leadsSelectCallCount = 0
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            return {
+              select: () => {
+                leadsSelectCallCount += 1
+                if (leadsSelectCallCount === 1) {
+                  return { eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false } }) }) }
+                }
+                return { eq: () => ({ single: async () => ({ data: { name: 'Cliente', email: null, professionals: {} } }) }) }
+              },
+              update: (payload: Record<string, unknown>) => { updateArgs = payload; return { eq: () => ({ eq: async () => ({ error: null }) }) } },
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento: vi.fn() }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado', valor_fechado: 850, valor_fechado_decision: 'informado' }))
+
+    expect(res.status).toBe(200)
+    expect(updateArgs).toEqual({ status: 'fechado', valor_fechado: 850 })
+  })
+
+  it('fechado com decisão "nao_informar": grava valor_fechado como null', async () => {
+    mockAuth('user-1')
+    let updateArgs: Record<string, unknown> | null = null
+    let leadsSelectCallCount = 0
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            return {
+              select: () => {
+                leadsSelectCallCount += 1
+                if (leadsSelectCallCount === 1) {
+                  return { eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false } }) }) }
+                }
+                return { eq: () => ({ single: async () => ({ data: { name: 'Cliente', email: null, professionals: {} } }) }) }
+              },
+              update: (payload: Record<string, unknown>) => { updateArgs = payload; return { eq: () => ({ eq: async () => ({ error: null }) }) } },
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento: vi.fn() }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'fechado', valor_fechado_decision: 'nao_informar' }))
+
+    expect(res.status).toBe(200)
+    expect(updateArgs).toEqual({ status: 'fechado', valor_fechado: null })
+  })
+
+  it('status diferente de "fechado": nunca escreve valor_fechado, mesmo que venha no pedido', async () => {
+    mockAuth('user-1')
+    let updateArgs: Record<string, unknown> | null = null
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false } }) }) }),
+              update: (payload: Record<string, unknown>) => { updateArgs = payload; return { eq: () => ({ eq: async () => ({ error: null }) }) } },
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/email', () => ({ emailPedidoDepoimento: vi.fn() }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', status: 'qualificado', valor_fechado: 500, valor_fechado_decision: 'informado' }))
+
+    expect(res.status).toBe(200)
+    expect(updateArgs).toEqual({ status: 'qualificado' })
   })
 })
