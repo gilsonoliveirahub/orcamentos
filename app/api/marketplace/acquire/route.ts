@@ -30,6 +30,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   credits: 'Sem créditos suficientes.',
   taken: 'Este pedido já foi adquirido por outro profissional.',
   not_found: 'Pedido não encontrado.',
+  unavailable: 'Estás em pausa e não podes adquirir pedidos. Reativa no teu perfil.',
 }
 
 export async function POST(req: NextRequest) {
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
   const result = await acquireMarketplaceLead({ leadId, professionalId })
 
   if (!result.ok) {
-    const status = result.error === 'not_found' ? 404 : result.error === 'taken' ? 409 : 402
+    const status = result.error === 'not_found' ? 404 : result.error === 'taken' ? 409 : result.error === 'unavailable' ? 403 : 402
     return NextResponse.json({ error: ERROR_MESSAGES[result.error], reason: result.error }, { status })
   }
 

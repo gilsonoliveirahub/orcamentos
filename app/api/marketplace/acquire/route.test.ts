@@ -80,4 +80,5 @@ describe('POST /api/marketplace/acquire', () => {
   it('erro "credits" devolve 402', () => expectStatusForError('credits', 402))
   it('erro "taken" devolve 409 (conflito — já adquirido por outro)', () => expectStatusForError('taken', 409))
   it('erro "not_found" devolve 404', () => expectStatusForError('not_found', 404))
+  it('erro "unavailable" (profissional em pausa) devolve 403', () => expectStatusForError('unavailable', 403))
 })

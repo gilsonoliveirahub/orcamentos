@@ -16,7 +16,7 @@ type Opportunity = {
 
 const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }
 
-type Professional = { id: string; plan: string | null; marketplace_credits: number | null }
+type Professional = { id: string; plan: string | null; marketplace_credits: number | null; accepting_leads: boolean | null }
 
 export default function MarketplacePage() {
   const router = useRouter()
@@ -39,7 +39,7 @@ export default function MarketplacePage() {
       if (!user) { router.push('/login'); return }
       const { data: prof } = await supabase
         .from('professionals')
-        .select('id, plan, marketplace_credits')
+        .select('id, plan, marketplace_credits, accepting_leads')
         .eq('user_id', user.id)
         .maybeSingle()
       if (!prof) { router.push('/login'); return }
@@ -88,6 +88,14 @@ export default function MarketplacePage() {
 
   const isFree = !professional || professional.plan === 'free'
   const hasCredits = (professional?.marketplace_credits ?? 0) > 0
+  // ?? true: coluna ainda por migrar/nunca definida conta como disponível.
+  const isPaused = (professional?.accepting_leads ?? true) === false
+
+  async function handleReactivate() {
+    if (!professional) return
+    await supabase.from('professionals').update({ accepting_leads: true }).eq('id', professional.id)
+    setProfessional(p => p ? { ...p, accepting_leads: true } : p)
+  }
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -114,7 +122,17 @@ export default function MarketplacePage() {
             </button>
           </div>
         )}
-        {!isFree && !hasCredits && (
+        {!isFree && isPaused && (
+          <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <p className="text-sm text-gray-300">Estás em pausa — podes ver oportunidades, mas não adquirir.</p>
+            <button onClick={handleReactivate}
+              className="text-xs font-bold px-4 py-2 rounded-xl flex-shrink-0"
+              style={{ background: '#fbbf24', color: '#000' }}>
+              Reativar
+            </button>
+          </div>
+        )}
+        {!isFree && !isPaused && !hasCredits && (
           <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
             <p className="text-sm text-gray-300">Sem créditos para adquirir. Cada aquisição consome 1 crédito.</p>
             <button onClick={() => router.push('/creditos')}

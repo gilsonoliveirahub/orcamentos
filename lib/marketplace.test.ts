@@ -141,6 +141,33 @@ describe('listMarketplaceOpportunities', () => {
     expect(keys.sort()).toEqual(['created_at', 'distance_km', 'distance_label', 'id', 'specialty', 'zone_requested'].sort())
   })
 
+  it('ordena por proximidade (mais perto primeiro), distância indisponível sempre no fim', async () => {
+    const professional = { specialty: 'Pintura', specialties: [], zone: 'Lisboa' }
+    const far = { id: 'lead-far', specialty: 'Pintura', zone_requested: 'algures', created_at: '2026-07-16T00:00:00Z', lat: LISBOA.lat + kmToLatOffset(40), lng: LISBOA.lng }
+    const near = { id: 'lead-near', specialty: 'Pintura', zone_requested: 'algures', created_at: '2026-07-15T00:00:00Z', lat: LISBOA.lat + kmToLatOffset(5), lng: LISBOA.lng }
+    const unknown = { id: 'lead-unknown', specialty: 'Pintura', zone_requested: 'Zona Desconhecida XYZ', created_at: '2026-07-17T00:00:00Z', lat: null, lng: null }
+    // Ordem de chegada da BD é propositadamente "errada" (far, unknown, near)
+    // para confirmar que é o código, não a query, que ordena por distância.
+    mockSupabase({ professional, leads: [far, unknown, near] })
+
+    const { listMarketplaceOpportunities } = await import('./marketplace')
+    const result = await listMarketplaceOpportunities('prof-1')
+
+    expect(result.map(o => o.id)).toEqual(['lead-near', 'lead-far', 'lead-unknown'])
+  })
+
+  it('empate na distância: desempata pelo mais recente primeiro', async () => {
+    const professional = { specialty: 'Pintura', specialties: [], zone: 'Lisboa' }
+    const older = { id: 'lead-older', specialty: 'Pintura', zone_requested: 'algures', created_at: '2026-07-10T00:00:00Z', lat: LISBOA.lat + kmToLatOffset(10), lng: LISBOA.lng }
+    const newer = { id: 'lead-newer', specialty: 'Pintura', zone_requested: 'algures', created_at: '2026-07-20T00:00:00Z', lat: LISBOA.lat + kmToLatOffset(10), lng: LISBOA.lng }
+    mockSupabase({ professional, leads: [older, newer] })
+
+    const { listMarketplaceOpportunities } = await import('./marketplace')
+    const result = await listMarketplaceOpportunities('prof-1')
+
+    expect(result.map(o => o.id)).toEqual(['lead-newer', 'lead-older'])
+  })
+
   it('sem especialidade nenhuma definida, devolve lista vazia sem tentar consultar leads', async () => {
     const professional = { specialty: null, specialties: [], zone: 'Lisboa' }
     const from = vi.fn((table: string) => {
@@ -199,6 +226,31 @@ describe('acquireMarketplaceLead', () => {
     const { acquireMarketplaceLead } = await import('./marketplace')
     const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
     expect(result).toEqual({ ok: false, error: 'out_of_range' })
+  })
+
+  it('profissional em pausa (accepting_leads=false): bloqueia antes de chamar a RPC', async () => {
+    const rpc = vi.fn()
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { zone: 'Lisboa', accepting_leads: false } }) }) }) }
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from, rpc } }))
+
+    const { acquireMarketplaceLead } = await import('./marketplace')
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+
+    expect(result).toEqual({ ok: false, error: 'unavailable' })
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('accepting_leads ausente (coluna ainda não existe / nunca definida): trata como disponível', async () => {
+    mockZoneAndRpc('Lisboa', { data: { ok: true } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+
+    const { acquireMarketplaceLead } = await import('./marketplace')
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+
+    expect(result).toEqual({ ok: true, leadId: 'lead-1' })
   })
 
   it('devolve not_found quando o profissional não existe', async () => {

@@ -88,12 +88,26 @@ export async function listMarketplaceOpportunities(professionalId: string): Prom
     }
   }
 
+  // Mais próximo primeiro — hoje a lista só saía ordenada por data (mais
+  // recente primeiro), apesar da distância já estar calculada. Ordenar por
+  // proximidade aproxima o pedido do profissional mais adequado sem exigir
+  // nenhuma estrutura nova. Distância indisponível fica sempre no fim (não
+  // se sabe se está perto ou longe); em caso de empate, mantém-se o mais
+  // recente primeiro.
+  withinRadius.sort((a, b) => {
+    if (a.distance_km === null && b.distance_km === null) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (a.distance_km === null) return 1
+    if (b.distance_km === null) return -1
+    if (a.distance_km !== b.distance_km) return a.distance_km - b.distance_km
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
   return withinRadius
 }
 
 export type AcquireResult =
   | { ok: true; leadId: string }
-  | { ok: false; error: 'plan' | 'credits' | 'taken' | 'not_found' | 'specialty' | 'out_of_range' }
+  | { ok: false; error: 'plan' | 'credits' | 'taken' | 'not_found' | 'specialty' | 'out_of_range' | 'unavailable' }
 
 type AcquireRpcResult = { ok: true } | { ok: false; error: 'plan' | 'credits' | 'taken' | 'not_found' | 'specialty' | 'out_of_range' }
 
@@ -112,11 +126,21 @@ export async function acquireMarketplaceLead(params: { leadId: string; professio
 
   const { data: prof } = await supabaseAdmin
     .from('professionals')
-    .select('zone')
+    .select('zone, accepting_leads')
     .eq('id', professionalId)
     .maybeSingle()
 
   if (!prof) return { ok: false, error: 'not_found' }
+
+  // "Disponibilidade": o profissional pode pausar-se para não adquirir mais
+  // pedidos do marketplace sem ter de desativar a conta. Verificação
+  // aplicacional (não dentro da transação SQL da RPC, ao contrário de
+  // plano/crédito/especialidade/raio) porque não há nada de financeiro em
+  // jogo aqui — o pior cenário de uma corrida rara com o toggle é adquirir
+  // um pedido extra, não perder dinheiro nem duplicar cobrança.
+  // === false é deliberado: coluna ausente (undefined, antes da migração
+  // ser aplicada) ou nunca definida conta sempre como "disponível".
+  if (prof.accepting_leads === false) return { ok: false, error: 'unavailable' }
 
   // Coordenadas do profissional calculadas aqui (zona vem da própria BD,
   // nunca do cliente) e passadas à função SQL, que faz a confirmação final

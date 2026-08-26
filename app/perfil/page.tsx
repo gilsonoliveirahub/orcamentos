@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, ZoomIn, ZoomOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import Cropper from 'react-easy-crop'
@@ -28,6 +28,8 @@ export default function PerfilPage() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarLightbox, setAvatarLightbox] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<number | null>(null)
+  const [acceptingLeads, setAcceptingLeads] = useState(true)
+  const [togglingAccepting, setTogglingAccepting] = useState(false)
   const touchStartX = useRef<number | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const portfolioRef = useRef<HTMLInputElement>(null)
@@ -45,6 +47,10 @@ export default function PerfilPage() {
         description: prof.description || '',
       })
       setSpecialties(prof.specialties?.length ? prof.specialties : [prof.specialty || 'Pintura'])
+      // ?? true: se a coluna ainda não existir na BD (migração por aplicar)
+      // ou nunca tiver sido definida, o profissional conta como disponível —
+      // nunca esconder pedidos por omissão.
+      setAcceptingLeads(prof.accepting_leads ?? true)
       const [{ data: portfolioData }, { data: reviewsData }] = await Promise.all([
         supabase.from('professional_portfolio').select('*').eq('professional_id', prof.id).order('sort_order').order('created_at'),
         supabase.from('reviews').select('*').eq('professional_id', prof.id).order('created_at', { ascending: false }),
@@ -69,6 +75,14 @@ export default function PerfilPage() {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function handleToggleAccepting() {
+    setTogglingAccepting(true)
+    const next = !acceptingLeads
+    const { error } = await supabase.from('professionals').update({ accepting_leads: next }).eq('id', professional.id)
+    if (!error) setAcceptingLeads(next)
+    setTogglingAccepting(false)
   }
 
   function copyLink() {
@@ -327,6 +341,25 @@ export default function PerfilPage() {
         {/* Formulário */}
         <form onSubmit={handleSave} className="rounded-2xl p-6 space-y-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
           <h2 className="font-black text-white">Editar informações</h2>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              {acceptingLeads
+                ? <Play size={16} className="text-emerald-400 flex-shrink-0" />
+                : <Pause size={16} className="text-amber-400 flex-shrink-0" />}
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white">{acceptingLeads ? 'A receber pedidos' : 'Em pausa'}</div>
+                <div className="text-xs text-gray-500">Pausa temporária: continuas a ver o marketplace, mas não podes adquirir novos pedidos.</div>
+              </div>
+            </div>
+            <button type="button" onClick={handleToggleAccepting} disabled={togglingAccepting}
+              className="flex-shrink-0 text-xs font-bold px-3 py-2 rounded-xl transition-all"
+              style={acceptingLeads
+                ? { background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }
+                : { background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+              {togglingAccepting ? '...' : acceptingLeads ? 'Pausar' : 'Reativar'}
+            </button>
+          </div>
 
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nome completo</label>
