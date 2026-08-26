@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Star, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AvaliarPage() {
   const { lead_id } = useParams()
+  const searchParams = useSearchParams()
+  const token = searchParams.get('token')
   const [lead, setLead] = useState<any>(null)
   const [professional, setProfessional] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -21,7 +23,7 @@ export default function AvaliarPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/reviews?lead_id=${lead_id}`)
+      const res = await fetch(`/api/reviews?lead_id=${lead_id}${token ? `&token=${token}` : ''}`)
       if (!res.ok) { setLoading(false); return }
       const json = await res.json()
       setLead(json.lead)
@@ -31,7 +33,7 @@ export default function AvaliarPage() {
       setLoading(false)
     }
     load()
-  }, [lead_id])
+  }, [lead_id, token])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,7 +45,7 @@ export default function AvaliarPage() {
     const res = await fetch('/api/reviews', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lead_id, rating, comment, client_name: name }),
+      body: JSON.stringify({ lead_id, rating, comment, client_name: name, token }),
     })
     const json = await res.json()
 

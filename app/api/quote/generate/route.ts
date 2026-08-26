@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
+import { calcPaintingAreas } from '@/lib/professions'
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,9 +26,23 @@ export async function POST(req: NextRequest) {
     if (!isLeadAuthorized(lead)) return NextResponse.json({ error: 'Pedido ainda bloqueado' }, { status: 403 })
 
     const professional = lead.professionals || {}
+    const metadata = lead.metadata || {}
 
+    // q3_area_m2 já é o valor exato de paredes calculado na criação do lead
+    // (ver mapAnswersToLeadFields, que grava sempre paintingAreas.area_paredes
+    // quando o formulário novo é usado). q8_teto, no entanto, é só um
+    // booleano ("tem teto?") — perde o valor numérico real. Para leads que
+    // usaram o formulário novo (metadata.altura_paredes presente), recupera
+    // o valor exato com calcPaintingAreas(metadata) — a mesma função que o
+    // cliente usava antes de este cálculo passar a correr aqui. Para
+    // metadata mais simples (formulário antigo) ou leads sem metadata
+    // (anteriores a esta funcionalidade), mantém os fallbacks já existentes.
     const area_paredes = lead.q3_area_m2 || 50
-    const area_tetos = lead.q8_teto ? Math.round(area_paredes * 0.3) : 0
+    const area_tetos = metadata.altura_paredes
+      ? calcPaintingAreas(metadata).area_tetos
+      : metadata.area_m2_tetos
+      ? parseFloat(metadata.area_m2_tetos) || 0
+      : lead.q8_teto ? Math.round(area_paredes * 0.3) : 0
     const quoteInput = {
       area_m2_paredes: area_paredes,
       area_m2_tetos: area_tetos,

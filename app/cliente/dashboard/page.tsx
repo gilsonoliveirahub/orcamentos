@@ -53,13 +53,19 @@ export default function ClienteDashboard() {
   async function submitReview() {
     if (!reviewLead) return
     setSubmittingReview(true)
-    await supabase.from('reviews').insert({
-      professional_id: reviewLead.professional_id,
-      lead_id: reviewLead.id,
-      client_name: client?.name,
-      rating,
-      comment,
-    })
+    // Nunca insere diretamente na tabela (RLS já não permite) — passa
+    // sempre por /api/reviews, que valida o lead, o rating e impede
+    // avaliações duplicadas do mesmo trabalho.
+    await fetch('/api/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lead_id: reviewLead.id,
+        client_name: client?.name,
+        rating,
+        comment,
+      }),
+    }).catch(() => {})
     setSubmittingReview(false)
     setReviewLead(null)
     setComment('')

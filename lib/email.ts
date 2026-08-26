@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateClientOptOutToken, generateProfessionalOptOutToken } from '@/lib/optout'
+import { generateReviewToken } from '@/lib/review-token'
 
 const FROM = 'FaçoPorTi <contacto@xn--faoporti-t0a.com>'
 // Confirmado com teste real em 2026-07-16: a caixa contacto@ no Hostinger
@@ -333,8 +334,19 @@ export async function emailPedidoDepoimento({
     ? `Como correu o trabalho com ${outroNome}? Deixa a tua opinião`
     : `Como foi a experiência com ${outroNome}? Partilha a tua opinião`
 
+  // O link só é gerado se REVIEW_TOKEN_SECRET estiver configurado — sem
+  // token, /api/reviews recusa sempre a avaliação (ver lib/review-token.ts),
+  // por isso nunca faz sentido mandar um link que conhecer o lead_id sozinho
+  // já não é suficiente para usar.
   const reviewLink = lead_id && !isPro
-    ? `${APP_URL}/avaliar/${lead_id}`
+    ? (() => {
+        const secret = process.env.REVIEW_TOKEN_SECRET
+        if (!secret) {
+          console.error('[email] REVIEW_TOKEN_SECRET em falta — link de avaliação não incluído')
+          return null
+        }
+        return `${APP_URL}/avaliar/${lead_id}?token=${generateReviewToken(lead_id, secret)}`
+      })()
     : null
 
   await sendEmail(email, subject, wrap(`

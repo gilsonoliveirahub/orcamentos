@@ -5,8 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
-import { calculateQuote, generateProposalText } from '@/lib/calculator'
-import { getProfession, PROFESSIONS, mapAnswersToLeadFields, calcPaintingAreas, type Question, type ProfessionConfig } from '@/lib/professions'
+import { getProfession, PROFESSIONS, mapAnswersToLeadFields, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track } from '@/lib/track-client'
 
 export default function ProfessionalPublicPage() {
@@ -190,44 +189,19 @@ export default function ProfessionalPublicPage() {
     const { lead } = await res.json()
 
     if (lead) {
+      // O cálculo do orçamento inicial (rascunho) passou a correr sempre no
+      // servidor — nunca mais um insert direto em `quotes` a partir do
+      // browser (a policy pública de INSERT foi removida). Pintura usa
+      // /api/quote/generate (reproduz exatamente o mesmo cálculo que corria
+      // aqui, incluindo a área de teto precisa via calcPaintingAreas a
+      // partir do metadata já gravado no lead); as restantes especialidades
+      // continuam a usar /api/quote/estimate, como já acontecia.
       if (selectedSpecialty === 'Pintura' && legacyFields.q3_area_m2) {
-        const paintingAreas = answers['altura_paredes']
-          ? calcPaintingAreas(answers)
-          : { area_paredes: legacyFields.q3_area_m2 || 0, area_tetos: answers['area_m2_tetos'] ? parseFloat(answers['area_m2_tetos']) : 0 }
-        const quoteInput = {
-          area_m2_paredes: paintingAreas.area_paredes,
-          area_m2_tetos: paintingAreas.area_tetos,
-          tipo: (legacyFields.q1_tipo_trabalho?.toLowerCase() || 'interior') as 'interior' | 'exterior' | 'ambos',
-          cor_escura: !!legacyFields.q4_cor_escura,
-          fissuras: !!legacyFields.q5_fissuras,
-          mobilias: !!legacyFields.q6_mobilias,
-          primer: !!legacyFields.q7_primer,
-          prices: {
-            price_m2_walls: professional.price_m2_walls || 4,
-            price_m2_ceiling: professional.price_m2_ceiling || 5,
-            price_m2_exterior: professional.price_m2_exterior || 6,
-            extra_dark_color: professional.extra_dark_color || 1.25,
-            extra_cracks: professional.extra_cracks || 6,
-            extra_furniture_move: professional.extra_furniture_move || 50,
-            extra_primer: professional.extra_primer || 2,
-            min_quote: professional.min_quote || 150,
-          },
-        }
-        const quoteResult = calculateQuote(quoteInput)
-        const proposalText = generateProposalText({ ...legacyFields, name }, quoteResult, professional)
-
-        await supabase.from('quotes').insert({
-          lead_id: lead.id,
-          professional_id: professional.id,
-          area_m2: quoteInput.area_m2_paredes,
-          valor_base: quoteResult.valor_base,
-          extras_total: quoteResult.extras_total,
-          valor_final: quoteResult.valor_final,
-          valor_min: quoteResult.valor_min,
-          valor_max: quoteResult.valor_max,
-          proposal_text: proposalText,
-          status: 'rascunho',
-        })
+        fetch('/api/quote/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: lead.id }),
+        }).catch(() => {})
       }
 
       if (selectedSpecialty !== 'Pintura') {

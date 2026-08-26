@@ -268,4 +268,61 @@ describe('email sending (lib/email.ts)', () => {
       expect(body.html).not.toContain('/cancelar-emails')
     })
   })
+
+  describe('emailPedidoDepoimento — link de avaliação com token (nunca só o lead_id)', () => {
+    // Os blocos anteriores (emailPromocionalCliente/Profissional) fazem
+    // vi.doMock('@/lib/supabase-admin', ...) seguido de vi.doUnmock no seu
+    // próprio afterEach — isso deixa de repor o vi.mock estático do topo
+    // do ficheiro para os testes seguintes. emailPedidoDepoimento não
+    // precisa de verificar consentimento (não é email promocional), mas o
+    // import de lib/email.ts continua a exigir supabaseAdmin construído.
+    beforeEach(() => {
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
+    })
+
+    it('inclui um token válido no link, verificável por verifyReviewToken', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.REVIEW_TOKEN_SECRET = 'segredo-review-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailPedidoDepoimento } = await import('./email')
+      const { verifyReviewToken } = await import('./review-token')
+      await emailPedidoDepoimento({ tipo: 'cliente', name: 'Cliente', email: 'cliente@example.com', outroNome: 'Prof', lead_id: 'lead-1' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      const match = body.html.match(/\/avaliar\/lead-1\?token=([0-9a-f]{64})/)
+      expect(match).not.toBeNull()
+      expect(verifyReviewToken('lead-1', match![1], 'segredo-review-teste')).toBe(true)
+    })
+
+    it('sem REVIEW_TOKEN_SECRET configurado: nunca envia o link sem token (cai para o mailto), e regista o erro', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      delete process.env.REVIEW_TOKEN_SECRET
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const { emailPedidoDepoimento } = await import('./email')
+      await emailPedidoDepoimento({ tipo: 'cliente', name: 'Cliente', email: 'cliente@example.com', outroNome: 'Prof', lead_id: 'lead-1' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.html).not.toContain('/avaliar/lead-1')
+      expect(body.html).toContain('mailto:')
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('REVIEW_TOKEN_SECRET'))
+    })
+
+    it('para o profissional (tipo: profissional), nunca inclui link de avaliação, com ou sem segredo', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.REVIEW_TOKEN_SECRET = 'segredo-review-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailPedidoDepoimento } = await import('./email')
+      await emailPedidoDepoimento({ tipo: 'profissional', name: 'Prof', email: 'prof@example.com', outroNome: 'Cliente', lead_id: 'lead-1' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.html).not.toContain('/avaliar/')
+    })
+  })
 })
