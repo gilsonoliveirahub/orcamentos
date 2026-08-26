@@ -10,11 +10,13 @@ import { computeAvgResponseHours, computeConversionRate } from '@/lib/conversion
 import { computeProposalRate } from '@/lib/lead-funnel'
 import { groupPerformance } from '@/lib/lead-performance'
 import { comparePeriods, type Period } from '@/lib/period-balance'
+import { summarizeAIVisibility } from '@/lib/ai-visibility'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
   conversion: { view_to_completed: number }
   unique_visitors: { by_day: Array<{ day: string; unique_visitors: number }>; daily_sum: number }
+  by_origin_channel?: Array<{ origin_channel: string; event_count: number }>
 }
 
 export default function StatsPage() {
@@ -362,6 +364,15 @@ export default function StatsPage() {
             <p className="text-xs text-gray-600 mt-4">
               Visitantes únicos aproximados por dia — soma do período: {funnel.unique_visitors.daily_sum} (pode contar a mesma pessoa em dias diferentes). Conversão visita → pedido: {Math.round(funnel.conversion.view_to_completed * 100)}%. &quot;Clique no WhatsApp&quot; é abertura do link, não confirma envio da mensagem.
             </p>
+            {(() => {
+              const aiVisibility = summarizeAIVisibility(funnel.by_origin_channel || [])
+              if (aiVisibility.observedReferralCount === 0) return null
+              return (
+                <p className="text-xs text-gray-600 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  🤖 {aiVisibility.observedReferralCount} visita{aiVisibility.observedReferralCount === 1 ? '' : 's'} com origem em ferramentas de IA (ChatGPT, Claude, Gemini...) — sinal parcial, não confirma que foste recomendado, só que alguém chegou a partir daí.
+                </p>
+              )
+            })()}
           </div>
         )}
 

@@ -14,7 +14,7 @@ export type AnalyticsEventType = typeof EVENT_TYPES[number]
 // Eventos que só podem ser gravados pelo próprio servidor (nunca aceites via /api/track)
 export const SERVER_ONLY_EVENT_TYPES: readonly AnalyticsEventType[] = ['request_completed']
 
-export const ORIGIN_CHANNELS = ['facebook', 'instagram', 'whatsapp', 'google', 'direto', 'outro'] as const
+export const ORIGIN_CHANNELS = ['facebook', 'instagram', 'whatsapp', 'google', 'ia', 'direto', 'outro'] as const
 export type OriginChannel = typeof ORIGIN_CHANNELS[number]
 
 export const SOURCES = ['pessoal', 'marketplace'] as const
@@ -86,12 +86,26 @@ const CHANNEL_DOMAINS: Record<string, OriginChannel> = {
   'api.whatsapp.com': 'whatsapp',
   'google.com': 'google',
   'google.pt': 'google',
+  // Só domínios de produtos de chat/IA dedicados, nunca motores de busca
+  // ambíguos (bing.com, google.com já classificado acima como 'google') —
+  // sinal parcial e observável (visita cujo referrer passou por aqui), não
+  // uma confirmação de que a IA "recomendou" o FaçoPorTi. Ver AI Visibility
+  // KPI (lib/ai-visibility.ts) para a distinção entre o que é mensurável
+  // hoje e o que fica só preparado para o futuro.
+  'chat.openai.com': 'ia',
+  'chatgpt.com': 'ia',
+  'claude.ai': 'ia',
+  'gemini.google.com': 'ia',
+  'perplexity.ai': 'ia',
+  'copilot.microsoft.com': 'ia',
+  'you.com': 'ia',
 }
 
 export function normalizeOriginChannel(referrerDomain: string | null, utmSource: string | null): OriginChannel {
   const src = (utmSource || '').toLowerCase()
   if (src.includes('facebook')) return 'facebook'
   if (src.includes('instagram')) return 'instagram'
+  if (src.includes('chatgpt') || src.includes('claude') || src.includes('gemini') || src.includes('perplexity') || src.includes('copilot')) return 'ia'
   if (src.includes('whatsapp')) return 'whatsapp'
   if (src.includes('google')) return 'google'
   if (referrerDomain && CHANNEL_DOMAINS[referrerDomain]) return CHANNEL_DOMAINS[referrerDomain]

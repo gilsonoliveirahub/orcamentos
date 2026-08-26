@@ -145,6 +145,17 @@ describe('normalizeOriginChannel', () => {
   it('classifies unknown referrers as "outro"', () => {
     expect(normalizeOriginChannel('some-unknown-blog.pt', null)).toBe('outro')
   })
+
+  it('classifies known AI chat products as "ia" (nunca motores de busca ambíguos como bing.com)', () => {
+    expect(normalizeOriginChannel('chat.openai.com', null)).toBe('ia')
+    expect(normalizeOriginChannel('claude.ai', null)).toBe('ia')
+    expect(normalizeOriginChannel('perplexity.ai', null)).toBe('ia')
+    expect(normalizeOriginChannel('bing.com', null)).toBe('outro')
+  })
+
+  it('classifica por utm_source de IA mesmo sem o domínio de referrer correspondente', () => {
+    expect(normalizeOriginChannel('t.co', 'chatgpt')).toBe('ia')
+  })
 })
 
 describe('event type whitelist', () => {
