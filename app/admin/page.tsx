@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield, Pencil, X, BarChart3 } from 'lucide-react'
+import { Users, FileText, Euro, TrendingUp, CheckCircle, LogOut, ToggleLeft, ToggleRight, ChevronRight, Loader2, Shield, Pencil, X, BarChart3, Scale } from 'lucide-react'
+import { buildCalibrationSamples, summarizeCalibration, summarizeCalibrationBySpecialty } from '@/lib/estimate-calibration'
 
 interface Professional {
   id: string
@@ -114,6 +115,13 @@ export default function AdminPage() {
   const leadsHoje = leads.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length
   const profActivos = professionals.filter(p => p.active).length
 
+  // Calibração da estimativa: nunca toca nos motores de cálculo nem na
+  // margem pública de +15% — só compara o que já foi gravado
+  // (quotes.valor_min/max/final vs. leads.valor_fechado real).
+  const calibrationSamples = buildCalibrationSamples(quotes, leads, professionals)
+  const calibrationOverall = summarizeCalibration(calibrationSamples)
+  const calibrationBySpecialty = summarizeCalibrationBySpecialty(calibrationSamples)
+
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       {/* Header */}
@@ -161,6 +169,50 @@ export default function AdminPage() {
               <div className="text-2xl font-black text-white">{k.value}</div>
             </div>
           ))}
+        </div>
+
+        {/* Calibração da estimativa vs. valor real — só mede, nunca ajusta
+            nada automaticamente. Sem amostra suficiente, mostra estado
+            neutro em vez de inventar um número. */}
+        <div className="mb-8">
+          <h2 className="text-lg font-black text-white mb-4 flex items-center gap-2">
+            <Scale size={18} /> Calibração da Estimativa
+          </h2>
+          <div className="rounded-2xl p-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {!calibrationOverall ? (
+              <p className="text-sm text-gray-500">Ainda sem trabalhos fechados com valor real e orçamento associado — sem amostra para comparar.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  {[
+                    { label: 'Amostra', value: calibrationOverall.sampleSize, color: '#818cf8' },
+                    { label: 'Erro médio', value: `${calibrationOverall.avgAbsErrorPercent.toFixed(1)}%`, color: '#fbbf24' },
+                    { label: 'Dentro do intervalo', value: calibrationOverall.withinRangeCount, color: '#34d399' },
+                    { label: 'Acima / Abaixo', value: `${calibrationOverall.aboveCount} / ${calibrationOverall.belowCount}`, color: '#f87171' },
+                  ].map((k, i) => (
+                    <div key={i}>
+                      <div className="text-xl font-black" style={{ color: k.color }}>{k.value}</div>
+                      <div className="text-xs text-gray-500">{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {calibrationBySpecialty.length > 0 && (
+                  <div className="pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Erro médio por especialidade</p>
+                    <div className="space-y-2">
+                      {calibrationBySpecialty.map(s => (
+                        <div key={s.specialty} className="flex items-center gap-3 text-sm">
+                          <span className="text-gray-300 flex-1">{s.specialty}</span>
+                          <span className="text-gray-500 text-xs">{s.sampleSize} amostras</span>
+                          <span className="font-bold w-16 text-right" style={{ color: '#fbbf24' }}>{s.avgAbsErrorPercent.toFixed(1)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Profissionais */}
