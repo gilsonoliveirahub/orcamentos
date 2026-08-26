@@ -14,11 +14,11 @@ export const HOMEPAGE_FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Quando pago por uma lead?',
-    a: 'Pagas com créditos sempre que recebes um lead do marketplace — desde 2,50€ por lead. Pedidos que chegam pelo teu link pessoal estão incluídos no plano mensal, sem custo adicional, até ao limite mensal do teu plano.',
+    a: 'Pagas com créditos sempre que recebes um lead do marketplace — desde 1,50€ por lead. Pedidos que chegam pelo teu link pessoal estão incluídos no plano mensal, sem custo adicional, até ao limite mensal do teu plano.',
   },
   {
     q: 'O que está incluído no plano mensal?',
-    a: 'O teu link pessoal, a receção e gestão de pedidos via esse link (até ao limite do teu plano — 10/mês no Starter, 50/mês no Pro), o pipeline Kanban e os orçamentos automáticos. No plano Pro tens ainda follow-up automático, notificações WhatsApp e estatísticas avançadas.',
+    a: 'O teu link pessoal, a receção e gestão de pedidos via esse link (até ao limite do teu plano — 10/mês no Starter, 30/mês no Pro), o pipeline Kanban e os orçamentos automáticos. No plano Pro tens ainda follow-up automático, notificações WhatsApp e estatísticas avançadas.',
   },
   {
     q: 'Posso comprar mais leads do marketplace?',
