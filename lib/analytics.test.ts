@@ -241,4 +241,25 @@ describe('recordRequestCompleted', () => {
 
     expect(insertedRows[0].professional_id).toBeNull()
   })
+
+  it('grava a atribuição de campanha (UTM/canal) quando fornecida — sem isto o pedido concluído nunca podia ser ligado à visita/campanha que o originou', async () => {
+    const insertedRows: Record<string, unknown>[] = []
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: { from: () => ({ insert: (row: Record<string, unknown>) => { insertedRows.push(row); return Promise.resolve({ error: null }) } }) },
+    }))
+
+    const { recordRequestCompleted } = await import('./analytics')
+    await recordRequestCompleted({
+      ip: '1.2.3.4', userAgent: 'Mozilla/5.0', professionalId: null, source: 'marketplace', path: '/pedir',
+      referrerDomain: 'facebook.com', utmSource: 'facebook', utmMedium: 'cpc', utmCampaign: 'lancamento', originChannel: 'facebook',
+    })
+
+    expect(insertedRows[0]).toMatchObject({
+      referrer_domain: 'facebook.com',
+      utm_source: 'facebook',
+      utm_medium: 'cpc',
+      utm_campaign: 'lancamento',
+      origin_channel: 'facebook',
+    })
+  })
 })

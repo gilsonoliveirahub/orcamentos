@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
 import { estimatePriceRange } from '@/lib/quote-estimate'
-import { track } from '@/lib/track-client'
+import { track, currentCampaignContext } from '@/lib/track-client'
 import { GENERIC_ZONE_LABEL } from '@/lib/lead-completeness'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', GENERIC_ZONE_LABEL]
@@ -116,6 +116,7 @@ export default function PedirPage() {
           marketing_opt_in: marketingOptIn,
           ...legacyFields,
           metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+          ...currentCampaignContext(),
         }),
       })
 

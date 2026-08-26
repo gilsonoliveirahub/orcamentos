@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
+import { recordRequestCompleted, clientIpFrom, sanitizeUtm, extractHostname, normalizeOriginChannel } from '@/lib/analytics'
 import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
 import { geocodeZone } from '@/lib/geo'
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { specialty, zone_requested, marketing_opt_in, ...fields } = body
+    const { specialty, zone_requested, marketing_opt_in, referrer, utm_source, utm_medium, utm_campaign, ...fields } = body
     // consent_version/consent_source nunca vêm do cliente — só o booleano da
     // checkbox; esta rota é usada por /pedir, por isso a origem é sempre 'pedir'.
     const consentFields = computeClientConsentFields(marketing_opt_in, 'pedir')
@@ -48,6 +48,14 @@ export async function POST(req: NextRequest) {
     // eventuais campanhas futuras (que ainda não existem).
     await upsertClientMarketingConsent({ email: fields.email, leadId: lead.id, fields: consentFields })
 
+    // Mesma atribuição de campanha já capturada no page_view/request_started
+    // desta visita (lib/track-client.ts) — repetida aqui porque o pedido
+    // concluído é um evento server-side à parte, não gravado pelo browser.
+    const referrerDomain = typeof referrer === 'string' ? extractHostname(referrer) : null
+    const utmSourceClean = sanitizeUtm(typeof utm_source === 'string' ? utm_source : null)
+    const utmMediumClean = sanitizeUtm(typeof utm_medium === 'string' ? utm_medium : null)
+    const utmCampaignClean = sanitizeUtm(typeof utm_campaign === 'string' ? utm_campaign : null)
+
     // Sem profissional atribuído na criação — conta nas métricas globais da
     // plataforma, nunca nas métricas de nenhum profissional específico.
     await recordRequestCompleted({
@@ -56,6 +64,11 @@ export async function POST(req: NextRequest) {
       professionalId: null,
       source: 'marketplace',
       path: '/pedir',
+      referrerDomain,
+      utmSource: utmSourceClean,
+      utmMedium: utmMediumClean,
+      utmCampaign: utmCampaignClean,
+      originChannel: normalizeOriginChannel(referrerDomain, utmSourceClean),
     })
 
     return NextResponse.json({ lead, assigned: false })

@@ -66,6 +66,37 @@ describe('POST /api/leads/public — registo de request_completed', () => {
     expect(analyticsInsert).not.toHaveBeenCalled()
   })
 
+  it('propaga referrer/UTM da submissão para o evento request_completed, sem os gravar como colunas do lead', async () => {
+    const analyticsInserts: Record<string, unknown>[] = []
+    const leadInserts: Record<string, unknown>[] = []
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'prof-1', marketplace_credits: 0 } }) }) }) }
+      if (table === 'leads') {
+        return {
+          insert: (payload: Record<string, unknown>) => {
+            leadInserts.push(payload)
+            return { select: () => ({ single: async () => ({ data: { id: 'lead-1' }, error: null }) }) }
+          },
+        }
+      }
+      if (table === 'analytics_events') return { insert: (row: Record<string, unknown>) => { analyticsInserts.push(row); return Promise.resolve({ error: null }) } }
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({
+      professional_id: 'prof-1', name: 'Cliente', phone: '351911111111', source: 'pessoal',
+      referrer: 'https://www.instagram.com/algumsitio', utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'bio',
+    }))
+
+    expect(analyticsInserts[0]).toMatchObject({
+      referrer_domain: 'instagram.com', utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'bio', origin_channel: 'instagram',
+    })
+    expect(leadInserts[0]).not.toHaveProperty('referrer')
+    expect(leadInserts[0]).not.toHaveProperty('utm_source')
+  })
+
   it('marca source: marketplace quando o pedido veio via ?ref=marketplace no /p/[slug]', async () => {
     const analyticsInserts: Record<string, unknown>[] = []
     // Como o marketplace_credits > 0, o código chama .update(...) na tabela

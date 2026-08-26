@@ -85,6 +85,21 @@ describe('POST /api/leads/marketplace — sem atribuição automática (removida
     expect(analyticsInserts[0]).toMatchObject({ event_type: 'request_completed', professional_id: null, source: 'marketplace' })
   })
 
+  it('propaga referrer/UTM da submissão para o evento request_completed, sem os gravar como colunas do lead', async () => {
+    const { leadInserts, analyticsInserts } = mockSupabase()
+    const { POST } = await import('./route')
+    await POST(fakeRequest({
+      specialty: 'Pintura', zone_requested: 'Lisboa', name: 'Cliente', phone: '351911111111',
+      referrer: 'https://www.facebook.com/algumsitio', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: 'lancamento',
+    }))
+
+    expect(analyticsInserts[0]).toMatchObject({
+      referrer_domain: 'facebook.com', utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: 'lancamento', origin_channel: 'facebook',
+    })
+    expect(leadInserts[0]).not.toHaveProperty('referrer')
+    expect(leadInserts[0]).not.toHaveProperty('utm_source')
+  })
+
   it('não regista request_completed quando a criação do lead falha', async () => {
     const analyticsInsert = vi.fn()
     const from = vi.fn((table: string) => {

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, type Question, type ProfessionConfig } from '@/lib/professions'
-import { track } from '@/lib/track-client'
+import { track, currentCampaignContext } from '@/lib/track-client'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -187,6 +187,7 @@ export default function ProfessionalPublicPage() {
           marketing_opt_in: marketingOptIn,
           ...legacyFields,
           metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
+          ...currentCampaignContext(),
         }),
       })
       const data = await res.json()

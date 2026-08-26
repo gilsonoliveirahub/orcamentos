@@ -126,6 +126,11 @@ export async function recordRequestCompleted(params: {
   professionalId: string | null
   source: AnalyticsSource
   path: string
+  referrerDomain?: string | null
+  utmSource?: string | null
+  utmMedium?: string | null
+  utmCampaign?: string | null
+  originChannel?: OriginChannel | null
 }) {
   const secret = process.env.ANALYTICS_HASH_SECRET
   if (!secret) {
@@ -136,12 +141,21 @@ export async function recordRequestCompleted(params: {
 
   const visitorHash = hashVisitor(params.ip, params.userAgent, secret)
 
+  // Mesmos campos de atribuição de campanha já gravados em page_view/
+  // request_started (ver /api/track) — sem isto, o passo de conversão do
+  // funil (pedido concluído) ficava sempre sem canal/UTM, impossibilitando
+  // medir que campanha gerou pedidos, e não só visitas.
   const { error } = await supabaseAdmin.from('analytics_events').insert({
     event_type: 'request_completed',
     professional_id: params.professionalId,
     visitor_hash: visitorHash,
     source: params.source,
     path: params.path,
+    referrer_domain: params.referrerDomain ?? null,
+    utm_source: params.utmSource ?? null,
+    utm_medium: params.utmMedium ?? null,
+    utm_campaign: params.utmCampaign ?? null,
+    origin_channel: params.originChannel ?? null,
   })
   if (error) {
     console.error(`[analytics] falha ao registar request_completed: ${error.message}`)

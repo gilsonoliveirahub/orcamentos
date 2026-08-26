@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { recordRequestCompleted, clientIpFrom } from '@/lib/analytics'
+import { recordRequestCompleted, clientIpFrom, sanitizeUtm, extractHostname, normalizeOriginChannel } from '@/lib/analytics'
 import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { professional_id, source, marketing_opt_in, ...fields } = body
+    const { professional_id, source, marketing_opt_in, referrer, utm_source, utm_medium, utm_campaign, ...fields } = body
     // consent_version/consent_source nunca vêm do cliente — só o booleano da
     // checkbox; a versão e a origem ('p_slug', esta rota é usada por /p/[slug])
     // são sempre definidas aqui, no servidor.
@@ -50,6 +50,14 @@ export async function POST(req: NextRequest) {
     // eventuais campanhas futuras (que ainda não existem).
     await upsertClientMarketingConsent({ email: fields.email, leadId: lead.id, fields: consentFields })
 
+    // Mesma atribuição de campanha já capturada no page_view/request_started
+    // desta visita (lib/track-client.ts) — repetida aqui porque o pedido
+    // concluído é um evento server-side à parte, não gravado pelo browser.
+    const referrerDomain = typeof referrer === 'string' ? extractHostname(referrer) : null
+    const utmSourceClean = sanitizeUtm(typeof utm_source === 'string' ? utm_source : null)
+    const utmMediumClean = sanitizeUtm(typeof utm_medium === 'string' ? utm_medium : null)
+    const utmCampaignClean = sanitizeUtm(typeof utm_campaign === 'string' ? utm_campaign : null)
+
     // Aguardado (não fire-and-forget): em ambiente serverless a função pode
     // ser terminada assim que a resposta é devolvida, o que cancelaria uma
     // promessa não aguardada antes de gravar o evento.
@@ -59,6 +67,11 @@ export async function POST(req: NextRequest) {
       professionalId: professional_id,
       source: isMarketplace ? 'marketplace' : 'pessoal',
       path: '/p/[slug]',
+      referrerDomain,
+      utmSource: utmSourceClean,
+      utmMedium: utmMediumClean,
+      utmCampaign: utmCampaignClean,
+      originChannel: normalizeOriginChannel(referrerDomain, utmSourceClean),
     })
 
     return NextResponse.json({ lead })
