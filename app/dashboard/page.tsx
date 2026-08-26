@@ -16,6 +16,10 @@ import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase
 import { useRouter } from 'next/navigation'
 import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
 import ClosedValueModal from '@/components/ClosedValueModal'
+import { isAbandonedLead } from '@/lib/reliability'
+import { shouldShowStaleLeadsReminder } from '@/lib/stale-leads-reminder'
+
+const STALE_REMINDER_DISMISSED_KEY = 'facoporti_stale_leads_reminder_dismissed_at'
 
 const COLUMNS = [
   { id: 'novo',        label: 'Novo',       color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
@@ -376,6 +380,18 @@ export default function Dashboard() {
   const [copied, setCopied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [closingLeadId, setClosingLeadId] = useState<string | null>(null)
+  const [staleReminderDismissedAt, setStaleReminderDismissedAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(STALE_REMINDER_DISMISSED_KEY) : null
+    setStaleReminderDismissedAt(stored ? Number(stored) : null)
+  }, [])
+
+  function dismissStaleReminder() {
+    const now = Date.now()
+    localStorage.setItem(STALE_REMINDER_DISMISSED_KEY, String(now))
+    setStaleReminderDismissedAt(now)
+  }
   const router = useRouter()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
   const [, startTransition] = useTransition()
@@ -489,6 +505,12 @@ export default function Dashboard() {
   const potencial = quotes
     .filter(q => leads.find(l => l.id === q.lead_id && l.status !== 'fechado' && l.status !== 'perdido'))
     .reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
+
+  // Processos por finalizar: mesma definição já usada em Stats/fiabilidade
+  // (lib/reliability.ts) — em aberto há mais de 30 dias, nunca fechado nem
+  // perdido. Lembrete só, nunca bloqueia nem obriga a preencher nada.
+  const staleLeadsCount = leads.filter(l => isAbandonedLead(l)).length
+  const showStaleReminder = shouldShowStaleLeadsReminder({ staleCount: staleLeadsCount, dismissedAt: staleReminderDismissedAt })
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -711,6 +733,27 @@ export default function Dashboard() {
           <span className="text-sm font-semibold" style={{ color: '#34d399' }}>
             Potencial este mês: <span className="font-black">€{Math.round(potencial)}</span> em trabalhos
           </span>
+        </div>
+      )}
+
+      {/* Lembrete de processos por finalizar — nunca bloqueia, dispensável,
+          com cooldown (lib/stale-leads-reminder.ts) para nunca ser excessivo. */}
+      {showStaleReminder && (
+        <div className="mx-3 md:mx-6 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+          <span className="text-sm text-gray-300">
+            <span className="font-bold text-white">Tens {staleLeadsCount} processo{staleLeadsCount === 1 ? '' : 's'} por finalizar.</span>{' '}
+            Mantém os teus trabalhos atualizados para teres estatísticas mais precisas sobre o desempenho do teu negócio.
+          </span>
+          <div className="flex items-center gap-3 flex-shrink-0 self-start sm:self-auto">
+            <a href="/stats" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>
+              Ver Stats →
+            </a>
+            <button onClick={dismissStaleReminder} className="text-gray-500 hover:text-white transition-colors">
+              <X size={16} />
+            </button>
+          </div>
         </div>
       )}
 
