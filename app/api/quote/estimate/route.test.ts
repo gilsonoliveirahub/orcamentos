@@ -54,4 +54,29 @@ describe('POST /api/quote/estimate — proteção contra acesso direto a lead bl
 
     expect(res.status).not.toBe(403)
   })
+
+  it('nunca inclui as URLs de fotos/vídeo em bruto no texto da proposta enviada ao cliente', async () => {
+    const lead = {
+      id: 'lead-4', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      name: 'Cliente Autorizado',
+      metadata: { tipo_trabalho: 'Pintura interior', media_urls: ['https://x/1.jpg', 'https://x/2.jpg'] },
+      professionals: { specialty: 'Outro', name: 'Profissional' },
+    }
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'leads') return { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }
+          if (table === 'quotes') return { upsert: () => ({ select: () => ({ single: async () => ({ data: { id: 'quote-1' } }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-4' }))
+    const json = await res.json()
+
+    expect(json.proposal_text).not.toContain('https://x/1.jpg')
+    expect(json.proposal_text).not.toContain('media urls')
+  })
 })

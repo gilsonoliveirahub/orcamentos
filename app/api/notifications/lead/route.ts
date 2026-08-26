@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     const area = metadata.area_m2 || lead.q3_area_m2
     const prazo = metadata.prazo || lead.q9_prazo || '—'
     const notas = metadata.notas || lead.q12_notas || ''
+    const mediaCount = Array.isArray(metadata.media_urls) ? metadata.media_urls.length : 0
 
     const extraRows = Object.entries(metadata)
       .filter(([k, v]) => v && !['tipo_trabalho', 'area_m2', 'prazo', 'notas', 'media_urls'].includes(k))
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
       notas,
       source: lead.source || 'pessoal',
       extraRows,
+      mediaCount,
     })
 
     // WhatsApp ao profissional
@@ -90,8 +92,9 @@ export async function POST(req: NextRequest) {
         `🔔 *Novo pedido de orçamento!*\n\n` +
         `👤 *Cliente:* ${lead.name || '—'}\n` +
         `📱 *Telefone:* ${lead.phone || '—'}\n` +
-        `🔧 *Serviço:* ${servico}\n\n` +
-        `Ver detalhes: ${appUrl}/leads/${lead.id}`
+        `🔧 *Serviço:* ${servico}\n` +
+        (mediaCount > 0 ? `📷 *Fotos/vídeos:* ${mediaCount} anexado${mediaCount === 1 ? '' : 's'}\n` : '') +
+        `\nVer detalhes: ${appUrl}/leads/${lead.id}`
       )
       if (result.status !== 'sent') {
         console.warn(`[notifications/lead] WhatsApp não enviado (lead ${lead.id}): ${result.reason}`)

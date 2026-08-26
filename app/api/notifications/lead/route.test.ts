@@ -194,6 +194,56 @@ describe('POST /api/notifications/lead', () => {
       expect(whatsappMessage).toContain('351977777777')
     })
 
+    it('lead com fotos/vídeos anexados: menciona a quantidade no email e no WhatsApp', async () => {
+      const lead = {
+        id: 'lead-media', name: 'Cliente Com Fotos', phone: '351966666666', email: null, locked: false,
+        opened_at: '2026-07-17T00:00:00Z', professional_id: 'prof-1',
+        q1_tipo_trabalho: 'Pintura',
+        metadata: { media_urls: ['https://x/1.jpg', 'https://x/2.jpg', 'https://x/3.mp4'] },
+        source: 'pessoal',
+        professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'starter', zone: 'Lisboa' },
+      }
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+      }))
+      const emailNovoLead = vi.fn().mockResolvedValue(undefined)
+      const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({ lead_id: 'lead-media' }))
+
+      expect(emailNovoLead).toHaveBeenCalledWith(expect.objectContaining({ mediaCount: 3 }))
+      const [, whatsappMessage] = sendWhatsApp.mock.calls[0]
+      expect(whatsappMessage).toContain('3 anexados')
+    })
+
+    it('lead sem fotos/vídeos: não menciona nada sobre media no WhatsApp nem passa mediaCount>0', async () => {
+      const lead = {
+        id: 'lead-sem-media', name: 'Cliente Sem Fotos', phone: '351955555555', email: null, locked: false,
+        opened_at: '2026-07-17T00:00:00Z', professional_id: 'prof-1',
+        q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal',
+        professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'starter', zone: 'Lisboa' },
+      }
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+      }))
+      const emailNovoLead = vi.fn().mockResolvedValue(undefined)
+      const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({ lead_id: 'lead-sem-media' }))
+
+      expect(emailNovoLead).toHaveBeenCalledWith(expect.objectContaining({ mediaCount: 0 }))
+      const [, whatsappMessage] = sendWhatsApp.mock.calls[0]
+      expect(whatsappMessage).not.toContain('Fotos/vídeos')
+    })
+
     it('lead do link pessoal ainda não aberto recebe só notificação redigida, mesmo com plano pago e locked=false (a quota só é consumida ao abrir, nunca antes)', async () => {
       const lead = {
         id: 'lead-6', name: 'Cliente Ainda Não Aberto', phone: '351999999999', email: null, locked: false,

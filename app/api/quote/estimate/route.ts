@@ -29,7 +29,7 @@ Profissional: ${profName}
 
 🔧 *Serviço*: ${descricao}
 ${Object.entries(answers)
-  .filter(([k, v]) => v && k !== 'notas' && k !== 'prazo')
+  .filter(([k, v]) => v && k !== 'notas' && k !== 'prazo' && k !== 'media_urls')
   .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${v}`)
   .join('\n')}
 

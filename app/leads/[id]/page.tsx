@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown } from 'lucide-react'
+import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
@@ -41,6 +41,7 @@ export default function LeadDetail() {
   const [copied, setCopied] = useState(false)
   const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [, startTransition] = useTransition()
 
   async function loadData() {
@@ -186,7 +187,7 @@ export default function LeadDetail() {
       notas: 'Notas adicionais',
     }
     for (const [k, v] of Object.entries(metadata)) {
-      if (!v) continue
+      if (!v || k === 'media_urls') continue
       const label = labelMap[k] || k.replace(/_/g, ' ')
       answers.push({ label, value: formatValue(k, v) })
     }
@@ -199,11 +200,46 @@ export default function LeadDetail() {
   }
 
   const canGenerate = hasMetadata || isPaint
+  // Antes disto, media_urls aparecia na lista de "Respostas do Cliente" como
+  // uma linha de texto com URLs em bruto separadas por vírgula (formatValue
+  // não trata arrays) — nunca era mostrado como fotos/vídeo navegável.
+  const mediaUrls: string[] = Array.isArray(metadata.media_urls) ? metadata.media_urls : []
+  const isVideoUrl = (url: string) => /\.(mp4|mov|webm)$/i.test(url)
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       {showCloseModal && (
         <ClosedValueModal onConfirm={handleConfirmClose} onCancel={() => setShowCloseModal(false)} />
+      )}
+      {lightboxIndex !== null && mediaUrls[lightboxIndex] && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.9)' }}
+          onClick={() => setLightboxIndex(null)}>
+          <button onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full"
+            style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <X size={20} />
+          </button>
+          {lightboxIndex > 0 && (
+            <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) - 1) }}
+              className="absolute left-4 text-white/70 hover:text-white p-2 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <ChevronLeft size={22} />
+            </button>
+          )}
+          {lightboxIndex < mediaUrls.length - 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i as number) + 1) }}
+              className="absolute right-4 text-white/70 hover:text-white p-2 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <ChevronRight size={22} />
+            </button>
+          )}
+          <div onClick={e => e.stopPropagation()}>
+            {isVideoUrl(mediaUrls[lightboxIndex])
+              ? <video src={mediaUrls[lightboxIndex]} controls autoPlay className="max-w-full rounded-xl" style={{ maxHeight: '85vh' }} />
+              : <img src={mediaUrls[lightboxIndex]} alt="" className="max-w-full rounded-xl object-contain" style={{ maxHeight: '85vh' }} />}
+          </div>
+        </div>
       )}
       {/* Header */}
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -250,6 +286,26 @@ export default function LeadDetail() {
             ))}
           </div>
         </div>
+
+        {/* Fotos e vídeos enviados pelo cliente */}
+        {mediaUrls.length > 0 && (
+          <div className="rounded-2xl p-5" style={cardStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
+              <ImageIcon size={15} /> Fotos e vídeos do cliente ({mediaUrls.length})
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              {mediaUrls.map((url, idx) => (
+                <button key={url} onClick={() => setLightboxIndex(idx)}
+                  className="relative aspect-square rounded-xl overflow-hidden transition-transform hover:scale-[1.02]"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {isVideoUrl(url)
+                    ? <video src={url} className="w-full h-full object-cover" />
+                    : <img src={url} alt="" className="w-full h-full object-cover" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Respostas */}
         {answers.length > 0 && (

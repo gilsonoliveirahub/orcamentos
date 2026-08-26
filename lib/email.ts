@@ -93,12 +93,12 @@ export async function emailNovoLeadBloqueado({
 export async function emailNovoLead({
   profName, profEmail, profSpecialty,
   leadId, leadName, leadPhone, leadEmail,
-  servico, area, prazo, notas, source, extraRows,
+  servico, area, prazo, notas, source, extraRows, mediaCount,
 }: {
   profName: string; profEmail: string; profSpecialty: string
   leadId: string; leadName: string; leadPhone: string; leadEmail?: string
   servico: string; area?: string; prazo: string; notas?: string
-  source: string; extraRows?: string
+  source: string; extraRows?: string; mediaCount?: number
 }) {
   const isMarketplace = source === 'marketplace'
   const badge = isMarketplace
@@ -133,6 +133,7 @@ export async function emailNovoLead({
         </tr>
         ${extraRows || ''}
         ${notas ? `<tr><td style="padding:10px;color:#64748b;font-size:13px">Descrição</td><td style="padding:10px;color:#94a3b8;font-style:italic">${notas}</td></tr>` : ''}
+        ${mediaCount ? `<tr style="background:rgba(255,255,255,0.05)"><td style="padding:10px;color:#64748b;font-size:13px">Fotos/vídeos</td><td style="padding:10px;color:#fff">📷 ${mediaCount} anexado${mediaCount === 1 ? '' : 's'} — ver no dashboard</td></tr>` : ''}
       </table>
       <a href="${APP_URL}/leads/${leadId}"
         style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
