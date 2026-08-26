@@ -5,11 +5,18 @@ import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-re
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
+import { estimatePriceRange } from '@/lib/quote-estimate'
 import { track } from '@/lib/track-client'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', 'Outra / Toda Portugal']
 
-type Phase = 'profissao' | 'zona' | 'perguntas' | 'media' | 'contacto' | 'enviado'
+// Margem adicional só na apresentação antecipada ao cliente (nunca gravada em
+// `quotes`, nunca vista pelo profissional) — reduz o risco de a proposta real
+// ultrapassar a expectativa criada aqui. Aprovada explicitamente: mínimo
+// público = mínimo interno; máximo público = máximo interno × 1.15.
+const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
+
+type Phase = 'profissao' | 'zona' | 'perguntas' | 'estimativa' | 'media' | 'contacto' | 'enviado'
 
 export default function PedirPage() {
   const [phase, setPhase] = useState<Phase>('profissao')
@@ -57,7 +64,7 @@ export default function PedirPage() {
     setAnswers(next)
     const filtered = filterQuestions(next)
     if (step < filtered.length) setStep(s => s + 1)
-    else setPhase('media')
+    else setPhase('estimativa')
   }
 
   function answerText(key: string, value: any) {
@@ -71,7 +78,8 @@ export default function PedirPage() {
       else setPhase('zona')
       return
     }
-    if (phase === 'media') { setPhase('perguntas'); setStep(totalSteps); return }
+    if (phase === 'estimativa') { setPhase('perguntas'); setStep(totalSteps); return }
+    if (phase === 'media') { setPhase('estimativa'); return }
     if (phase === 'contacto') { setPhase('media'); return }
   }
 
@@ -145,6 +153,7 @@ export default function PedirPage() {
               {phase === 'profissao' && 'De que serviço precisa?'}
               {phase === 'zona' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
               {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
+              {phase === 'estimativa' && 'A sua estimativa'}
               {phase === 'media' && 'Fotos e/ou vídeos'}
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
@@ -156,6 +165,9 @@ export default function PedirPage() {
             )}
             {phase === 'zona' && (
               <p className="text-xs text-gray-500 mt-0.5">Em que zona?</p>
+            )}
+            {phase === 'estimativa' && (
+              <p className="text-xs text-gray-500 mt-0.5">Valor indicativo com base nas suas respostas</p>
             )}
           </div>
         </div>
@@ -217,6 +229,16 @@ export default function PedirPage() {
             answer={answers[questions[step - 1].key]}
             onAnswer={(v: any) => answerAndAdvance(questions[step - 1].key, v)}
             onTextNext={(v: any) => answerText(questions[step - 1].key, v)}
+            onBack={goBack}
+          />
+        )}
+
+        {/* Estimativa indicativa */}
+        {phase === 'estimativa' && profession && (
+          <EstimateStep
+            specialty={specialty}
+            answers={answers}
+            onNext={() => setPhase('media')}
             onBack={goBack}
           />
         )}
@@ -421,6 +443,40 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
           boxShadow: canContinue ? '0 8px 24px rgba(99,102,241,0.4)' : 'none',
         }}>
         {question.optional && !text ? 'Saltar' : 'Continuar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
+// ── Estimativa indicativa ────────────────────────────────────────────────────
+function EstimateStep({ specialty, answers, onNext, onBack }: any) {
+  const { min, max: maxInterno } = estimatePriceRange(specialty, answers)
+  const maxPublico = Math.round(maxInterno * PUBLIC_ESTIMATE_MAX_MARGIN)
+
+  return (
+    <div>
+      <p className="text-sm text-gray-500 mb-6">Com base nas respostas que deu.</p>
+
+      <div className="rounded-2xl p-6 text-center mb-4"
+        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Intervalo estimado</div>
+        <div className="text-3xl font-black" style={{ color: '#818cf8' }}>
+          €{min} – €{maxPublico}
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-500 leading-relaxed mb-6">
+        Estimativa baseada nas informações fornecidas. O valor final poderá variar e será confirmado
+        pelo profissional após avaliar o trabalho.
+      </p>
+
+      <button onClick={onNext}
+        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+        Continuar <ChevronRight size={18} />
       </button>
       <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
         <ChevronLeft size={15} /> Voltar
