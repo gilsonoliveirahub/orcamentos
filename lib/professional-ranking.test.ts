@@ -90,4 +90,44 @@ describe('sortProfessionalsForRanking', () => {
     const sorted = sortProfessionalsForRanking(profs, scores)
     expect(sorted.map(p => p.id)).toEqual(['sem-dado', 'com-carga'])
   })
+
+  it('mesmo plano/disponibilidade/fiabilidade: desempata por conversão (fecha mais do que perde) antes de antiguidade', () => {
+    const profs = [
+      { id: 'perde-muito', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'converte-bem', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      'perde-muito': { score: 1, total: 10, conversion_rate: 0.2 },
+      'converte-bem': { score: 1, total: 10, conversion_rate: 0.9 },
+    }
+    const sorted = sortProfessionalsForRanking(profs, scores)
+    expect(sorted.map(p => p.id)).toEqual(['converte-bem', 'perde-muito'])
+  })
+
+  it('mesmo plano/disponibilidade/fiabilidade/conversão: desempata por resposta mais rápida', () => {
+    const profs = [
+      { id: 'lento', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'rapido', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      lento: { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 48 },
+      rapido: { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 2 },
+    }
+    const sorted = sortProfessionalsForRanking(profs, scores)
+    expect(sorted.map(p => p.id)).toEqual(['rapido', 'lento'])
+  })
+
+  it('velocidade de resposta sem dado (null) num dos dois: não compara, passa para o critério seguinte', () => {
+    const profs = [
+      { id: 'sem-dado-resposta', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'com-dado-lento', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      'sem-dado-resposta': { score: 1, total: 5, conversion_rate: 1, avg_response_hours: null, active_count: 5 },
+      'com-dado-lento': { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 48, active_count: 1 },
+    }
+    // Sem poder comparar resposta, cai para capacidade: menos ativos primeiro.
+    const sorted = sortProfessionalsForRanking(profs, scores)
+    expect(sorted.map(p => p.id)).toEqual(['com-dado-lento', 'sem-dado-resposta'])
+  })
 })

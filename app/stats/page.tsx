@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck, Timer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
 import { computeReliabilityScore } from '@/lib/reliability'
+import { computeAvgResponseHours } from '@/lib/conversion'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -70,6 +71,11 @@ export default function StatsPage() {
   const coberturaValorLabel = totalFechados > 0
     ? `${comValorCount} de ${totalFechados} trabalhos com valor registado`
     : 'sem obras fechadas ainda'
+
+  // Velocidade de resposta — só considera leads do link pessoal (têm
+  // opened_at); leads do marketplace autorizam por aquisição, não por
+  // abertura, por isso nunca entram nesta média.
+  const avgResponseHours = computeAvgResponseHours(leads)
 
   // Tempo médio para fechar (dias)
   const tempoMedio = fechados.length > 0
@@ -150,6 +156,13 @@ export default function StatsPage() {
               value: `${Math.round(reliability.score * 100)}%`,
               sub: `${reliability.abandoned} pedido${reliability.abandoned === 1 ? '' : 's'} nunca resolvido${reliability.abandoned === 1 ? '' : 's'}`,
               color: '#2dd4bf',
+            }] : []),
+            ...(avgResponseHours !== null ? [{
+              icon: <Timer size={15} className="text-sky-400" />,
+              label: 'RESPOSTA',
+              value: avgResponseHours < 24 ? `${Math.round(avgResponseHours)}h` : `${Math.round(avgResponseHours / 24)}d`,
+              sub: 'tempo médio até abrir o pedido',
+              color: '#38bdf8',
             }] : []),
           ].map((k, i) => (
             <div key={i} className="rounded-2xl p-4" style={kpiStyle}>
