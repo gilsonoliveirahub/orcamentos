@@ -30,28 +30,41 @@ export default function StatsPage() {
   const [period, setPeriod] = useState<Period>('mes')
 
   useEffect(() => {
-    // dashboard_leads() (RPC) — nunca select direto: um lead do link
-    // pessoal ainda não aberto pelo profissional ficou invisível para
-    // select('*') direto (RLS exige lead_is_authorized), mas esta função
-    // devolve sempre o resumo de TODOS os leads do profissional (aberto ou
-    // não), o que é o que as métricas agregadas aqui precisam — nenhum dos
-    // cálculos nesta página usa nome/telefone/notas.
-    Promise.all([
-      supabase.rpc('dashboard_leads'),
-      supabase.from('quotes').select('*'),
-    ]).then(([{ data: l }, { data: q }]) => {
+    // Estatísticas avançadas são exclusivas do plano Pro (decisão de
+    // negócio) — Free e Starter são redirecionados para /upgrade, mesmo
+    // padrão já usado em app/leads/[id]/page.tsx para o gate de plano free.
+    // "loading" fica true durante o redirecionamento, por isso nunca chega
+    // a mostrar o conteúdo da página a quem não tem acesso.
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { router.replace('/login'); return }
+      const { data: prof } = await supabase.from('professionals').select('plan').eq('user_id', user.id).maybeSingle()
+      if (!prof || prof.plan !== 'pro') {
+        router.replace('/upgrade')
+        return
+      }
+
+      // dashboard_leads() (RPC) — nunca select direto: um lead do link
+      // pessoal ainda não aberto pelo profissional ficou invisível para
+      // select('*') direto (RLS exige lead_is_authorized), mas esta função
+      // devolve sempre o resumo de TODOS os leads do profissional (aberto ou
+      // não), o que é o que as métricas agregadas aqui precisam — nenhum dos
+      // cálculos nesta página usa nome/telefone/notas.
+      const [{ data: l }, { data: q }] = await Promise.all([
+        supabase.rpc('dashboard_leads'),
+        supabase.from('quotes').select('*'),
+      ])
       const sorted = [...(l || [])].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       setLeads(sorted)
       setQuotes(q || [])
       setLoading(false)
-    })
 
-    fetch('/api/professional/metrics')
-      .then(res => res.ok ? res.json() : null)
-      .then(json => setFunnel(json))
-      .catch(() => setFunnel(null))
-      .finally(() => setFunnelLoading(false))
-  }, [])
+      fetch('/api/professional/metrics')
+        .then(res => res.ok ? res.json() : null)
+        .then(json => setFunnel(json))
+        .catch(() => setFunnel(null))
+        .finally(() => setFunnelLoading(false))
+    })
+  }, [router])
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>

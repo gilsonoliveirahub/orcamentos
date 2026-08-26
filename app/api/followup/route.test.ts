@@ -94,7 +94,7 @@ describe('GET /api/followup', () => {
     expect(sendWhatsApp).not.toHaveBeenCalled()
   })
 
-  it('envia follow-up normalmente para um lead desbloqueado (plano pago, locked=false)', async () => {
+  it('envia follow-up normalmente para um lead desbloqueado (plano Pro, locked=false)', async () => {
     const unlockedLead = {
       id: 'lead-3', name: 'Cliente Livre', phone: '351955555555', status: 'novo', locked: false,
       source: 'pessoal', opened_at: '2026-06-01T00:00:00Z', professional_id: 'prof-3',
@@ -123,11 +123,37 @@ describe('GET /api/followup', () => {
     expect(emailFollowup).toHaveBeenCalledWith(expect.objectContaining({ leadName: 'Cliente Livre' }))
   })
 
-  it('nunca envia follow-up para um lead do link pessoal ainda não aberto cuja quota do ciclo está esgotada', async () => {
+  it('follow-up automático é exclusivo do plano Pro: Starter desbloqueado nunca recebe email nem WhatsApp', async () => {
+    const starterLead = {
+      id: 'lead-starter', name: 'Cliente Starter', phone: '351911122233', status: 'novo', locked: false,
+      source: 'pessoal', opened_at: '2026-06-01T00:00:00Z', professional_id: 'prof-starter',
+      professionals: { name: 'Prof Starter', email: 'profstarter2@example.com', phone: '351922233344', specialty: 'Pintura', plan: 'starter' },
+    }
+
+    const from = vi.fn((table: string) => {
+      if (table === 'leads') return leadsChain([starterLead])
+      return leadsChain([])
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+
+    const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+    vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+    const emailFollowup = vi.fn().mockResolvedValue(undefined)
+    const emailUpgradeNudge = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('@/lib/email', () => ({ emailFollowup, emailUpgradeNudge }))
+
+    const { GET } = await import('./route')
+    await GET(fakeRequest())
+
+    expect(emailFollowup).not.toHaveBeenCalled()
+    expect(sendWhatsApp).not.toHaveBeenCalled()
+  })
+
+  it('nunca envia follow-up para um lead do link pessoal ainda não aberto cuja quota do ciclo está esgotada (plano Pro)', async () => {
     const quotaExhaustedLead = {
       id: 'lead-4', name: 'Cliente Sem Quota', phone: '351977777777', status: 'novo', locked: false,
       source: 'pessoal', opened_at: null, professional_id: 'prof-4',
-      professionals: { name: 'Prof Starter', email: 'profstarter@example.com', phone: '351988888888', specialty: 'Pintura', plan: 'starter' },
+      professionals: { name: 'Prof Pro', email: 'profpro2@example.com', phone: '351988888888', specialty: 'Pintura', plan: 'pro' },
     }
 
     const from = vi.fn((table: string) => {

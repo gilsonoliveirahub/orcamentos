@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
     // contacto depois do lead estar realmente aberto (link pessoal) ou
     // adquirido (marketplace). Nunca reimplementar esta condição aqui.
     const isFreePlan = !prof.plan || prof.plan === 'free'
+    // Notificações por WhatsApp são exclusivas do plano Pro (decisão de
+    // negócio) — email continua para todos os planos pagos/free consoante
+    // as regras já existentes, isto só gate o canal WhatsApp.
+    const isPro = prof.plan === 'pro'
     const authorized = isLeadAuthorized(lead)
 
     if (!authorized) {
@@ -37,7 +41,7 @@ export async function POST(req: NextRequest) {
         isFreePlan,
       })
 
-      if (prof.phone) {
+      if (prof.phone && isPro) {
         const ctaUrl = isFreePlan ? `${appUrl}/upgrade` : `${appUrl}/dashboard`
         const result = await sendWhatsApp(prof.phone,
           `🔒 *Novo pedido de orçamento!*\n\n` +
@@ -86,8 +90,8 @@ export async function POST(req: NextRequest) {
       mediaCount,
     })
 
-    // WhatsApp ao profissional
-    if (prof.phone) {
+    // WhatsApp ao profissional — exclusivo do plano Pro (decisão de negócio)
+    if (prof.phone && isPro) {
       const result = await sendWhatsApp(prof.phone,
         `🔔 *Novo pedido de orçamento!*\n\n` +
         `👤 *Cliente:* ${lead.name || '—'}\n` +

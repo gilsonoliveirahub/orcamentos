@@ -13,10 +13,10 @@ import {
   computeUniqueVisitors,
 } from '@/lib/metrics'
 
-// Devolve o id do profissional autenticado — nunca aceita professional_id
-// vindo do pedido do cliente. Um profissional só pode consultar as suas
-// próprias métricas, resolvido sempre a partir da sessão.
-async function getAuthenticatedProfessionalId(): Promise<string | null> {
+// Devolve o profissional autenticado (id + plan) — nunca aceita
+// professional_id vindo do pedido do cliente. Um profissional só pode
+// consultar as suas próprias métricas, resolvido sempre a partir da sessão.
+async function getAuthenticatedProfessional(): Promise<{ id: string; plan: string | null } | null> {
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,16 +28,21 @@ async function getAuthenticatedProfessionalId(): Promise<string | null> {
 
   const { data: professional } = await supabaseAdmin
     .from('professionals')
-    .select('id')
+    .select('id, plan')
     .eq('user_id', user.id)
     .maybeSingle()
 
-  return professional?.id ?? null
+  return professional ? { id: professional.id, plan: professional.plan } : null
 }
 
+// Estatísticas avançadas (consumidas só por /stats) são exclusivas do plano
+// Pro (decisão de negócio) — gate aqui também, não só na página, para a
+// exclusividade não poder ser contornada chamando a API diretamente.
 export async function GET(req: NextRequest) {
-  const professionalId = await getAuthenticatedProfessionalId()
-  if (!professionalId) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 })
+  const professional = await getAuthenticatedProfessional()
+  if (!professional) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 })
+  if (professional.plan !== 'pro') return NextResponse.json({ error: 'Funcionalidade exclusiva do plano Pro' }, { status: 403 })
+  const professionalId = professional.id
 
   const { searchParams } = new URL(req.url)
   const from = searchParams.get('from') || undefined

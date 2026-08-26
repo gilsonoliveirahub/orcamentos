@@ -64,7 +64,7 @@ describe('GET /api/professional/metrics', () => {
     const uniqueRows = [{ day: '2026-07-10', professional_id: 'meu-prof-id', unique_visitors: 4 }]
 
     const from = vi.fn((table: string) => {
-      if (table === 'professionals') return chainable({ data: { id: 'meu-prof-id' } })
+      if (table === 'professionals') return chainable({ data: { id: 'meu-prof-id', plan: 'pro' } })
       if (table === 'analytics_daily_summary') return chainable({ data: summaryRows, error: null }, args => inCalls.push(args))
       if (table === 'analytics_daily_unique_visitors') return chainable({ data: uniqueRows, error: null }, args => inCalls.push(args))
       throw new Error(`tabela inesperada: ${table}`)
@@ -84,5 +84,33 @@ describe('GET /api/professional/metrics', () => {
       ['professional_id', ['meu-prof-id']],
     ])
     expect(JSON.stringify(json)).not.toContain('profissional-de-outra-pessoa')
+  })
+
+  it('estatísticas avançadas são exclusivas do plano Pro: Starter é bloqueado mesmo autenticado', async () => {
+    vi.doMock('next/headers', () => ({ cookies: async () => ({ getAll: () => [] }) }))
+    vi.doMock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user-starter' } } }) } }) }))
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return chainable({ data: { id: 'prof-starter', plan: 'starter' } })
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+
+    const { GET } = await import('./route')
+    const res = await GET(fakeRequest(''))
+    expect(res.status).toBe(403)
+  })
+
+  it('estatísticas avançadas são exclusivas do plano Pro: Free é bloqueado mesmo autenticado', async () => {
+    vi.doMock('next/headers', () => ({ cookies: async () => ({ getAll: () => [] }) }))
+    vi.doMock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user-free' } } }) } }) }))
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return chainable({ data: { id: 'prof-free', plan: 'free' } })
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+
+    const { GET } = await import('./route')
+    const res = await GET(fakeRequest(''))
+    expect(res.status).toBe(403)
   })
 })

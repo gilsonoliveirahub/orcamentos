@@ -47,16 +47,19 @@ export async function GET(req: NextRequest) {
       const prof = lead.professionals
       if (!prof?.email) continue
 
-      // Nunca enviar follow-up (revela nome/telefone) para um lead que o
-      // profissional ainda não desbloqueou — plano free, marketplace sem
+      // Follow-up automático (email + WhatsApp) é exclusivo do plano Pro
+      // (decisão de negócio) — nunca afeta o nudge de upgrade mais abaixo,
+      // que é especificamente para quem está no plano free.
+      // Também nunca enviar follow-up (revela nome/telefone) para um lead
+      // que o profissional ainda não desbloqueou — marketplace sem
       // créditos, ou link pessoal ainda não aberto com a quota do ciclo já
       // esgotada (não seria autorizado a abri-lo agora, por isso o
       // follow-up também não pode revelar nem processar os dados).
-      const isFreePlan = !prof.plan || prof.plan === 'free'
-      const quotaExhausted = !isFreePlan && lead.source !== 'marketplace' && !lead.opened_at
+      const isPro = prof.plan === 'pro'
+      const quotaExhausted = isPro && lead.source !== 'marketplace' && !lead.opened_at
         ? await isPersonalLinkQuotaExhausted(lead.professional_id)
         : false
-      const isBlocked = isFreePlan || !!lead.locked || quotaExhausted
+      const isBlocked = !isPro || !!lead.locked || quotaExhausted
       if (isBlocked) continue
 
       const metadata = lead.metadata || {}
