@@ -44,6 +44,7 @@ export default function LeadDetail() {
   const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [actionError, setActionError] = useState('')
   const [, startTransition] = useTransition()
 
   async function loadData() {
@@ -85,13 +86,17 @@ export default function LeadDetail() {
 
   async function handleGenerateQuote() {
     setGenerating(true)
+    setActionError('')
     const specialty = lead?.professionals?.specialty || 'Pintura'
     const endpoint = specialty === 'Pintura' ? '/api/quote/generate' : '/api/quote/estimate'
-    await fetch(endpoint, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: id }),
     })
+    // Sem esta verificação, um erro do servidor deixava o botão "A calcular..."
+    // terminar em silêncio, sem orçamento nenhum e sem explicação.
+    if (!res.ok) setActionError('Não foi possível gerar o orçamento. Tente novamente.')
     await loadData()
     setGenerating(false)
   }
@@ -99,17 +104,26 @@ export default function LeadDetail() {
   async function handleStatusChange(newStatus: string) {
     // "Fechado" exige decidir o valor final primeiro — nunca avança direto.
     if (newStatus === 'fechado') { setShowCloseModal(true); return }
-    await fetch('/api/leads/status', {
+    const previousStatus = lead?.status
+    setLead((prev: any) => ({ ...prev, status: newStatus }))
+    setActionError('')
+    const res = await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: id, status: newStatus }),
     })
-    setLead((prev: any) => ({ ...prev, status: newStatus }))
+    if (!res.ok) {
+      setLead((prev: any) => ({ ...prev, status: previousStatus }))
+      setActionError('Não foi possível mudar o estado. Tente novamente.')
+    }
   }
 
   async function handleConfirmClose(valor: number | null) {
     setShowCloseModal(false)
-    await fetch('/api/leads/status', {
+    const previousStatus = lead?.status
+    setLead((prev: any) => ({ ...prev, status: 'fechado' }))
+    setActionError('')
+    const res = await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -119,7 +133,10 @@ export default function LeadDetail() {
         valor_fechado_decision: valor === null ? 'nao_informar' : 'informado',
       }),
     })
-    setLead((prev: any) => ({ ...prev, status: 'fechado' }))
+    if (!res.ok) {
+      setLead((prev: any) => ({ ...prev, status: previousStatus }))
+      setActionError('Não foi possível fechar o pedido. Tente novamente.')
+    }
   }
 
   function copyProposal() {
@@ -274,6 +291,16 @@ export default function LeadDetail() {
       </div>
 
       <div className="max-w-2xl mx-auto p-6 space-y-5">
+
+        {actionError && (
+          <div className="rounded-2xl p-4 flex items-center justify-between gap-2"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <span className="text-sm" style={{ color: '#f87171' }}>{actionError}</span>
+            <button onClick={() => setActionError('')} className="text-gray-500 hover:text-white transition-colors flex-shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Status */}
         <div className="rounded-2xl p-5" style={cardStyle}>

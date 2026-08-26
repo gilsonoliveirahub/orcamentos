@@ -250,6 +250,7 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     q8_teto: false, q9_prazo: 'normal', q12_notas: '',
   })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   function set(key: string, value: any) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -258,14 +259,23 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await fetch('/api/leads/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setSaving(false)
-    onCreated()
-    onClose()
+    setError('')
+    try {
+      const res = await fetch('/api/leads/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      // Sem esta verificação, uma falha no servidor fechava o modal na mesma
+      // e o profissional perdia os dados que acabou de escrever, sem aviso.
+      if (!res.ok) throw new Error()
+      onCreated()
+      onClose()
+    } catch {
+      setError('Não foi possível criar o lead. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputClass = "w-full rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
@@ -360,6 +370,7 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
               className={`${inputClass} resize-none`} style={inputStyle} />
           </div>
 
+          {error && <p className="text-red-400 text-xs text-center">{error}</p>}
           <button type="submit" disabled={saving}
             className="w-full font-bold py-3.5 rounded-xl text-sm text-white transition-all"
             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
@@ -381,6 +392,7 @@ export default function Dashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [closingLeadId, setClosingLeadId] = useState<string | null>(null)
   const [staleReminderDismissedAt, setStaleReminderDismissedAt] = useState<number | null>(null)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem(STALE_REMINDER_DISMISSED_KEY) : null
@@ -456,20 +468,31 @@ export default function Dashboard() {
     // "Fechado" exige decidir o valor final primeiro — não move o card nem
     // chama a API já; só depois de confirmado no modal (ver handleConfirmClose).
     if (newStatus === 'fechado') { setClosingLeadId(leadId); return }
+    const previousStatus = leads.find(l => l.id === leadId)?.status
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
-    await fetch('/api/leads/status', {
+    setActionError('')
+    const res = await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: leadId, status: newStatus }),
     })
+    if (!res.ok) {
+      // Reverte a mudança otimista — sem isto o quadro continuava a mostrar
+      // um estado (ex: "Proposta") que nunca chegou a ser gravado, e as
+      // Stats acabavam por não bater certo com o que o profissional via aqui.
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: previousStatus } : l))
+      setActionError('Não foi possível mover o pedido. Tente novamente.')
+    }
   }
 
   async function handleConfirmClose(valor: number | null) {
     const leadId = closingLeadId
     setClosingLeadId(null)
     if (!leadId) return
+    const previousStatus = leads.find(l => l.id === leadId)?.status
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: 'fechado' } : l))
-    await fetch('/api/leads/status', {
+    setActionError('')
+    const res = await fetch('/api/leads/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -479,6 +502,10 @@ export default function Dashboard() {
         valor_fechado_decision: valor === null ? 'nao_informar' : 'informado',
       }),
     })
+    if (!res.ok) {
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: previousStatus } : l))
+      setActionError('Não foi possível fechar o pedido. Tente novamente.')
+    }
   }
 
   const totalFechado = leads.filter(l => l.status === 'fechado').length
@@ -733,6 +760,17 @@ export default function Dashboard() {
           <span className="text-sm font-semibold" style={{ color: '#34d399' }}>
             Potencial este mês: <span className="font-black">€{Math.round(potencial)}</span> em trabalhos
           </span>
+        </div>
+      )}
+
+      {/* Erro ao mudar estado/fechar (drag-and-drop ou modal de fecho) */}
+      {actionError && (
+        <div className="mx-3 md:mx-6 mt-3 flex items-center justify-between gap-2 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm" style={{ color: '#f87171' }}>{actionError}</span>
+          <button onClick={() => setActionError('')} className="text-gray-500 hover:text-white transition-colors flex-shrink-0">
+            <X size={16} />
+          </button>
         </div>
       )}
 
