@@ -32,6 +32,7 @@ export default function PedirPage() {
   const [email, setEmail] = useState('')
   const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [assigned, setAssigned] = useState(false)
   const requestStartedTracked = useRef(false)
 
@@ -97,29 +98,40 @@ export default function PedirPage() {
   async function handleSubmit() {
     if (submitting) return
     setSubmitting(true)
+    setSubmitError('')
 
     const legacyFields = mapAnswersToLeadFields(answers)
 
-    const res = await fetch('/api/leads/marketplace', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        specialty,
-        zone_requested: zona !== GENERIC_ZONE_LABEL ? zona : (zonaDetalhe.trim() || null),
-        name,
-        phone,
-        email: email || null,
-        status: 'novo',
-        marketing_opt_in: marketingOptIn,
-        ...legacyFields,
-        metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
-      }),
-    })
+    try {
+      const res = await fetch('/api/leads/marketplace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          specialty,
+          zone_requested: zona !== GENERIC_ZONE_LABEL ? zona : (zonaDetalhe.trim() || null),
+          name,
+          phone,
+          email: email || null,
+          status: 'novo',
+          marketing_opt_in: marketingOptIn,
+          ...legacyFields,
+          metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+        }),
+      })
 
-    const { lead, assigned: wasAssigned } = await res.json()
-    setAssigned(wasAssigned)
-    setSubmitting(false)
-    setPhase('enviado')
+      const data = await res.json()
+      // Um erro do servidor (400/500) devolve sempre `{ error }`, nunca
+      // `lead` — sem esta verificação o ecrã "Pedido enviado!" aparecia
+      // mesmo quando o pedido não chegou a ser criado.
+      if (!res.ok || !data.lead) throw new Error(data.error || 'Falha ao enviar o pedido')
+
+      setAssigned(!!data.assigned)
+      setPhase('enviado')
+    } catch {
+      setSubmitError('Não foi possível enviar o pedido. Verifique a sua ligação à internet e tente novamente.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // ── Enviado ────────────────────────────────────────────────────────────────
@@ -298,7 +310,7 @@ export default function PedirPage() {
         {phase === 'contacto' && (
           <ContactStep
             name={name} phone={phone} email={email} marketingOptIn={marketingOptIn}
-            submitting={submitting}
+            submitting={submitting} submitError={submitError}
             onNameChange={setName}
             onPhoneChange={setPhone}
             onEmailChange={setEmail}
@@ -537,7 +549,10 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
     setError(''); setUploading(true)
     const newUrls: string[] = []
     for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) continue
+      if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+        setError('Tipo de ficheiro não suportado — escolha uma foto ou vídeo.')
+        continue
+      }
       if (file.size > 50 * 1024 * 1024) { setError('Ficheiro demasiado grande (máx 50MB)'); continue }
       const ext = file.name.split('.').pop()
       const path = `leads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
@@ -591,7 +606,7 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
 }
 
 // ── Contacto ──────────────────────────────────────────────────────────────────
-function ContactStep({ name, phone, email, marketingOptIn, submitting, onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit }: any) {
+function ContactStep({ name, phone, email, marketingOptIn, submitting, submitError, onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit }: any) {
   const [rgpd, setRgpd] = useState(false)
   const ready = name.trim().length > 1 && phone.trim().length >= 9 && rgpd
   return (
@@ -638,6 +653,9 @@ function ContactStep({ name, phone, email, marketingOptIn, submitting, onNameCha
           </span>
         </label>
       </div>
+      {submitError && (
+        <p className="text-red-400 text-xs mt-4 text-center">{submitError}</p>
+      )}
       <button onClick={onSubmit} disabled={!ready || submitting}
         className="w-full mt-6 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
         style={{

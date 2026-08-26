@@ -28,6 +28,7 @@ export default function ProfessionalPublicPage() {
   const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null)
 
   async function loadSpecialtyConfig(spec: string) {
@@ -165,30 +166,36 @@ export default function ProfessionalPublicPage() {
   async function handleSubmit() {
     if (submitting) return
     setSubmitting(true)
+    setSubmitError('')
 
     // O pedido nunca é bloqueado na submissão — o limite do plano (10
     // Starter / 30 Pro por ciclo) só se aplica à ABERTURA do lead pelo
     // profissional, não à criação (ver lib/personal-link-limits.ts).
     const legacyFields = mapAnswersToLeadFields(answers)
 
-    const res = await fetch('/api/leads/public', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        professional_id: professional.id,
-        name,
-        phone,
-        email: email || null,
-        status: 'novo',
-        source,
-        marketing_opt_in: marketingOptIn,
-        ...legacyFields,
-        metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
-      }),
-    })
-    const { lead } = await res.json()
+    try {
+      const res = await fetch('/api/leads/public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          professional_id: professional.id,
+          name,
+          phone,
+          email: email || null,
+          status: 'novo',
+          source,
+          marketing_opt_in: marketingOptIn,
+          ...legacyFields,
+          metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
+        }),
+      })
+      const data = await res.json()
+      // Um erro do servidor (400/500) devolve sempre `{ error }`, nunca
+      // `lead` — sem esta verificação o ecrã de confirmação aparecia mesmo
+      // quando o pedido não chegou a ser criado.
+      if (!res.ok || !data.lead) throw new Error(data.error || 'Falha ao enviar o pedido')
+      const lead = data.lead
 
-    if (lead) {
       // O cálculo do orçamento inicial (rascunho) passou a correr sempre no
       // servidor — nunca mais um insert direto em `quotes` a partir do
       // browser (a policy pública de INSERT foi removida). Pintura usa
@@ -217,10 +224,13 @@ export default function ProfessionalPublicPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: lead.id }),
       }).catch(() => {})
-    }
 
-    setSubmitted(true)
-    setSubmitting(false)
+      setSubmitted(true)
+    } catch {
+      setSubmitError('Não foi possível enviar o pedido. Verifique a sua ligação à internet e tente novamente.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const waLines = Object.entries(answers)
@@ -501,6 +511,7 @@ export default function ProfessionalPublicPage() {
             marketingOptIn={marketingOptIn}
             total={totalSteps}
             submitting={submitting}
+            submitError={submitError}
             onNameChange={setName}
             onPhoneChange={setPhone}
             onEmailChange={setEmail}
@@ -554,7 +565,10 @@ function MediaStep({
     for (const file of Array.from(files)) {
       const isImage = file.type.startsWith('image/')
       const isVideo = file.type.startsWith('video/')
-      if (!isImage && !isVideo) continue
+      if (!isImage && !isVideo) {
+        setError('Tipo de ficheiro não suportado — escolha uma foto ou vídeo.')
+        continue
+      }
       if (file.size > 50 * 1024 * 1024) { setError('Ficheiro demasiado grande (máx 50MB)'); continue }
 
       const ext = file.name.split('.').pop()
@@ -832,7 +846,7 @@ function QuestionStep({
 // ── Dados de contacto ─────────────────────────────────────────────────────────
 
 function ContactStep({
-  name, phone, email, marketingOptIn, total, submitting,
+  name, phone, email, marketingOptIn, total, submitting, submitError,
   onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit,
 }: {
   name: string
@@ -841,6 +855,7 @@ function ContactStep({
   marketingOptIn: boolean
   total: number
   submitting: boolean
+  submitError: string
   onNameChange: (v: string) => void
   onPhoneChange: (v: string) => void
   onEmailChange: (v: string) => void
@@ -910,6 +925,9 @@ function ContactStep({
           </span>
         </label>
       </div>
+      {submitError && (
+        <p className="text-red-400 text-xs mt-4 text-center">{submitError}</p>
+      )}
       <button
         onClick={onSubmit}
         disabled={!ready || submitting}
