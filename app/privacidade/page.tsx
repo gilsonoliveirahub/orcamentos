@@ -1,4 +1,10 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Política de Privacidade | FaçoPorTi',
+  description: 'Como o FaçoPorTi recolhe, usa e protege os dados pessoais de clientes e profissionais na plataforma.',
+}
 
 export default function PrivacidadePage() {
   return (

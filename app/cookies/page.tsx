@@ -1,4 +1,10 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Política de Cookies | FaçoPorTi',
+  description: 'Como o FaçoPorTi usa cookies e tecnologias semelhantes na plataforma.',
+}
 
 export default function CookiesPage() {
   return (
