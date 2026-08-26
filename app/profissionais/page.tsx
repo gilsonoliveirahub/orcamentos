@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Search, MapPin, Briefcase, Star, ChevronRight, Loader2, ArrowLeft, ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 import { PROFESSIONS, SPECIALTY_LIST } from '@/lib/professions'
+import { sortProfessionalsForRanking } from '@/lib/professional-ranking'
 
 const ZONAS = ['Todas as zonas', 'Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora']
 
@@ -16,21 +17,22 @@ export default function ProfissionaisPage() {
   const [filterZona, setFilterZona] = useState('Todas as zonas')
 
   useEffect(() => {
-    supabase
-      .from('professionals')
-      .select('*, reviews(rating), professional_portfolio(id, url, type)')
-      .eq('active', true)
-      .then(({ data }) => {
-        const all = data || []
-        const planScore = (plan: string) => plan === 'pro' ? 3 : plan === 'starter' ? 2 : 1
-        const sorted = [...all].sort((a, b) => {
-          const diff = planScore(b.plan) - planScore(a.plan)
-          if (diff !== 0) return diff
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        })
-        setProfessionals(all.length > 20 ? sorted.slice(0, 20) : sorted)
-        setLoading(false)
-      })
+    Promise.all([
+      supabase
+        .from('professionals')
+        .select('*, reviews(rating), professional_portfolio(id, url, type)')
+        .eq('active', true),
+      // Score agregado de fiabilidade de processo (fecha/perde vs. abandona)
+      // — endpoint público que nunca devolve dados de lead, só o número. Se
+      // falhar, cai para o comportamento anterior (só plano + antiguidade),
+      // nunca bloqueia a página.
+      fetch('/api/professionals/reliability').then(r => r.ok ? r.json() : { scores: {} }).catch(() => ({ scores: {} })),
+    ]).then(([{ data }, { scores }]) => {
+      const all = data || []
+      const sorted = sortProfessionalsForRanking(all, scores || {})
+      setProfessionals(all.length > 20 ? sorted.slice(0, 20) : sorted)
+      setLoading(false)
+    })
   }, [])
 
   const filtered = professionals.filter(p => {

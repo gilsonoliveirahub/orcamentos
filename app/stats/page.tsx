@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
+import { computeReliabilityScore } from '@/lib/reliability'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -61,6 +62,11 @@ export default function StatsPage() {
   // fallback — só leads.valor_fechado realmente informado.
   const faturacaoPotencial = quotes.reduce((sum, q) => sum + ((q.valor_min + q.valor_max) / 2), 0)
   const { faturacaoReal, ticketMedio, comValorCount, totalFechados } = calcFaturacaoReal(fechados)
+  // Fiabilidade de processo — leva os pedidos a um estado terminal
+  // (fechado/perdido) em vez de os deixar por resolver. Não é a mesma coisa
+  // que a nota das reviews (isso é qualidade do trabalho, não do processo).
+  const reliability = computeReliabilityScore(leads)
+  const reliabilityDecided = reliability.resolved + reliability.abandoned
   const coberturaValorLabel = totalFechados > 0
     ? `${comValorCount} de ${totalFechados} trabalhos com valor registado`
     : 'sem obras fechadas ainda'
@@ -138,6 +144,13 @@ export default function StatsPage() {
             { icon: <Clock size={15} className="text-blue-400" />, label: 'TEMPO FECHO', value: tempoMedio > 0 ? `${tempoMedio}d` : '—', sub: 'média para fechar', color: '#60a5fa' },
             { icon: <Zap size={15} className="text-red-400" />, label: 'PERDIDOS', value: perdidos.length, sub: `${totalLeads > 0 ? Math.round(perdidos.length / totalLeads * 100) : 0}% do total`, color: '#f87171' },
             { icon: <CheckCircle size={15} className="text-cyan-400" />, label: 'EM CURSO', value: ativos.length, sub: 'leads ativos', color: '#22d3ee' },
+            ...(reliabilityDecided > 0 ? [{
+              icon: <ShieldCheck size={15} className="text-teal-400" />,
+              label: 'FIABILIDADE',
+              value: `${Math.round(reliability.score * 100)}%`,
+              sub: `${reliability.abandoned} pedido${reliability.abandoned === 1 ? '' : 's'} nunca resolvido${reliability.abandoned === 1 ? '' : 's'}`,
+              color: '#2dd4bf',
+            }] : []),
           ].map((k, i) => (
             <div key={i} className="rounded-2xl p-4" style={kpiStyle}>
               <div className="flex items-center gap-2 mb-2">
