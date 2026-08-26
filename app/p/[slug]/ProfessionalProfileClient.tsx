@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track, currentCampaignContext } from '@/lib/track-client'
+import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN } from '@/lib/quote-estimate'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -149,8 +150,18 @@ export default function ProfessionalPublicPage() {
     })
   }
   const questions = filterQuestions(answers)
-  const totalSteps = questions.length + 2
-  const isMediaStep = step === questions.length + 1
+  // Pintura usa os preços próprios do profissional (calculateQuote com
+  // professional.price_m2_*, só conhecidos depois da submissão, em
+  // /api/quote/generate) — mostrar aqui uma pré-visualização com a tabela
+  // genérica arriscava divergir do orçamento real gerado a seguir, o que é
+  // pior do que não mostrar nada. As restantes especialidades usam sempre a
+  // mesma tabela genérica (lib/quote-estimate.ts) tanto aqui como em
+  // /api/quote/estimate, por isso podem mostrar, sem qualquer risco de
+  // inconsistência, a mesma pré-visualização já usada em /pedir.
+  const isPintura = selectedSpecialty === 'Pintura'
+  const totalSteps = questions.length + (isPintura ? 0 : 1) + 2
+  const isEstimateStep = !isPintura && step === questions.length + 1
+  const isMediaStep = step === questions.length + (isPintura ? 1 : 2)
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
@@ -494,9 +505,19 @@ export default function ProfessionalPublicPage() {
             onBack={() => setStep(s => s - 1)}
           />
         )}
+        {isEstimateStep && (
+          <EstimateStep
+            current={questions.length + 1}
+            total={totalSteps}
+            specialty={selectedSpecialty as string}
+            answers={answers}
+            onNext={() => setStep(s => s + 1)}
+            onBack={() => setStep(s => s - 1)}
+          />
+        )}
         {isMediaStep && (
           <MediaStep
-            current={questions.length + 1}
+            current={questions.length + (isPintura ? 1 : 2)}
             total={totalSteps}
             mediaUrls={mediaUrls}
             onMediaChange={setMediaUrls}
@@ -640,6 +661,52 @@ function MediaStep({
         style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}
       >
         {mediaUrls.length > 0 ? 'Continuar' : 'Saltar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
+// ── Estimativa indicativa ─────────────────────────────────────────────────────
+// Mesma tabela genérica e a mesma margem pública (lib/quote-estimate.ts) já
+// usadas em app/pedir — nunca duplicadas aqui, só reutilizadas.
+
+function EstimateStep({ current, total, specialty, answers, onNext, onBack }: {
+  current: number
+  total: number
+  specialty: string
+  answers: Record<string, any>
+  onNext: () => void
+  onBack: () => void
+}) {
+  const { min, max: maxInterno } = estimatePriceRange(specialty, answers)
+  const maxPublico = Math.round(maxInterno * PUBLIC_ESTIMATE_MAX_MARGIN)
+
+  return (
+    <div>
+      <ProgressBar current={current} total={total} />
+      <h2 className="text-xl font-black text-white mb-1">A sua estimativa</h2>
+      <p className="text-sm text-gray-500 mb-6">Com base nas respostas que deu.</p>
+
+      <div className="rounded-2xl p-6 text-center mb-4"
+        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Intervalo estimado</div>
+        <div className="text-3xl font-black" style={{ color: '#818cf8' }}>
+          €{min} – €{maxPublico}
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-500 leading-relaxed mb-6">
+        Estimativa baseada nas informações fornecidas. O valor final poderá variar e será confirmado
+        pelo profissional após avaliar o trabalho.
+      </p>
+
+      <button onClick={onNext}
+        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white transition-all"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+        Continuar <ChevronRight size={18} />
       </button>
       <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
         <ChevronLeft size={15} /> Voltar

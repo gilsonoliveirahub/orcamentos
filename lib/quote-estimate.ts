@@ -6,6 +6,15 @@
 
 export type PriceEstimate = { min: number; max: number; descricao: string }
 
+// Margem adicional só na apresentação antecipada ao cliente (nunca gravada em
+// `quotes`, nunca vista pelo profissional) — reduz o risco de a proposta real
+// ultrapassar a expectativa criada aqui. Aprovada explicitamente: mínimo
+// público = mínimo interno; máximo público = máximo interno × 1.15. Partilhada
+// por qualquer fluxo que use estimatePriceRange para mostrar uma
+// pré-visualização ao cliente (app/pedir e o link pessoal para especialidades
+// que não têm preços próprios do profissional — ver ProfessionalProfileClient).
+export const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
+
 const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstimate> = {
   Pintura: (a) => {
     let area_paredes: number

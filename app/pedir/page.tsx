@@ -5,17 +5,11 @@ import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-re
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
-import { estimatePriceRange } from '@/lib/quote-estimate'
+import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN } from '@/lib/quote-estimate'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { GENERIC_ZONE_LABEL } from '@/lib/lead-completeness'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', GENERIC_ZONE_LABEL]
-
-// Margem adicional só na apresentação antecipada ao cliente (nunca gravada em
-// `quotes`, nunca vista pelo profissional) — reduz o risco de a proposta real
-// ultrapassar a expectativa criada aqui. Aprovada explicitamente: mínimo
-// público = mínimo interno; máximo público = máximo interno × 1.15.
-const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
 
 type Phase = 'profissao' | 'zona' | 'zona-detalhe' | 'perguntas' | 'estimativa' | 'media' | 'contacto' | 'enviado'
 
