@@ -182,7 +182,7 @@ export default function PedirPage() {
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
             {phase === 'profissao' && (
-              <p className="text-xs text-gray-500 mt-0.5">Escolha o tipo de trabalho — demora menos de 2 minutos</p>
+              <p className="text-xs text-gray-500 mt-0.5">Gratuito e sem compromisso — demora menos de 2 minutos</p>
             )}
             {phase === 'perguntas' && (
               <p className="text-xs text-gray-500 mt-0.5">{step}/{totalSteps}</p>
@@ -567,7 +567,7 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
   return (
     <div>
       <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
-      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a dar um orçamento mais preciso.</p>
+      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a dar um orçamento mais preciso, mas não substitui uma avaliação presencial quando for necessária.</p>
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           {mediaUrls.map((url: string) => (

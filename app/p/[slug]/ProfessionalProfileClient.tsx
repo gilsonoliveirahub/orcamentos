@@ -591,7 +591,7 @@ function MediaStep({
     <div>
       <ProgressBar current={current} total={total} />
       <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
-      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a preparar um orçamento mais preciso.</p>
+      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a preparar um orçamento mais preciso, mas não substitui uma avaliação presencial quando for necessária.</p>
 
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
