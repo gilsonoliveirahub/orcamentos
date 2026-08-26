@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailBoasVindas, emailNovaProfissao, emailNovoRegisto } from '@/lib/email'
 import { SPECIALTY_LIST } from '@/lib/professions'
+import { toFriendlyMessage } from '@/lib/friendly-error'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,10 @@ export async function POST(req: NextRequest) {
         password,
         email_confirm: true, // Conta ativa imediatamente, sem email do Supabase
       })
-      if (authError) return NextResponse.json({ error: authError.message }, { status: 400 })
+      if (authError) {
+        console.error('[api/auth/register] falha ao criar utilizador:', authError.message)
+        return NextResponse.json({ error: toFriendlyMessage(authError.message) }, { status: 400 })
+      }
       user_id = authData.user.id
     }
 
@@ -45,7 +49,10 @@ export async function POST(req: NextRequest) {
         trial_ends_at: trialEndsAt.toISOString(),
         active: true,
       })
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      if (error) {
+        console.error('[api/auth/register] falha ao criar profissional:', error.message)
+        return NextResponse.json({ error: toFriendlyMessage(error.message) }, { status: 400 })
+      }
 
       emailBoasVindas({ name, email, slug }).catch(() => {})
       emailNovoRegisto({ tipo: 'profissional', name, email, phone, specialty, slug }).catch(() => {})
@@ -67,12 +74,16 @@ export async function POST(req: NextRequest) {
         email,
         phone: phone || null,
       })
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      if (error) {
+        console.error('[api/auth/register] falha ao criar cliente:', error.message)
+        return NextResponse.json({ error: toFriendlyMessage(error.message) }, { status: 400 })
+      }
       emailNovoRegisto({ tipo: 'cliente', name, email, phone }).catch(() => {})
     }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[api/auth/register] erro inesperado:', err?.message ?? err)
+    return NextResponse.json({ error: toFriendlyMessage(err?.message) }, { status: 500 })
   }
 }
