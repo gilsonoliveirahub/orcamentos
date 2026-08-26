@@ -50,7 +50,11 @@ export default function MarketplacePage() {
   }, [router])
 
   async function handleAcquire(leadId: string) {
-    if (!professional || professional.plan === 'free') { router.push('/upgrade'); return }
+    // Lista de planos pagos (nunca a lista dos não-pagos) — 'inactive'
+    // (subscrição cancelada/pagamento falhado) não é 'free', mas também não
+    // é pago; um deny-list deixava passar esse caso até ao servidor rejeitar.
+    const isPaid = professional?.plan === 'starter' || professional?.plan === 'pro'
+    if (!isPaid) { router.push('/upgrade'); return }
     if ((professional.marketplace_credits ?? 0) < 1) { router.push('/creditos'); return }
 
     setAcquiring(leadId)
@@ -86,7 +90,7 @@ export default function MarketplacePage() {
     </div>
   )
 
-  const isFree = !professional || professional.plan === 'free'
+  const isFree = !professional || !(professional.plan === 'starter' || professional.plan === 'pro')
   const hasCredits = (professional?.marketplace_credits ?? 0) > 0
   // ?? true: coluna ainda por migrar/nunca definida conta como disponível.
   const isPaused = (professional?.accepting_leads ?? true) === false

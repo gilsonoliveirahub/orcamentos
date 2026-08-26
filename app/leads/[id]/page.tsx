@@ -51,7 +51,13 @@ export default function LeadDetail() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: prof } = await supabase.from('professionals').select('plan').eq('user_id', user.id).maybeSingle()
-      if (!prof || prof.plan === 'free' || !prof.plan) {
+      // Lista de planos pagos (nunca a lista dos não-pagos) — a mesma
+      // definição de "isPaid" já usada no dashboard. Um plano 'inactive'
+      // (subscrição cancelada/pagamento falhado) não é 'free', mas também
+      // não é pago; antes disto passava por esta verificação sem ser
+      // redirecionado, ao contrário do que já acontecia no dashboard.
+      const isPaid = prof?.plan === 'starter' || prof?.plan === 'pro'
+      if (!isPaid) {
         router.replace('/upgrade')
         return
       }
