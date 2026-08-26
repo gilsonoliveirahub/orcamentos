@@ -39,6 +39,15 @@ export const metadata: Metadata = {
   },
 };
 
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'FaçoPorTi',
+  url: 'https://façoporti.com',
+  description: 'Plataforma de gestão de leads e orçamentos para profissionais independentes em Portugal — pintores, eletricistas, canalizadores e outras especialidades.',
+  areaServed: { '@type': 'Country', name: 'Portugal' },
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -50,6 +59,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }} />
         {children}
         <CookieBanner />
         <PWAInstall />
