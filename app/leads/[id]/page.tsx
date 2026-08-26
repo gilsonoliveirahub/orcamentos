@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
 import { computeLeadCompleteness } from '@/lib/lead-completeness'
+import { summarizeMedia } from '@/lib/media-summary'
 
 // Legacy paint fields
 const PAINT_LABELS: Record<string, string> = {
@@ -210,6 +211,7 @@ export default function LeadDetail() {
   // nunca IA, só para o profissional ver de relance o que este pedido já tem
   // de sólido antes de decidir avançar.
   const completeness = computeLeadCompleteness(lead)
+  const mediaSummary = summarizeMedia(mediaUrls)
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -313,9 +315,16 @@ export default function LeadDetail() {
         {/* Fotos e vídeos enviados pelo cliente */}
         {mediaUrls.length > 0 && (
           <div className="rounded-2xl p-5" style={cardStyle}>
-            <h2 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">
-              <ImageIcon size={15} /> Fotos e vídeos do cliente ({mediaUrls.length})
+            <h2 className="text-sm font-bold text-gray-400 mb-1 flex items-center gap-2">
+              <ImageIcon size={15} />
+              Fotos e vídeos do cliente
+              {' — '}
+              {[
+                mediaSummary.photoCount > 0 ? `${mediaSummary.photoCount} foto${mediaSummary.photoCount === 1 ? '' : 's'}` : null,
+                mediaSummary.videoCount > 0 ? `${mediaSummary.videoCount} vídeo${mediaSummary.videoCount === 1 ? '' : 's'}` : null,
+              ].filter(Boolean).join(', ')}
             </h2>
+            <p className="text-xs text-gray-600 mb-4">Contagem automática — a avaliação do que está nas imagens continua a ser sua.</p>
             <div className="grid grid-cols-3 gap-2">
               {mediaUrls.map((url, idx) => (
                 <button key={url} onClick={() => setLightboxIndex(idx)}
