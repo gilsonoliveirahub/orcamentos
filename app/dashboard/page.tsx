@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart, GripVertical } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
 import ClosedValueModal from '@/components/ClosedValueModal'
@@ -30,8 +30,7 @@ const COLUMNS = [
   { id: 'perdido',     label: 'Perdido',     color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
 
-function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhausted }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; isPaid: boolean; personalQuotaExhausted?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id })
+function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, personalQuotaExhausted }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; onStatusChange: (leadId: string, status: string) => void; isPaid: boolean; personalQuotaExhausted?: boolean }) {
   const router = useRouter()
   const isPlanLocked = !isPaid
   const isMarketplaceLocked = !isPlanLocked && lead.locked && lead.source === 'marketplace'
@@ -41,6 +40,9 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhaust
   // visual antecipada).
   const isQuotaLocked = !isPlanLocked && lead.source !== 'marketplace' && !lead.opened_at && !!personalQuotaExhausted
   const isLocked = isPlanLocked || isMarketplaceLocked || isQuotaLocked
+  // Um lead bloqueado não deve poder ser arrastado — nunca fazia sentido
+  // mudar de estado algo que ainda nem se consegue ver.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id, disabled: isLocked })
 
   const style = transform
     ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 999, opacity: 0.9 }
@@ -55,8 +57,6 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhaust
         border: isLocked ? '1px solid rgba(248,113,113,0.2)' : '1px solid rgba(255,255,255,0.07)',
         boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
       }}
-      {...attributes}
-      {...listeners}
       onClick={isLocked ? undefined : onClick}
       className={`group relative rounded-2xl p-4 transition-all select-none ${
         isDragging ? 'shadow-2xl scale-105' : isLocked ? 'cursor-default' : 'cursor-pointer hover:translate-y-[-2px] hover:shadow-xl'
@@ -91,7 +91,25 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhaust
             </div>
           </div>
         </div>
-        {!isLocked && <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 transition-colors" />}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Handle de arrastar — só no desktop. Isolar aqui (em vez do
+              cartão inteiro) evita que arrastar um dedo para fazer scroll
+              horizontal no telemóvel seja interpretado como início de drag;
+              em telemóvel a mudança de estado passa pelo select abaixo. */}
+          {!isLocked && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              onClick={e => e.stopPropagation()}
+              aria-label="Arrastar para mudar estado"
+              className="hidden md:flex items-center justify-center w-6 h-6 rounded-lg text-gray-600 hover:text-gray-300 transition-colors cursor-grab active:cursor-grabbing"
+            >
+              <GripVertical size={14} />
+            </button>
+          )}
+          {!isLocked && <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 transition-colors" />}
+        </div>
       </div>
 
       {/* Tags */}
@@ -185,11 +203,28 @@ function LeadCard({ lead, quote, onClick, onUnlock, isPaid, personalQuotaExhaust
           </>
         )}
       </div>
+
+      {/* Controlo explícito de estado — só no telemóvel. Não obriga a
+          arrastar; usa exatamente a mesma função de mudança de estado do
+          drag-and-drop (ver changeLeadStatus em Dashboard), nunca duplicada. */}
+      {!isLocked && (
+        <select
+          value={lead.status}
+          onClick={e => e.stopPropagation()}
+          onChange={e => { e.stopPropagation(); onStatusChange(lead.id, e.target.value) }}
+          className="md:hidden w-full mt-3 text-xs font-semibold rounded-xl px-3 py-2"
+          style={{ background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          {COLUMNS.map(c => (
+            <option key={c.id} value={c.id} style={{ background: '#13152a' }}>{c.label}</option>
+          ))}
+        </select>
+      )}
     </div>
   )
 }
 
-function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, isPaid, personalQuotaExhausted }: any) {
+function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, onStatusChange, isPaid, personalQuotaExhausted }: any) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const colLeads = leads.filter((l: any) => l.status === id)
 
@@ -224,6 +259,7 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, is
             quote={quotes.find((q: any) => q.lead_id === lead.id)}
             onClick={() => onCardClick(lead.id)}
             onUnlock={() => onUnlock(lead.id)}
+            onStatusChange={onStatusChange}
             isPaid={isPaid}
             personalQuotaExhausted={personalQuotaExhausted}
           />
@@ -459,16 +495,16 @@ export default function Dashboard() {
     }
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over) return
-    const leadId = active.id as string
-    const newStatus = over.id as string
+  // Única função de mudança de estado — usada tanto pelo drag-and-drop
+  // (desktop) como pelo select explícito (telemóvel), para nunca duplicar
+  // esta lógica em dois sítios.
+  async function changeLeadStatus(leadId: string, newStatus: string) {
     if (!COLUMNS.find(c => c.id === newStatus)) return
+    const previousStatus = leads.find(l => l.id === leadId)?.status
+    if (previousStatus === newStatus) return
     // "Fechado" exige decidir o valor final primeiro — não move o card nem
     // chama a API já; só depois de confirmado no modal (ver handleConfirmClose).
     if (newStatus === 'fechado') { setClosingLeadId(leadId); return }
-    const previousStatus = leads.find(l => l.id === leadId)?.status
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l))
     setActionError('')
     const res = await fetch('/api/leads/status', {
@@ -483,6 +519,12 @@ export default function Dashboard() {
       setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: previousStatus } : l))
       setActionError('Não foi possível mover o pedido. Tente novamente.')
     }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over) return
+    await changeLeadStatus(active.id as string, over.id as string)
   }
 
   async function handleConfirmClose(valor: number | null) {
@@ -811,6 +853,7 @@ export default function Dashboard() {
                 <Column key={col.id} {...col} leads={leads} quotes={quotes}
                   onCardClick={(id: string) => router.push(`/leads/${id}`)}
                   onUnlock={handleUnlock}
+                  onStatusChange={changeLeadStatus}
                   isPaid={professional?.plan === 'starter' || professional?.plan === 'pro'}
                   personalQuotaExhausted={personalQuotaExhausted} />
               ))}
