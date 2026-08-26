@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck, Timer } from 'lucide-react'
+import { ArrowLeft, TrendingUp, Users, Euro, CheckCircle, Clock, Target, Zap, Eye, MousePointerClick, MessageCircle, ShieldCheck, Timer, FileText, Trophy } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
 import { computeReliabilityScore } from '@/lib/reliability'
-import { computeAvgResponseHours } from '@/lib/conversion'
+import { computeAvgResponseHours, computeConversionRate } from '@/lib/conversion'
+import { computeProposalRate } from '@/lib/lead-funnel'
+import { groupPerformance } from '@/lib/lead-performance'
 
 type FunnelData = {
   totals: { page_view: number; quote_cta_click: number; request_started: number; request_completed: number; whatsapp_click: number; email_click: number }
@@ -76,6 +78,21 @@ export default function StatsPage() {
   // opened_at); leads do marketplace autorizam por aquisição, não por
   // abertura, por isso nunca entram nesta média.
   const avgResponseHours = computeAvgResponseHours(leads)
+
+  // Lead → Proposta: não há histórico de transições de estado gravado, por
+  // isso usa-se o artefacto real (existe uma linha em `quotes`) em vez de
+  // tentar adivinhar pelo estado atual.
+  const proposalStats = computeProposalRate(leads, quotes)
+
+  // Fechado vs. Perdido — só entre os já decididos (nunca conta os ainda em
+  // aberto). Distinto da CONVERSÃO acima, que divide pelo total de leads.
+  const winRate = computeConversionRate(leads)
+  const winRateDecided = fechados.length + perdidos.length
+
+  // Desempenho por especialidade/origem — só mostra grupos com amostra
+  // mínima (lib/lead-performance.ts), nunca finge precisão com 1 ou 2 leads.
+  const performanceByType = groupPerformance(leads, l => l.metadata?.tipo_trabalho || l.q1_tipo_trabalho || 'Outro')
+  const performanceByOrigin = groupPerformance(leads, l => l.source === 'marketplace' ? 'Marketplace' : 'Link pessoal')
 
   // Tempo médio para fechar (dias)
   const tempoMedio = fechados.length > 0
@@ -164,6 +181,20 @@ export default function StatsPage() {
               sub: 'tempo médio até abrir o pedido',
               color: '#38bdf8',
             }] : []),
+            ...(proposalStats.rate !== null ? [{
+              icon: <FileText size={15} className="text-violet-400" />,
+              label: 'PROPOSTA',
+              value: `${Math.round(proposalStats.rate * 100)}%`,
+              sub: `${proposalStats.withQuote} de ${proposalStats.total} chegaram a orçamento`,
+              color: '#a78bfa',
+            }] : []),
+            ...(winRateDecided > 0 ? [{
+              icon: <Trophy size={15} className="text-yellow-400" />,
+              label: 'TAXA DE VITÓRIA',
+              value: `${Math.round(winRate * 100)}%`,
+              sub: `${fechados.length} ganhos, ${perdidos.length} perdidos`,
+              color: '#facc15',
+            }] : []),
           ].map((k, i) => (
             <div key={i} className="rounded-2xl p-4" style={kpiStyle}>
               <div className="flex items-center gap-2 mb-2">
@@ -237,6 +268,24 @@ export default function StatsPage() {
           </div>
         )}
 
+        {/* Desempenho por especialidade — só especialidades com amostra
+            mínima (lib/lead-performance.ts); distinto de "Top Serviços"
+            acima, que é só popularidade, não desempenho. */}
+        {performanceByType.length > 0 && (
+          <div className="rounded-2xl p-5" style={kpiStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-4">Desempenho por Especialidade</h2>
+            <PerformanceTable rows={performanceByType} />
+          </div>
+        )}
+
+        {/* Desempenho por origem (link pessoal vs. marketplace) */}
+        {performanceByOrigin.length > 0 && (
+          <div className="rounded-2xl p-5" style={kpiStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-4">Desempenho por Origem</h2>
+            <PerformanceTable rows={performanceByOrigin} />
+          </div>
+        )}
+
         {/* Funil de visitas e cliques do link pessoal */}
         {!funnelLoading && funnel && (
           <div className="rounded-2xl p-5" style={kpiStyle}>
@@ -268,6 +317,23 @@ export default function StatsPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function PerformanceTable({ rows }: { rows: { label: string; total: number; fechados: number; conversionRate: number; faturacaoReal: number }[] }) {
+  return (
+    <div className="space-y-3">
+      {rows.map(r => (
+        <div key={r.label} className="flex items-center gap-3">
+          <span className="text-sm text-gray-300 flex-1 capitalize truncate">{r.label}</span>
+          <span className="text-xs text-gray-500 w-16 text-right">{r.total} leads</span>
+          <span className="text-xs font-bold w-12 text-right" style={{ color: r.conversionRate >= 0.5 ? '#34d399' : '#9ca3af' }}>
+            {Math.round(r.conversionRate * 100)}%
+          </span>
+          <span className="text-sm font-black text-white w-16 text-right">€{Math.round(r.faturacaoReal)}</span>
+        </div>
+      ))}
     </div>
   )
 }
