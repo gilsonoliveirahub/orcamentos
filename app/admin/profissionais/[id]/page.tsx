@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -8,6 +8,7 @@ import {
   ExternalLink, TrendingUp, Euro, Clock, ShieldCheck, History,
 } from 'lucide-react'
 import { ADMIN_PLAN_LABELS, type AdminPlanLabel } from '@/lib/admin-plan-label'
+import { Section, Field, Stat, fmtDate } from '@/components/admin/AdminFicha'
 
 type Ficha = {
   professional: {
@@ -34,40 +35,7 @@ type Ficha = {
 
 type FieldChange = { before: unknown; after: unknown }
 
-const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }
 const PLAN_BADGE_COLOR: Record<AdminPlanLabel, string> = { free: '#64748b', trial: '#fbbf24', starter: '#60a5fa', pro: '#34d399', inactive: '#f87171' }
-
-function fmtDate(iso: string | null) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function Stat({ label, value, color = '#818cf8' }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div>
-      <div className="text-xl font-black" style={{ color }}>{value}</div>
-      <div className="text-xs text-gray-500">{label}</div>
-    </div>
-  )
-}
-
-function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
-  return (
-    <div className="rounded-2xl p-5" style={cardStyle}>
-      <h2 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">{icon} {title}</h2>
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-sm text-white font-semibold break-words">{value ?? '—'}</div>
-    </div>
-  )
-}
 
 export default function AdminProfissionalFichaPage() {
   const { id } = useParams<{ id: string }>()
