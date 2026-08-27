@@ -24,9 +24,10 @@ describe('GET /api/admin/search', () => {
           if (table === 'professionals') return { select: () => ({ or: () => ({ limit: async () => ({ data: professionals, error: null }) }) }) }
           if (table === 'leads') {
             orCallCount += 1
-            const isDirectQuery = orCallCount > 1 // 2ª chamada a 'leads' é a de resultados diretos, com order+limit
-            if (isDirectQuery) return { select: () => ({ or: () => ({ order: () => ({ limit: async () => ({ data: leadsDirect, error: null }) }) }) }) }
-            return { select: () => ({ or: async () => ({ data: leadsForClients, error: null }) }) }
+            // 1ª chamada a 'leads' agrupa por cliente (limite mais alto);
+            // 2ª é a de resultados diretos — ambas .or().order().limit() hoje.
+            const data = orCallCount === 1 ? leadsForClients : leadsDirect
+            return { select: () => ({ or: () => ({ order: () => ({ limit: async () => ({ data, error: null }) }) }) }) }
           }
           throw new Error(`tabela inesperada: ${table}`)
         },

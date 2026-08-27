@@ -9,7 +9,7 @@ import AdminNav from '@/components/admin/AdminNav'
 
 type Overview = {
   professionals: { total: number; byPlan: Record<AdminPlanLabel, number> }
-  business: { totalLeads: number; leadsHoje: number; novos: number; emCurso: number; propostas: number; fechados: number; perdidos: number; taxaFecho: number }
+  business: { totalLeads: number; leadsHoje: number; novos: number; emCurso: number; propostas: number; fechados: number; perdidos: number; taxaFecho: number | null }
   value: { valorFechadoReal: number; ticketMedio: number; comValorCount: number }
   alerts: { trialsEndingSoon: Array<{ id: string; name: string; trial_ends_at: string }>; abandonedLeadsCount: number }
   calibration: {
@@ -125,7 +125,7 @@ export default function AdminPage() {
             <Kpi icon={<FileText size={18} />} value={business.propostas} label="Propostas" color="#c084fc" onClick={() => router.push('/admin/leads?status=proposta')} />
             <Kpi icon={<FileText size={18} />} value={business.fechados} label="Fechados" color="#34d399" onClick={() => router.push('/admin/leads?status=fechado')} />
             <Kpi icon={<FileText size={18} />} value={business.perdidos} label="Perdidos" color="#f87171" onClick={() => router.push('/admin/leads?status=perdido')} />
-            <Kpi icon={<FileText size={18} />} value={`${Math.round(business.taxaFecho * 100)}%`} label="Taxa de fecho" color="#fbbf24" />
+            <Kpi icon={<FileText size={18} />} value={business.taxaFecho === null ? '—' : `${Math.round(business.taxaFecho * 100)}%`} label="Taxa de fecho" color="#fbbf24" />
           </div>
         </div>
 

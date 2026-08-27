@@ -72,4 +72,30 @@ describe('GET /api/admin/overview', () => {
     expect(json.recentLeads).toHaveLength(5)
     expect(json.recentLeads[0].professional_name).toBe('Ana')
   })
+
+  it('taxa de fecho: null quando não há nenhum lead fechado nem perdido ainda (nunca "100%" por omissão)', async () => {
+    const leadsSemDecisao = [
+      { id: 'l1', name: 'C1', status: 'novo', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Lisboa', valor_fechado: null, created_at: now.toISOString(), opened_at: null, professional_id: 'p1', professionals: { name: 'Ana' } },
+      { id: 'l2', name: 'C2', status: 'visita', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Lisboa', valor_fechado: null, created_at: now.toISOString(), opened_at: null, professional_id: 'p1', professionals: { name: 'Ana' } },
+    ]
+    vi.doMock('@/lib/admin-auth', () => ({ getAuthenticatedAdmin: async () => ({ id: 'admin-1' }) }))
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: async () => ({ data: professionals, error: null }) }
+          if (table === 'leads') return { select: () => ({ order: async () => ({ data: leadsSemDecisao, error: null }) }) }
+          if (table === 'quotes') return { select: async () => ({ data: [], error: null }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+
+    const { GET } = await import('./route')
+    const res = await GET()
+    const json = await res.json()
+
+    expect(json.business.fechados).toBe(0)
+    expect(json.business.perdidos).toBe(0)
+    expect(json.business.taxaFecho).toBeNull()
+  })
 })

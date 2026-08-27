@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getAuthenticatedAdmin } from '@/lib/admin-auth'
 import { getAdminPlanLabel, isTrialEndingSoon, ADMIN_PLAN_LABELS, type AdminPlanLabel } from '@/lib/admin-plan-label'
-import { computeConversionRate } from '@/lib/conversion'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
 import { isAbandonedLead } from '@/lib/reliability'
 import { buildCalibrationSamples, summarizeCalibration, summarizeCalibrationBySpecialty } from '@/lib/estimate-calibration'
@@ -56,6 +55,16 @@ export async function GET() {
 
   const faturacao = calcFaturacaoReal(fechados)
 
+  // Nunca usar computeConversionRate (lib/conversion.ts) aqui: o "neutro=1"
+  // dela existe para não penalizar um profissional individual sem
+  // histórico (ranking), mas aplicado a este KPI agregado de negócio
+  // mostraria "100% de taxa de fecho" com ZERO leads decididos — o
+  // oposto do que "sem amostra" deve comunicar. null quando ainda não há
+  // nenhum fechado nem perdido; a UI mostra "—" em vez de inventar uma
+  // percentagem.
+  const decided = fechados.length + perdidos.length
+  const taxaFecho = decided === 0 ? null : fechados.length / decided
+
   const trialsEndingSoon = profs
     .filter(p => isTrialEndingSoon({ plan: p.plan as string | null, trial_ends_at: p.trial_ends_at as string | null }, now))
     .map(p => ({ id: p.id, name: p.name, trial_ends_at: p.trial_ends_at }))
@@ -76,7 +85,7 @@ export async function GET() {
       propostas: propostas.length,
       fechados: fechados.length,
       perdidos: perdidos.length,
-      taxaFecho: computeConversionRate(allLeads),
+      taxaFecho,
     },
     value: {
       valorFechadoReal: faturacao.faturacaoReal,

@@ -28,8 +28,13 @@ export async function GET(req: NextRequest) {
     supabaseAdmin.from('professionals').select('id, name, email, slug')
       .or(`name.ilike.${pattern},email.ilike.${pattern}`)
       .limit(RESULT_LIMIT),
+    // Limite mais alto que RESULT_LIMIT porque vários leads podem pertencer
+    // ao mesmo cliente (telefone) — o corte a 5 clientes finais acontece
+    // depois de agrupar, nunca antes.
     supabaseAdmin.from('leads').select('id, phone, name, email, status, source, valor_fechado, created_at, professional_id, professionals(name)')
-      .or(`name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`),
+      .or(`name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
+      .order('created_at', { ascending: false })
+      .limit(50),
     supabaseAdmin.from('leads').select('id, name, phone, status, created_at')
       .or(`name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
       .order('created_at', { ascending: false })
