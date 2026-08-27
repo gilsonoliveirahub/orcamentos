@@ -1,20 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Search, MapPin, Loader2, ArrowLeft } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, MapPin, Loader2, ArrowLeft, LocateFixed } from 'lucide-react'
 import Link from 'next/link'
 import { PROFESSIONS, SPECIALTY_LIST } from '@/lib/professions'
-import { sortProfessionalsForRanking } from '@/lib/professional-ranking'
+import { sortProfessionalsForRanking, type DistancesById, type ReliabilityScoresById } from '@/lib/professional-ranking'
+import { professionalSpecialties } from '@/lib/professional-specialties'
+import { geocodeZone, computeDistanceKm, formatDistanceKm, type Coordinates } from '@/lib/geo'
 import ProfessionalCard from '@/components/ProfessionalCard'
 
 const ZONAS = ['Todas as zonas', 'Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora']
 
+type GeoStatus = 'idle' | 'locating' | 'granted' | 'denied' | 'unavailable'
+
 export default function ProfissionaisPage() {
   const [professionals, setProfessionals] = useState<any[]>([])
+  const [scores, setScores] = useState<ReliabilityScoresById>({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterSpec, setFilterSpec] = useState('Todos')
   const [filterZona, setFilterZona] = useState('Todas as zonas')
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle')
+  const [myCoords, setMyCoords] = useState<Coordinates | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -28,19 +35,51 @@ export default function ProfissionaisPage() {
       // nunca bloqueia a página.
       fetch('/api/professionals/reliability').then(r => r.ok ? r.json() : { scores: {} }).catch(() => ({ scores: {} })),
     ]).then(([{ professionals }, { scores }]) => {
-      const all = professionals || []
-      const sorted = sortProfessionalsForRanking(all, scores || {})
-      setProfessionals(all.length > 20 ? sorted.slice(0, 20) : sorted)
+      setProfessionals(professionals || [])
+      setScores(scores || {})
       setLoading(false)
     })
   }, [])
 
-  const filtered = professionals.filter(p => {
+  // "Perto de mim" — pede geolocalização do browser (normal, com fallback
+  // total quando negada/indisponível: os filtros de zona/pesquisa já
+  // existentes continuam a funcionar sozinhos). Nunca guarda a localização
+  // em lado nenhum — só em estado do componente, só para ordenar esta
+  // visita. Coordenadas dos profissionais nunca são exatas: continuam a
+  // vir só da zona (texto), geocodificada aproximadamente (lib/geo.ts),
+  // exatamente como já acontece no marketplace interno.
+  function handleFindNearMe() {
+    if (!('geolocation' in navigator)) { setGeoStatus('unavailable'); return }
+    setGeoStatus('locating')
+    navigator.geolocation.getCurrentPosition(
+      pos => { setMyCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGeoStatus('granted') },
+      () => setGeoStatus('denied'),
+      { timeout: 8000, maximumAge: 300000 }
+    )
+  }
+
+  const distances: DistancesById | undefined = useMemo(() => {
+    if (!myCoords) return undefined
+    const map: DistancesById = {}
+    for (const p of professionals) {
+      map[p.id] = computeDistanceKm(myCoords, geocodeZone(p.zone))
+    }
+    return map
+  }, [myCoords, professionals])
+
+  const ranked = useMemo(
+    () => sortProfessionalsForRanking(professionals, scores, distances),
+    [professionals, scores, distances]
+  )
+  const visible = ranked.length > 20 && !myCoords ? ranked.slice(0, 20) : ranked
+
+  const filtered = visible.filter(p => {
+    const specs = professionalSpecialties(p)
     const matchSearch = !search ||
       p.name?.toLowerCase().includes(search.toLowerCase()) ||
       p.zone?.toLowerCase().includes(search.toLowerCase()) ||
-      p.specialty?.toLowerCase().includes(search.toLowerCase())
-    const matchSpec = filterSpec === 'Todos' || p.specialty === filterSpec
+      specs.some(s => s.toLowerCase().includes(search.toLowerCase()))
+    const matchSpec = filterSpec === 'Todos' || specs.includes(filterSpec)
     const matchZona = filterZona === 'Todas as zonas' || p.zone?.toLowerCase().includes(filterZona.toLowerCase())
     return matchSearch && matchSpec && matchZona
   })
@@ -65,17 +104,36 @@ export default function ProfissionaisPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-6">
 
-        {/* Pesquisa */}
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Pesquisar por nome, zona ou serviço..."
-            className="w-full rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-          />
+        {/* Pesquisa + perto de mim */}
+        <div className="flex gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Pesquisar por nome, zona ou serviço..."
+              className="w-full rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+            />
+          </div>
+          <button
+            onClick={handleFindNearMe}
+            disabled={geoStatus === 'locating'}
+            title="Ordenar por profissionais mais próximos de ti"
+            className="flex-shrink-0 flex items-center gap-1.5 px-4 rounded-2xl text-sm font-semibold transition-all"
+            style={myCoords
+              ? { background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }
+              : { background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            {geoStatus === 'locating' ? <Loader2 size={15} className="animate-spin" /> : <LocateFixed size={15} />}
+            <span className="hidden sm:inline">{myCoords ? 'Perto de mim' : 'Perto de mim'}</span>
+          </button>
         </div>
+        {(geoStatus === 'denied' || geoStatus === 'unavailable') && (
+          <p className="text-xs text-gray-500 -mt-2 mb-4">
+            Não foi possível usar a tua localização — usa os filtros de zona abaixo.
+          </p>
+        )}
 
         {/* Grid de profissões */}
         <div className="grid grid-cols-5 sm:grid-cols-9 gap-2 mb-4">
@@ -142,7 +200,7 @@ export default function ProfissionaisPage() {
         ) : (
           <div className="grid gap-4">
             {filtered.map(prof => (
-              <ProfessionalCard key={prof.id} prof={prof} />
+              <ProfessionalCard key={prof.id} prof={prof} distanceLabel={distances?.[prof.id] != null ? formatDistanceKm(distances[prof.id] as number) : undefined} />
             ))}
           </div>
         )}

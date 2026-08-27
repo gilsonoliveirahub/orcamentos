@@ -6,7 +6,11 @@ import { PROFESSIONS } from '@/lib/professions'
 // reutilizável também pelas páginas de especialidade
 // (app/profissionais/[especialidade]/page.tsx) — mesma apresentação, sem
 // nenhuma alteração de lógica.
-export default function ProfessionalCard({ prof }: { prof: any }) {
+// distanceLabel: rótulo aproximado já formatado (ex: "aproximadamente 5
+// km", ver lib/geo.ts formatDistanceKm) — nunca coordenadas nem distância
+// exata. Opcional: só definido quando a página tem localização do cliente
+// (ver app/profissionais/page.tsx, "Perto de mim").
+export default function ProfessionalCard({ prof, distanceLabel }: { prof: any; distanceLabel?: string }) {
   const emoji = PROFESSIONS[prof.specialty]?.emoji || '🔧'
   const reviews: any[] = prof.reviews || []
   const portfolio: any[] = prof.professional_portfolio || []
@@ -67,6 +71,11 @@ export default function ProfessionalCard({ prof }: { prof: any }) {
               {prof.zone && (
                 <span className="flex items-center gap-1 text-xs text-gray-400">
                   <MapPin size={10} /> {prof.zone}
+                </span>
+              )}
+              {distanceLabel && (
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#34d399' }}>
+                  <MapPin size={10} /> {distanceLabel}
                 </span>
               )}
             </div>
