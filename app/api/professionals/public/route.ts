@@ -20,7 +20,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 // sortProfessionalsForRanking — não são segredos como os campos acima,
 // só a lista deixa de incluir tudo o resto. Nenhuma regra de negócio,
 // RLS ou dado real foi alterado.
-const PUBLIC_SELECT = 'id, name, slug, specialty, specialties, zone, description, bio, avatar_url, plan, created_at, accepting_leads, reviews(rating), professional_portfolio(id, url, type)'
+//
+// NOTA (corrigido 2026-08-27): a coluna `bio` chegou a existir no
+// schema.sql do repositório mas NÃO existe na tabela real em produção
+// (renomeada para `description` nalgum momento sem atualizar o ficheiro
+// local) — incluí-la aqui partia esta rota com um 500 em produção.
+// Confirmado via leitura direta (information_schema.columns) antes desta
+// correção.
+const PUBLIC_SELECT = 'id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, reviews(rating), professional_portfolio(id, url, type)'
 
 export async function GET() {
   try {

@@ -9,7 +9,7 @@ describe('GET /api/professionals/public', () => {
     let filteredActive: unknown
     const row = {
       id: 'prof-1', name: 'Ana Pintora', slug: 'ana-pintora-123', specialty: 'Pintura',
-      specialties: ['Pintura'], zone: 'Lisboa', description: 'Pinto tudo', bio: null,
+      specialties: ['Pintura'], zone: 'Lisboa', description: 'Pinto tudo',
       avatar_url: null, plan: 'pro', created_at: '2026-01-01T00:00:00Z', accepting_leads: true,
       reviews: [{ rating: 5 }], professional_portfolio: [],
     }
