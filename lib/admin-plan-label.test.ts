@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAdminPlanLabel } from './admin-plan-label'
+import { getAdminPlanLabel, isTrialEndingSoon } from './admin-plan-label'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -23,5 +23,22 @@ describe('getAdminPlanLabel', () => {
     expect(getAdminPlanLabel({ plan: 'free', trial_ends_at: expired }, now)).toBe('free')
     expect(getAdminPlanLabel({ plan: 'free', trial_ends_at: null }, now)).toBe('free')
     expect(getAdminPlanLabel({ plan: null, trial_ends_at: undefined }, now)).toBe('free')
+  })
+})
+
+describe('isTrialEndingSoon', () => {
+  const now = new Date('2026-08-27T12:00:00Z')
+
+  it('trial com menos de 7 dias pela frente: true', () => {
+    expect(isTrialEndingSoon({ plan: 'free', trial_ends_at: new Date(now.getTime() + 2 * DAY).toISOString() }, now)).toBe(true)
+  })
+
+  it('trial com mais de 7 dias pela frente: false', () => {
+    expect(isTrialEndingSoon({ plan: 'free', trial_ends_at: new Date(now.getTime() + 10 * DAY).toISOString() }, now)).toBe(false)
+  })
+
+  it('não está em trial (starter/pro/free sem trial): sempre false', () => {
+    expect(isTrialEndingSoon({ plan: 'starter', trial_ends_at: null }, now)).toBe(false)
+    expect(isTrialEndingSoon({ plan: 'free', trial_ends_at: null }, now)).toBe(false)
   })
 })

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, LogOut, Loader2, Search, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import AdminNav from '@/components/admin/AdminNav'
 import { ADMIN_PLAN_LABELS, type AdminPlanLabel } from '@/lib/admin-plan-label'
@@ -33,16 +33,18 @@ const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0
 
 export default function AdminProfissionaisPage() {
   const router = useRouter()
+  const searchParamsInit = useSearchParams()
   const [checking, setChecking] = useState(true)
   const [loading, setLoading] = useState(true)
   const [professionals, setProfessionals] = useState<ProfessionalRow[]>([])
   const [error, setError] = useState('')
 
   const [q, setQ] = useState('')
-  const [plan, setPlan] = useState('')
+  const [plan, setPlan] = useState(searchParamsInit.get('plan') || '')
   const [active, setActive] = useState('')
   const [specialty, setSpecialty] = useState('')
   const [zone, setZone] = useState('')
+  const [expiringSoon, setExpiringSoon] = useState(searchParamsInit.get('expiring_soon') === 'true')
   const [, startTransition] = useTransition()
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export default function AdminProfissionaisPage() {
     if (active) params.set('active', active)
     if (specialty) params.set('specialty', specialty)
     if (zone) params.set('zone', zone)
+    if (expiringSoon) params.set('expiring_soon', 'true')
 
     fetch(`/api/admin/professionals?${params.toString()}`)
       .then(async res => {
@@ -75,7 +78,7 @@ export default function AdminProfissionaisPage() {
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Falha ao carregar profissionais'))
       .finally(() => setLoading(false))
-  }, [checking, q, plan, active, specialty, zone])
+  }, [checking, q, plan, active, specialty, zone, expiringSoon])
 
   async function toggleActive(id: string, current: boolean) {
     const res = await fetch(`/api/admin/professionals/${id}`, {
@@ -163,6 +166,9 @@ export default function AdminProfissionaisPage() {
             <input value={zone} onChange={e => setZone(e.target.value)} placeholder="Ex: Lisboa"
               className="bg-transparent border rounded-lg px-2 py-1.5 text-sm text-white w-28" style={{ borderColor: 'rgba(255,255,255,0.1)' }} />
           </div>
+          <label className="flex items-center gap-2 text-xs text-gray-400 pb-1.5">
+            <input type="checkbox" checked={expiringSoon} onChange={e => setExpiringSoon(e.target.checked)} /> Só trials a terminar em breve
+          </label>
         </div>
 
         {error && (

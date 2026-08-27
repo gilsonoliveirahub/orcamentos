@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getAuthenticatedAdmin } from '@/lib/admin-auth'
-import { getAdminPlanLabel, type AdminPlanLabel } from '@/lib/admin-plan-label'
+import { getAdminPlanLabel, isTrialEndingSoon, type AdminPlanLabel } from '@/lib/admin-plan-label'
 import { countActiveLeads } from '@/lib/capacity'
 
 const LIST_FIELDS = 'id, name, email, phone, specialty, specialties, zone, active, slug, plan, trial_ends_at, created_at'
@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
   const activeFilter = searchParams.get('active') // 'true' | 'false' | null (=todos)
   const specialtyFilter = searchParams.get('specialty') || ''
   const zoneFilter = (searchParams.get('zone') || '').trim().toLowerCase()
+  const expiringSoon = searchParams.get('expiring_soon') === 'true'
   const sort = (searchParams.get('sort') as SortKey) || 'name'
 
   const { data: professionals, error } = await supabaseAdmin
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
     })
   }
   if (zoneFilter) rows = rows.filter(p => (p.zone as string | null)?.toLowerCase().includes(zoneFilter))
+  if (expiringSoon) rows = rows.filter(p => isTrialEndingSoon({ plan: p.plan as string | null, trial_ends_at: p.trial_ends_at as string | null }, now))
 
   rows.sort((a, b) => {
     if (sort === 'created_at') return new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime()

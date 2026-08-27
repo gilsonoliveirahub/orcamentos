@@ -22,6 +22,18 @@ export function getAdminPlanLabel(prof: AdminPlanInput, now: Date = new Date()):
   return 'free'
 }
 
+// Janela usada só pelo alerta "trials a terminar" da Visão Geral — não é
+// uma regra de negócio (o trial em si continua a durar 7 dias, decidido em
+// api/auth/register), só a distância à qual o admin passa a querer ver o
+// aviso.
+export const TRIAL_ENDING_SOON_DAYS = 7
+
+export function isTrialEndingSoon(prof: AdminPlanInput, now: Date = new Date()): boolean {
+  if (getAdminPlanLabel(prof, now) !== 'trial') return false
+  const msRemaining = new Date(prof.trial_ends_at as string).getTime() - now.getTime()
+  return msRemaining <= TRIAL_ENDING_SOON_DAYS * 24 * 60 * 60 * 1000
+}
+
 export const ADMIN_PLAN_LABELS: Record<AdminPlanLabel, string> = {
   free: 'Free',
   trial: 'Trial',
