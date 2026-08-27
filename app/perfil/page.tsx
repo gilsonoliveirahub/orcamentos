@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
+import { computeProfileCompleteness } from '@/lib/profile-completeness'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 
@@ -159,6 +160,17 @@ export default function PerfilPage() {
   const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free
   const photoCount = portfolio.filter(i => i.type !== 'video').length
   const videoCount = portfolio.filter(i => i.type === 'video').length
+
+  // Só informativo — nunca afeta ranking nem visibilidade, só ajuda o
+  // profissional a perceber o que falta para um perfil mais forte.
+  const completeness = professional ? computeProfileCompleteness({
+    description: form.description,
+    avatar_url: professional.avatar_url,
+    zone: form.zone,
+    phone: form.phone,
+    portfolioCount: portfolio.length,
+    reviewsCount: reviews.length,
+  }) : null
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
@@ -337,6 +349,27 @@ export default function PerfilPage() {
             </div>
           </div>
         </div>
+
+        {/* Completude do perfil — só informativo, nunca afeta ranking */}
+        {completeness && completeness.percent < 100 && (
+          <div className="rounded-2xl p-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-bold text-white">Completa o teu perfil</h2>
+              <span className="text-xs font-bold" style={{ color: '#818cf8' }}>{completeness.percent}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full mb-3" style={{ background: 'rgba(255,255,255,0.06)' }}>
+              <div className="h-1.5 rounded-full transition-all" style={{ width: `${completeness.percent}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+            </div>
+            <ul className="space-y-1">
+              {completeness.items.filter(i => !i.done).map(i => (
+                <li key={i.key} className="text-xs text-gray-500 flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: '#64748b' }} />
+                  {i.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Formulário */}
         <form onSubmit={handleSave} className="rounded-2xl p-6 space-y-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
