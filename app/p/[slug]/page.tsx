@@ -53,11 +53,12 @@ export default async function Page({ params }: Props) {
   if (prof) {
     const { data: reviews } = await supabaseAdmin
       .from('reviews')
-      .select('rating')
+      .select('rating, client_name, comment, created_at')
       .eq('professional_id', prof.id)
+      .order('created_at', { ascending: false })
 
-    const ratings = (reviews || []).map(r => r.rating).filter((r): r is number => typeof r === 'number')
-    jsonLd = professionalJsonLd(prof, ratings)
+    const validReviews = (reviews || []).filter((r): r is typeof r & { rating: number } => typeof r.rating === 'number')
+    jsonLd = professionalJsonLd(prof, validReviews)
   }
 
   return (
