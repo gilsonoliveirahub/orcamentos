@@ -425,35 +425,45 @@ export async function emailFollowup({
 }
 
 // ── Nudge para upgradar plano ─────────────────────────────────────────────────
+// Enviado nos dias 1, 3 e 7 do trial de 7 dias (sempre a quem ainda está
+// `plan: 'free'`, ver app/api/followup/route.ts) — ou seja, sempre a alguém
+// com trial ativo (ou mesmo no limite dele no dia 7), nunca a quem já está
+// sem trial há muito tempo. Por decisão de negócio, o trial dá acesso
+// equivalente ao Starter (ver lib/effective-plan.ts): esta mensagem nunca
+// pode dizer ou insinuar que o profissional está sem plano/sem acesso —
+// só lembrar que o trial termina e incentivar a escolher Starter ou Pro
+// para continuar com o mesmo acesso, sem interrupção.
 export async function emailUpgradeNudge({
   name, email, totalLeads, dia,
 }: {
   name: string; email: string; totalLeads: number; dia: number
 }) {
+  const diasRestantes = Math.max(0, 7 - dia)
   const subjects: Record<number, string> = {
-    1: `${totalLeads} lead${totalLeads > 1 ? 's' : ''} à tua espera — activa o teu plano`,
-    3: `Já tens ${totalLeads} cliente${totalLeads > 1 ? 's' : ''} à espera e não podes responder`,
-    7: `${name}, os teus clientes ainda estão à espera`,
+    1: `O teu trial está ativo — já tens ${totalLeads} lead${totalLeads > 1 ? 's' : ''} no FaçoPorTi`,
+    3: `${totalLeads} lead${totalLeads > 1 ? 's' : ''} no teu FaçoPorTi — o trial termina em ${diasRestantes} dias`,
+    7: `${name}, o teu trial está a terminar`,
   }
   const subject = subjects[dia] || `Novos leads no FaçoPorTi — ${name}`
+  const prazoTexto = dia >= 7 ? 'termina muito em breve' : `termina daqui a ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`
 
   await sendEmail(email, subject, wrap(`
     <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px 32px">
-      <h2 style="margin:0;color:#fff;font-size:20px">🔒 ${totalLeads} lead${totalLeads > 1 ? 's' : ''} bloqueado${totalLeads > 1 ? 's' : ''}</h2>
-      <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:14px">Activa um plano para ver os contactos</p>
+      <h2 style="margin:0;color:#fff;font-size:20px">⚡ Trial ativo — acesso equivalente ao Starter</h2>
+      <p style="margin:4px 0 0;color:rgba(255,255,255,0.7);font-size:14px">${dia >= 7 ? 'Termina muito em breve' : `Restam ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''}`}</p>
     </div>
     <div style="padding:24px 32px">
       <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${name}</strong>,</p>
       <p style="color:#94a3b8;margin:0 0 24px">
-        Já tens <strong style="color:#fff">${totalLeads} pedido${totalLeads > 1 ? 's' : ''} de orçamento</strong> no teu dashboard — mas não podes ver os contactos sem um plano ativo.
+        Já tens <strong style="color:#fff">${totalLeads} pedido${totalLeads > 1 ? 's' : ''} de orçamento</strong> no teu dashboard — o teu trial dá-te acesso equivalente ao plano Starter, sem custo, mas ${prazoTexto}. Escolhe Starter ou Pro para continuares sem interrupção.
       </p>
       <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:20px;margin:0 0 24px;text-align:center">
         <p style="color:#818cf8;font-size:32px;font-weight:900;margin:0 0 4px">${totalLeads}</p>
-        <p style="color:#64748b;font-size:13px;margin:0">cliente${totalLeads > 1 ? 's' : ''} à espera de resposta</p>
+        <p style="color:#64748b;font-size:13px;margin:0">pedido${totalLeads > 1 ? 's' : ''} no teu dashboard</p>
       </div>
       <a href="${APP_URL}/upgrade"
         style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
-        Activar plano — a partir de €19/mês →
+        Escolher Starter ou Pro — a partir de €19/mês →
       </a>
       <p style="color:#475569;font-size:12px;margin:20px 0 0">Sem compromisso · Cancela a qualquer momento</p>
     </div>

@@ -89,6 +89,54 @@ describe('email sending (lib/email.ts)', () => {
     ).rejects.toThrow(/Resend error 429/)
   })
 
+  describe('emailUpgradeNudge — trial (D+1/D+3/D+7) nunca pode dizer que o profissional está sem plano/acesso', () => {
+    it('D+1: menciona trial ativo e dias restantes, nunca "bloqueado" nem "sem plano ativo"', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailUpgradeNudge } = await import('./email')
+      await emailUpgradeNudge({ name: 'Ana', email: 'ana@example.com', totalLeads: 2, dia: 1 })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.subject).not.toMatch(/bloqueado/i)
+      expect(body.html).not.toMatch(/bloqueado/i)
+      expect(body.html).not.toMatch(/sem (um )?plano ativo/i)
+      expect(body.html).toContain('trial')
+      expect(body.html).toContain('Starter')
+      expect(body.html).toContain('6 dias')
+    })
+
+    it('D+3: continua a tratar o trial como ativo, com menos dias restantes', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailUpgradeNudge } = await import('./email')
+      await emailUpgradeNudge({ name: 'Ana', email: 'ana@example.com', totalLeads: 3, dia: 3 })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.subject).toContain('4 dias')
+      expect(body.html).not.toMatch(/bloqueado/i)
+      expect(body.html).toContain('4 dias')
+    })
+
+    it('D+7: incentiva escolher Starter/Pro para não interromper o acesso, sem afirmar que já perdeu o acesso', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailUpgradeNudge } = await import('./email')
+      await emailUpgradeNudge({ name: 'Ana', email: 'ana@example.com', totalLeads: 5, dia: 7 })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.subject).toContain('a terminar')
+      expect(body.html).not.toMatch(/bloqueado/i)
+      expect(body.html).not.toMatch(/j[áa] perdeste/i)
+      expect(body.html).toContain('Starter ou Pro')
+    })
+  })
+
   it('follow-up email uses the verified domain and reaches the professional, not the admin', async () => {
     process.env.RESEND_API_KEY = 'test_key'
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
