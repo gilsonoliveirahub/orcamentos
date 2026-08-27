@@ -6,7 +6,10 @@ import { getAuthenticatedAdmin } from '@/lib/admin-auth'
 import { getAdminPlanLabel, isTrialEndingSoon, type AdminPlanLabel } from '@/lib/admin-plan-label'
 import { countActiveLeads } from '@/lib/capacity'
 
-const LIST_FIELDS = 'id, name, email, phone, specialty, specialties, zone, active, slug, plan, trial_ends_at, created_at'
+// Inclui campos de subscrição (current_period_*, pending_plan, créditos,
+// IDs Stripe) para servirem tanto /admin/profissionais como /admin/subscricoes
+// sem duplicar esta rota — nenhum deles é escrito aqui, só lido.
+const LIST_FIELDS = 'id, name, email, phone, specialty, specialties, zone, active, slug, plan, trial_ends_at, current_period_start, current_period_end, pending_plan, marketplace_credits, stripe_customer_id, stripe_subscription_id, created_at'
 
 type SortKey = 'name' | 'created_at' | 'active_leads'
 
