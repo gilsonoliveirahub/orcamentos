@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Search, MapPin, Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { PROFESSIONS, SPECIALTY_LIST } from '@/lib/professions'
@@ -19,17 +18,17 @@ export default function ProfissionaisPage() {
 
   useEffect(() => {
     Promise.all([
-      supabase
-        .from('professionals')
-        .select('*, reviews(rating), professional_portfolio(id, url, type)')
-        .eq('active', true),
+      // Lista pública de profissionais ativos — via rota server-side (nunca
+      // select('*') direto do browser com a chave anon, que expunha colunas
+      // sensíveis por a policy RLS ser ao nível da linha, não da coluna).
+      fetch('/api/professionals/public').then(r => r.ok ? r.json() : { professionals: [] }).catch(() => ({ professionals: [] })),
       // Score agregado de fiabilidade de processo (fecha/perde vs. abandona)
       // — endpoint público que nunca devolve dados de lead, só o número. Se
       // falhar, cai para o comportamento anterior (só plano + antiguidade),
       // nunca bloqueia a página.
       fetch('/api/professionals/reliability').then(r => r.ok ? r.json() : { scores: {} }).catch(() => ({ scores: {} })),
-    ]).then(([{ data }, { scores }]) => {
-      const all = data || []
+    ]).then(([{ professionals }, { scores }]) => {
+      const all = professionals || []
       const sorted = sortProfessionalsForRanking(all, scores || {})
       setProfessionals(all.length > 20 ? sorted.slice(0, 20) : sorted)
       setLoading(false)
