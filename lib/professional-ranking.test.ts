@@ -130,4 +130,51 @@ describe('sortProfessionalsForRanking', () => {
     const sorted = sortProfessionalsForRanking(profs, scores)
     expect(sorted.map(p => p.id)).toEqual(['com-dado-lento', 'sem-dado-resposta'])
   })
+
+  it('sem localização do cliente (distances omitido): comportamento idêntico a antes, nunca quebra chamadas existentes', () => {
+    const profs = [
+      { id: 'antigo', plan: 'starter', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'novo', plan: 'starter', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const sorted = sortProfessionalsForRanking(profs, {})
+    expect(sorted.map(p => p.id)).toEqual(['antigo', 'novo'])
+  })
+
+  it('mesmo plano/disponibilidade/fiabilidade/conversão/resposta/capacidade: desempata por proximidade ao cliente', () => {
+    const profs = [
+      { id: 'longe', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+      { id: 'perto', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      longe: { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 5, active_count: 2 },
+      perto: { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 5, active_count: 2 },
+    }
+    const distances = { longe: 40, perto: 5 }
+    const sorted = sortProfessionalsForRanking(profs, scores, distances)
+    expect(sorted.map(p => p.id)).toEqual(['perto', 'longe'])
+  })
+
+  it('proximidade sem dado num dos dois: não compara, cai para antiguidade (nunca inventa distância)', () => {
+    const profs = [
+      { id: 'sem-distancia', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'com-distancia', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },
+    ]
+    const scores = {
+      'sem-distancia': { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 5, active_count: 2 },
+      'com-distancia': { score: 1, total: 5, conversion_rate: 1, avg_response_hours: 5, active_count: 2 },
+    }
+    const distances = { 'com-distancia': 10 } // 'sem-distancia' ausente do mapa
+    const sorted = sortProfessionalsForRanking(profs, scores, distances)
+    expect(sorted.map(p => p.id)).toEqual(['com-distancia', 'sem-distancia']) // antiguidade: mais antigo primeiro
+  })
+
+  it('proximidade nunca sobrepõe plano/disponibilidade/fiabilidade — só desempata dentro deles', () => {
+    const profs = [
+      { id: 'pro-longe', plan: 'pro', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'starter-perto', plan: 'starter', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const distances = { 'pro-longe': 50, 'starter-perto': 1 }
+    const sorted = sortProfessionalsForRanking(profs, {}, distances)
+    expect(sorted.map(p => p.id)).toEqual(['pro-longe', 'starter-perto'])
+  })
 })

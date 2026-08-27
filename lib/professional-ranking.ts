@@ -10,7 +10,10 @@
 //      pedido mais depressa;
 //   5. capacidade — menos pedidos ativos agora primeiro (lib/capacity.ts),
 //      proxy simples de disponibilidade sem nenhum sistema de agenda;
-//   6. antiguidade (desempate final, como já era).
+//   6. proximidade ao cliente (lib/geo.ts), só quando há localização
+//      disponível — nunca substitui os critérios acima, só desempata
+//      dentro deles quando ainda estão empatados;
+//   7. antiguidade (desempate final, como já era).
 
 export type ProfessionalForRanking = { id: string; plan: string | null; created_at: string; accepting_leads?: boolean | null }
 export type ReliabilityScoresById = Record<string, {
@@ -25,9 +28,17 @@ function planScore(plan: string | null): number {
   return plan === 'pro' ? 3 : plan === 'starter' ? 2 : 1
 }
 
+// Distância aproximada (km) por id de profissional — calculada pelo
+// chamador (geocodeZone do cliente vs. geocodeZone(prof.zone), ver
+// lib/geo.ts) só quando a localização do cliente está disponível.
+// Ausente/null = sem dado, nunca compara pior nem melhor (mesma filosofia
+// dos restantes critérios desta função).
+export type DistancesById = Record<string, number | null | undefined>
+
 export function sortProfessionalsForRanking<T extends ProfessionalForRanking>(
   professionals: T[],
-  scores: ReliabilityScoresById
+  scores: ReliabilityScoresById,
+  distances?: DistancesById
 ): T[] {
   // Sem histórico no agregado: neutro em tudo — nunca penaliza quem ainda
   // não teve leads suficientes para ter dados.
@@ -59,6 +70,10 @@ export function sortProfessionalsForRanking<T extends ProfessionalForRanking>(
 
     const capacityDiff = activeCount(a.id) - activeCount(b.id)
     if (capacityDiff !== 0) return capacityDiff
+
+    const distA = distances?.[a.id]
+    const distB = distances?.[b.id]
+    if (distA != null && distB != null && distA !== distB) return distA - distB
 
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   })

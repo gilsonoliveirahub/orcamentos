@@ -6,6 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { specialtyFromSlug } from '@/lib/specialty-slug'
 import { PROFESSIONS } from '@/lib/professions'
 import ProfessionalCard from '@/components/ProfessionalCard'
+import { sortProfessionalsForRanking } from '@/lib/professional-ranking'
+import { buildReliabilityScores } from '@/lib/professional-reliability-scores'
 
 type Props = { params: Promise<{ especialidade: string }> }
 
@@ -18,10 +20,18 @@ type Props = { params: Promise<{ especialidade: string }> }
 async function getActiveProfessionalsBySpecialty(specialty: string) {
   const { data } = await supabaseAdmin
     .from('professionals')
-    .select('id, name, slug, specialty, specialties, zone, description, avatar_url, reviews(rating), professional_portfolio(id, url, type)')
+    .select('id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, reviews(rating), professional_portfolio(id, url, type)')
     .eq('active', true)
     .or(`specialty.eq.${specialty},specialties.cs.{${specialty}}`)
-  return data || []
+  const professionals = data || []
+
+  // Mesmo ranking de /profissionais (lib/professional-ranking.ts) — nunca
+  // uma ordenação diferente por página, senão o mesmo profissional aparece
+  // em posições contraditórias consoante a página pública visitada.
+  // Se a agregação de fiabilidade falhar, cai para {} (ranking só por
+  // plano/disponibilidade/antiguidade) em vez de rebentar a página.
+  const scores = await buildReliabilityScores().catch(() => ({}))
+  return sortProfessionalsForRanking(professionals, scores)
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
