@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { geocodeZone, computeDistanceKm, formatDistanceKm } from '@/lib/geo'
+import { professionalSpecialties } from '@/lib/professional-specialties'
 
 export const MARKETPLACE_RADIUS_KM = 50
 
@@ -10,16 +11,6 @@ export type MarketplaceOpportunity = {
   created_at: string
   distance_km: number | null
   distance_label: string // "aproximadamente 18 km" ou "distância indisponível"
-}
-
-/**
- * Especialidades do profissional — usa specialties[] quando definido, cai
- * para o campo singular "specialty" quando o array está vazio (perfis
- * antigos que nunca usaram a funcionalidade de múltiplas especialidades).
- */
-function professionalSpecialties(prof: { specialty: string | null; specialties: string[] | null }): string[] {
-  if (prof.specialties && prof.specialties.length > 0) return prof.specialties
-  return prof.specialty ? [prof.specialty] : []
 }
 
 /**
