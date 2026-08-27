@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { Suspense, useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, LogOut, Loader2, Search } from 'lucide-react'
@@ -19,7 +19,21 @@ const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0
 const STATUS_COLOR: Record<string, string> = { novo: '#818cf8', qualificado: '#60a5fa', visita: '#fbbf24', proposta: '#c084fc', fechado: '#34d399', perdido: '#f87171' }
 const ACCESS_COLOR: Record<AdminLeadAccessState, string> = { aberto: '#34d399', bloqueado: '#f87171', disponivel: '#60a5fa', adquirido: '#c084fc', desconhecido: '#64748b' }
 
+// useSearchParams() exige um limite de Suspense em rotas estáticas (sem
+// isto, o build de produção falha com "missing-suspense-with-csr-bailout").
 export default function AdminLeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+      </div>
+    }>
+      <AdminLeadsPageInner />
+    </Suspense>
+  )
+}
+
+function AdminLeadsPageInner() {
   const router = useRouter()
   const searchParamsInit = useSearchParams()
   const [checking, setChecking] = useState(true)

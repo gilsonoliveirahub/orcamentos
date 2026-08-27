@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { Suspense, useEffect, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, LogOut, Loader2, Search, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react'
@@ -31,7 +31,21 @@ const PLAN_BADGE_COLOR: Record<AdminPlanLabel, string> = {
 
 const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }
 
+// useSearchParams() exige um limite de Suspense em rotas estáticas (sem
+// isto, o build de produção falha com "missing-suspense-with-csr-bailout").
 export default function AdminProfissionaisPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
+        <Loader2 className="animate-spin text-indigo-500" size={32} />
+      </div>
+    }>
+      <AdminProfissionaisPageInner />
+    </Suspense>
+  )
+}
+
+function AdminProfissionaisPageInner() {
   const router = useRouter()
   const searchParamsInit = useSearchParams()
   const [checking, setChecking] = useState(true)
