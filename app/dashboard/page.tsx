@@ -15,6 +15,7 @@ import {
 import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart, GripVertical } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
+import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
 import ClosedValueModal from '@/components/ClosedValueModal'
 import { isAbandonedLead } from '@/lib/reliability'
 import { shouldShowStaleLeadsReminder } from '@/lib/stale-leads-reminder'
@@ -460,7 +461,7 @@ export default function Dashboard() {
     const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
       supabase.rpc('dashboard_leads'),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
-      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan, trial_ends_at, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     const sortedLeads = [...(leadsData || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     setLeads(sortedLeads)
@@ -566,7 +567,11 @@ export default function Dashboard() {
   const personalOpenedThisCycle = leads.filter(l =>
     l.source !== 'marketplace' && l.opened_at && new Date(l.opened_at) >= cycleStart
   ).length
-  const personalLimit = PERSONAL_LINK_PLAN_LIMITS[professional?.plan as string] ?? 0
+  // Fonte de verdade única de permissões (lib/effective-plan.ts) — trial
+  // ativo conta como Starter aqui, nunca como Pro; inactive nunca conta como
+  // pago, mesmo tendo sido pago antes.
+  const effectivePlan = getEffectivePlan({ plan: professional?.plan ?? null, trial_ends_at: professional?.trial_ends_at ?? null })
+  const personalLimit = PERSONAL_LINK_PLAN_LIMITS[effectivePlan] ?? 0
   const personalQuotaExhausted = personalOpenedThisCycle >= personalLimit
   const faturacao = quotes
     .filter(q => leads.find(l => l.id === q.lead_id && l.status === 'fechado'))
@@ -759,15 +764,17 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Banner trial */}
-      {professional?.trial_ends_at && (() => {
+      {/* Banner trial — escondido para quem já subscreveu (Starter ou Pro),
+          independentemente de trial_ends_at: uma vez pago, o trial deixa de
+          ser relevante, mesmo que a data em si não mude. */}
+      {professional?.trial_ends_at && professional?.plan !== 'pro' && professional?.plan !== 'starter' && (() => {
         const days = Math.max(0, Math.ceil((new Date(professional.trial_ends_at).getTime() - Date.now()) / 86400000))
-        if (days > 3 || professional?.plan === 'pro') return null
+        if (days > 3) return null
         return (
           <div className="mx-3 md:mx-6 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-3 rounded-xl"
             style={{ background: days === 0 ? 'rgba(239,68,68,0.08)' : 'rgba(201,168,76,0.08)', border: `1px solid ${days === 0 ? 'rgba(239,68,68,0.2)' : 'rgba(201,168,76,0.2)'}` }}>
             <span className="text-sm font-semibold" style={{ color: days === 0 ? '#f87171' : '#c9a84c' }}>
-              {days === 0 ? '⚠️ Trial expirado — limitado a 10 leads' : `⚡ Trial: ${days} dia${days !== 1 ? 's' : ''} restante${days !== 1 ? 's' : ''}`}
+              {days === 0 ? '⚠️ Trial expirado — ativa um plano para continuar a receber pedidos pelo teu link pessoal' : `⚡ Trial (equivalente a Starter): ${days} dia${days !== 1 ? 's' : ''} restante${days !== 1 ? 's' : ''}`}
             </span>
             <a href="/upgrade" className="text-xs font-black px-3 py-1.5 rounded-lg transition-colors self-start sm:self-auto"
               style={{ background: days === 0 ? 'rgba(239,68,68,0.15)' : 'rgba(201,168,76,0.15)', color: days === 0 ? '#f87171' : '#c9a84c' }}>
@@ -854,7 +861,7 @@ export default function Dashboard() {
                   onCardClick={(id: string) => router.push(`/leads/${id}`)}
                   onUnlock={handleUnlock}
                   onStatusChange={changeLeadStatus}
-                  isPaid={professional?.plan === 'starter' || professional?.plan === 'pro'}
+                  isPaid={isPaidEffective(effectivePlan)}
                   personalQuotaExhausted={personalQuotaExhausted} />
               ))}
             </div>

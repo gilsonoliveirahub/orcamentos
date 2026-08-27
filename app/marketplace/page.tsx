@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, MapPin, Calendar, ShoppingCart, Lock } from 'lucide-react'
+import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
 
 type Opportunity = {
   id: string
@@ -16,7 +17,7 @@ type Opportunity = {
 
 const cardStyle = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }
 
-type Professional = { id: string; plan: string | null; marketplace_credits: number | null; accepting_leads: boolean | null }
+type Professional = { id: string; plan: string | null; trial_ends_at: string | null; marketplace_credits: number | null; accepting_leads: boolean | null }
 
 export default function MarketplacePage() {
   const router = useRouter()
@@ -39,7 +40,7 @@ export default function MarketplacePage() {
       if (!user) { router.push('/login'); return }
       const { data: prof } = await supabase
         .from('professionals')
-        .select('id, plan, marketplace_credits, accepting_leads')
+        .select('id, plan, trial_ends_at, marketplace_credits, accepting_leads')
         .eq('user_id', user.id)
         .maybeSingle()
       if (!prof) { router.push('/login'); return }
@@ -50,11 +51,10 @@ export default function MarketplacePage() {
   }, [router])
 
   async function handleAcquire(leadId: string) {
-    // Lista de planos pagos (nunca a lista dos não-pagos) — 'inactive'
-    // (subscrição cancelada/pagamento falhado) não é 'free', mas também não
-    // é pago; um deny-list deixava passar esse caso até ao servidor rejeitar.
-    const isPaid = professional?.plan === 'starter' || professional?.plan === 'pro'
-    if (!isPaid) { router.push('/upgrade'); return }
+    // Fonte de verdade única (lib/effective-plan.ts): trial ativo conta como
+    // Starter (pode adquirir), inactive nunca conta como pago mesmo tendo
+    // pago no passado.
+    if (!professional || !isPaidEffective(getEffectivePlan(professional))) { router.push('/upgrade'); return }
     if ((professional.marketplace_credits ?? 0) < 1) { router.push('/creditos'); return }
 
     setAcquiring(leadId)
@@ -90,7 +90,7 @@ export default function MarketplacePage() {
     </div>
   )
 
-  const isFree = !professional || !(professional.plan === 'starter' || professional.plan === 'pro')
+  const isFree = !professional || !isPaidEffective(getEffectivePlan(professional))
   const hasCredits = (professional?.marketplace_credits ?? 0) > 0
   // ?? true: coluna ainda por migrar/nunca definida conta como disponível.
   const isPaused = (professional?.accepting_leads ?? true) === false

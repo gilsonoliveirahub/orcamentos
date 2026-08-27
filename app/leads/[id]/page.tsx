@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS } from '@/lib/professions'
@@ -48,35 +47,26 @@ export default function LeadDetail() {
   const [, startTransition] = useTransition()
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      const { data: prof } = await supabase.from('professionals').select('plan').eq('user_id', user.id).maybeSingle()
-      // Lista de planos pagos (nunca a lista dos não-pagos) — a mesma
-      // definição de "isPaid" já usada no dashboard. Um plano 'inactive'
-      // (subscrição cancelada/pagamento falhado) não é 'free', mas também
-      // não é pago; antes disto passava por esta verificação sem ser
-      // redirecionado, ao contrário do que já acontecia no dashboard.
-      const isPaid = prof?.plan === 'starter' || prof?.plan === 'pro'
-      if (!isPaid) {
-        router.replace('/upgrade')
-        return
-      }
-    }
-
-    // Única fonte de dados completos do lead: o cliente Supabase já não
-    // consegue pedir nome/telefone/email/notas diretamente (colunas
-    // revogadas para o papel authenticated — ver
-    // supabase/migration_marketplace_v3_atomic.sql), e a decisão de
-    // autorizar (abrir quota do ciclo do link pessoal, ou confirmar
-    // aquisição do marketplace) é sempre tomada no servidor, nunca na
-    // interface. Se bloqueado, os dados completos nem chegam a entrar no
-    // estado da página.
+    // Sem pré-verificação de plano aqui de propósito: um profissional em
+    // trial (equivalente a Starter) ou inactive com este lead já autorizado
+    // no passado têm de conseguir continuar — a única autoridade real é
+    // /api/leads/open, que decide por LEAD (isLeadAuthorized), nunca por um
+    // corte genérico do plano atual do profissional. Ver lib/effective-plan.ts
+    // e lib/lead-authorization.ts.
     const res = await fetch('/api/leads/open', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lead_id: id }),
     })
     if (!res.ok) {
+      const { reason } = await res.json().catch(() => ({ reason: null }))
+      // 'plan': nunca teve (ou já não tem) acesso pago/trial válido para
+      // ABRIR este lead pela primeira vez — só aqui faz sentido mandar para
+      // /upgrade. Quota/bloqueio/não encontrado mostram o ecrã já existente.
+      if (reason === 'plan') {
+        router.replace('/upgrade')
+        return
+      }
       setQuotaBlocked(true)
       setLoading(false)
       return

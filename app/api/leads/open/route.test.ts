@@ -169,6 +169,42 @@ describe('POST /api/leads/open', () => {
     expect(json.lead).toBeUndefined()
   })
 
+  it('profissional inactive com lead do marketplace já adquirido antes (locked=false): continua a ver os dados completos, mesmo sem plano pago atual', async () => {
+    mockAuth('user-1')
+    let leadsCallCount = 0
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          // Esta rota nunca consulta professionals.plan — a autorização de
+          // um lead já adquirido depende só de locked=false (ver
+          // lib/lead-authorization.ts), nunca do plano atual do profissional.
+          // Um 'inactive' que já pagou para adquirir este lead no passado
+          // continua a poder vê-lo, consultar contactos e geri-lo.
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            leadsCallCount += 1
+            const row = { id: 'lead-1', professional_id: 'prof-1', source: 'marketplace', opened_at: null, locked: false }
+            if (leadsCallCount === 1) return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row }) }) }) }
+            if (leadsCallCount === 2) return { select: () => ({ eq: () => ({ single: async () => ({ data: row }) }) }) }
+            return { select: () => ({ eq: () => ({ single: async () => ({ data: { ...row, name: 'Cliente Adquirido Antes', phone: '351911112222' } }) }) }) }
+          }
+          if (table === 'quotes') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    const openPersonalLead = vi.fn()
+    vi.doMock('@/lib/personal-link-limits', () => ({ openPersonalLead }))
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.lead.name).toBe('Cliente Adquirido Antes')
+    expect(openPersonalLead).not.toHaveBeenCalled()
+  })
+
   it('lead do marketplace ainda bloqueado (locked=true): não tenta abrir, devolve 403 sem dados', async () => {
     mockAuth('user-1')
     let leadsCallCount = 0

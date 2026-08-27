@@ -147,6 +147,26 @@ describe('isPersonalLinkQuotaExhausted', () => {
     expect(await isPersonalLinkQuotaExhausted('prof-1')).toBe(true)
   })
 
+  it('trial ativo (plan ainda free, trial_ends_at no futuro): conta como Starter, não esgotada com 9/10', async () => {
+    const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+    mockFlow({ prof: { plan: 'free', trial_ends_at: trialEndsAt, current_period_start: null, current_period_end: null }, openedCount: 9 })
+    const { isPersonalLinkQuotaExhausted } = await import('./personal-link-limits')
+    expect(await isPersonalLinkQuotaExhausted('prof-1')).toBe(false)
+  })
+
+  it('trial expirado (plan ainda free, trial_ends_at no passado): volta a esgotada (limite 0), igual a Free', async () => {
+    const trialEndsAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    mockFlow({ prof: { plan: 'free', trial_ends_at: trialEndsAt, current_period_start: null, current_period_end: null }, openedCount: 0 })
+    const { isPersonalLinkQuotaExhausted } = await import('./personal-link-limits')
+    expect(await isPersonalLinkQuotaExhausted('prof-1')).toBe(true)
+  })
+
+  it('inactive: sempre esgotada (limite 0), mesmo tendo sido pago antes', async () => {
+    mockFlow({ prof: { plan: 'inactive', current_period_start: null, current_period_end: null } })
+    const { isPersonalLinkQuotaExhausted } = await import('./personal-link-limits')
+    expect(await isPersonalLinkQuotaExhausted('prof-1')).toBe(true)
+  })
+
   it('Starter com 9 de 10 usados no ciclo: ainda não esgotada', async () => {
     mockFlow({ prof: { plan: 'starter', current_period_start: null, current_period_end: null }, openedCount: 9 })
     const { isPersonalLinkQuotaExhausted } = await import('./personal-link-limits')

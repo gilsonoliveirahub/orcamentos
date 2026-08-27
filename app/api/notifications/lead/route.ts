@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailNovoLead, emailNovoLeadBloqueado } from '@/lib/email'
 import { sendWhatsApp } from '@/lib/whatsapp'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
+import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('*, professionals(name, email, phone, specialty, plan, zone)')
+      .select('*, professionals(name, email, phone, specialty, plan, trial_ends_at, zone)')
       .eq('id', lead_id)
       .single()
 
@@ -25,10 +26,15 @@ export async function POST(req: NextRequest) {
     // (dashboard, /api/leads/open, /api/leads/status): só revela dados de
     // contacto depois do lead estar realmente aberto (link pessoal) ou
     // adquirido (marketplace). Nunca reimplementar esta condição aqui.
-    const isFreePlan = !prof.plan || prof.plan === 'free'
+    // isFreePlan decide só o CTA/copy do email/WhatsApp de lead bloqueado
+    // ("ativa o teu plano" vs "desbloqueia no dashboard") — fonte de verdade
+    // única (lib/effective-plan.ts): trial ativo conta como Starter (mesmo
+    // CTA que um pago), inactive volta a contar como não-pago.
+    const isFreePlan = !isPaidEffective(getEffectivePlan(prof))
     // Notificações por WhatsApp são exclusivas do plano Pro (decisão de
     // negócio) — email continua para todos os planos pagos/free consoante
-    // as regras já existentes, isto só gate o canal WhatsApp.
+    // as regras já existentes, isto só gate o canal WhatsApp. Trial nunca
+    // conta como Pro.
     const isPro = prof.plan === 'pro'
     const authorized = isLeadAuthorized(lead)
 

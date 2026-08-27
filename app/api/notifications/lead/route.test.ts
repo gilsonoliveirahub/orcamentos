@@ -156,6 +156,58 @@ describe('POST /api/notifications/lead', () => {
       expect(sendWhatsApp).not.toHaveBeenCalled()
     })
 
+    it('profissional em trial ativo (plan free, trial_ends_at no futuro): CTA de "desbloquear" como um pago, não "ativa o teu plano"', async () => {
+      const lead = {
+        id: 'lead-3c', name: 'Nome Real do Cliente', phone: '351933333333', email: 'cliente@example.com', locked: false,
+        q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal', zone_requested: null,
+        professionals: {
+          name: 'Prof Trial', email: 'proftrial@example.com', specialty: 'Pintura', phone: '351944444444', zone: 'Porto',
+          plan: 'free', trial_ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      }
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+      }))
+      const emailNovoLead = vi.fn().mockResolvedValue(undefined)
+      const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ lead_id: 'lead-3c' }))
+      const json = await res.json()
+
+      expect(json).toEqual({ ok: true, blocked: true })
+      expect(emailNovoLeadBloqueado).toHaveBeenCalledWith(expect.objectContaining({ isFreePlan: false }))
+      // WhatsApp continua exclusivo do Pro real — trial nunca conta como Pro.
+      expect(sendWhatsApp).not.toHaveBeenCalled()
+    })
+
+    it('profissional inactive (cancelado/pagamento falhado): CTA volta a "ativa o teu plano", mesmo tendo sido pago antes', async () => {
+      const lead = {
+        id: 'lead-3d', name: 'Nome Real do Cliente', phone: '351933333333', email: 'cliente@example.com', locked: false,
+        q1_tipo_trabalho: 'Pintura', metadata: {}, source: 'pessoal', zone_requested: null,
+        professionals: { name: 'Prof Inactive', email: 'profinactive@example.com', specialty: 'Pintura', phone: '351944444444', plan: 'inactive', zone: 'Porto' },
+      }
+      vi.doMock('@/lib/supabase-admin', () => ({
+        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+      }))
+      const emailNovoLead = vi.fn().mockResolvedValue(undefined)
+      const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoLead, emailNovoLeadBloqueado }))
+      const sendWhatsApp = vi.fn().mockResolvedValue({ status: 'sent' })
+      vi.doMock('@/lib/whatsapp', () => ({ sendWhatsApp }))
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ lead_id: 'lead-3d' }))
+      const json = await res.json()
+
+      expect(json).toEqual({ ok: true, blocked: true })
+      expect(emailNovoLeadBloqueado).toHaveBeenCalledWith(expect.objectContaining({ isFreePlan: true }))
+      expect(sendWhatsApp).not.toHaveBeenCalled()
+    })
+
     it('lead do marketplace sem créditos (locked=true) recebe só notificação redigida, mesmo com plano pago', async () => {
       const lead = {
         id: 'lead-4', name: 'Outro Cliente', phone: '351955555555', email: null, locked: true,

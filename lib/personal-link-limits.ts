@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { PERSONAL_LINK_PLAN_LIMITS, getCycleWindow, type SubscriptionPeriod } from '@/lib/personal-link-limits-shared'
+import { getEffectivePlan } from '@/lib/effective-plan'
 
 // As constantes/cálculos puros (sem dependência de supabaseAdmin) vivem em
 // lib/personal-link-limits-shared.ts — esse ficheiro é seguro de importar
@@ -68,13 +69,14 @@ export type PersonalLinkQuotaStatus = { limit: number; used: number; remaining: 
 export async function getPersonalLinkQuotaStatus(professionalId: string): Promise<PersonalLinkQuotaStatus> {
   const { data: prof } = await supabaseAdmin
     .from('professionals')
-    .select('plan, current_period_start, current_period_end')
+    .select('plan, trial_ends_at, current_period_start, current_period_end')
     .eq('id', professionalId)
     .maybeSingle()
 
   if (!prof) return { limit: 0, used: 0, remaining: 0, exhausted: true }
 
-  const limit = PERSONAL_LINK_PLAN_LIMITS[prof.plan ?? 'free'] ?? 0
+  // Trial ativo conta como Starter (10/ciclo) — ver lib/effective-plan.ts.
+  const limit = PERSONAL_LINK_PLAN_LIMITS[getEffectivePlan(prof)] ?? 0
   if (limit <= 0) return { limit: 0, used: 0, remaining: 0, exhausted: true }
 
   const { start, end } = getCycleWindow(prof)
