@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2, Eye, MousePointerClick, PlayCircle, CheckCircle2, MessageCircle, Mail } from 'lucide-react'
+import AdminNav from '@/components/admin/AdminNav'
 
 type Totals = {
   page_view: number
@@ -126,14 +127,17 @@ export default function AdminMetricasPage() {
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button onClick={() => router.push('/admin')} className="text-gray-500 hover:text-white transition-colors">
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-lg font-black text-white">Métricas</h1>
-            <p className="text-gray-500 text-xs">Visitas, cliques e conversão da plataforma</p>
+        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.push('/admin')} className="text-gray-500 hover:text-white transition-colors">
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-lg font-black text-white">Métricas</h1>
+              <p className="text-gray-500 text-xs">Visitas, cliques e conversão da plataforma</p>
+            </div>
           </div>
+          <AdminNav active="metricas" />
         </div>
       </div>
 
