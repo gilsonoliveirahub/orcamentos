@@ -6,7 +6,10 @@ import { getAuthenticatedAdmin } from '@/lib/admin-auth'
 import { getAdminLeadAccessState, type AdminLeadAccessState } from '@/lib/admin-lead-access-state'
 import { isAbandonedLead } from '@/lib/reliability'
 
-const LIST_FIELDS = 'id, name, phone, email, status, source, specialty, zone_requested, professional_id, created_at, opened_at, locked, valor_fechado, professionals(name, specialty, zone)'
+// marketplace_credits vem junto porque a área Marketplace mostra o saldo
+// atual do profissional que adquiriu cada lead (nunca um histórico de
+// transações, que não existe).
+const LIST_FIELDS = 'id, name, phone, email, status, source, specialty, zone_requested, professional_id, created_at, opened_at, locked, valor_fechado, professionals(name, specialty, zone, marketplace_credits)'
 
 // Vista administrativa global de leads/pedidos — nunca substitui nem altera
 // o fluxo do profissional (dashboard_leads(), lead_is_authorized, etc.):
