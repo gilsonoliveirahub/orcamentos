@@ -153,3 +153,85 @@ describe('PATCH /api/admin/professionals/[id]', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('GET /api/admin/professionals/[id] (ficha administrativa)', () => {
+  beforeEach(() => vi.resetModules())
+  afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('@/lib/admin-auth'); vi.doUnmock('@/lib/supabase-admin') })
+
+  const professional = {
+    id: 'prof-1', name: 'Ana', email: 'ana@x.com', phone: '351911111111', specialty: 'Pintura',
+    specialties: ['Pintura'], zone: 'Lisboa', active: true, slug: 'ana', plan: 'free',
+    trial_ends_at: '2099-01-01T00:00:00Z', current_period_start: null, current_period_end: null,
+    pending_plan: null, marketplace_credits: 0, stripe_customer_id: null, stripe_subscription_id: null,
+    accepting_leads: true, created_at: '2026-01-01T00:00:00Z',
+  }
+  const leads = [
+    { id: 'l1', source: 'pessoal', status: 'fechado', created_at: '2026-01-01T00:00:00Z', opened_at: '2026-01-01T01:00:00Z', valor_fechado: 500 },
+    { id: 'l2', source: 'marketplace', status: 'perdido', created_at: '2026-01-02T00:00:00Z', opened_at: null, valor_fechado: null },
+    { id: 'l3', source: 'pessoal', status: 'novo', created_at: '2026-01-03T00:00:00Z', opened_at: null, valor_fechado: null },
+  ]
+  const auditRows = [
+    { id: 'a1', admin_id: 'admin-1', changes: { active: { before: true, after: false } }, created_at: '2026-01-05T00:00:00Z' },
+  ]
+  const admins = [{ user_id: 'admin-1', email: 'gilson@x.com' }]
+
+  function mockDeps({ isAdmin = true, profData = professional }: { isAdmin?: boolean; profData?: unknown } = {}) {
+    vi.doMock('@/lib/admin-auth', () => ({ getAuthenticatedAdmin: async () => (isAdmin ? { id: 'admin-1' } : null) }))
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ single: async () => ({ data: profData, error: profData ? null : { message: 'not found' } }) }) }) }
+          if (table === 'leads') return { select: () => ({ eq: async () => ({ data: leads, error: null }) }) }
+          if (table === 'admin_audit_log') return { select: () => ({ eq: () => ({ order: async () => ({ data: auditRows, error: null }) }) }) }
+          if (table === 'admins') return { select: () => ({ in: async () => ({ data: admins, error: null }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+  }
+
+  it('bloqueia quem não é admin', async () => {
+    mockDeps({ isAdmin: false })
+    const { GET } = await import('./route')
+    const res = await GET({} as unknown as NextRequest, fakeParams('prof-1'))
+    expect(res.status).toBe(403)
+  })
+
+  it('devolve 404 se o profissional não existir', async () => {
+    mockDeps({ profData: null })
+    const { GET } = await import('./route')
+    const res = await GET({} as unknown as NextRequest, fakeParams('prof-inexistente'))
+    expect(res.status).toBe(404)
+  })
+
+  it('agrega identificação, plano efetivo, atividade, desempenho (via libs existentes) e histórico real', async () => {
+    mockDeps()
+    const { GET } = await import('./route')
+    const res = await GET({} as unknown as NextRequest, fakeParams('prof-1'))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.professional.name).toBe('Ana')
+    expect(json.effective_plan).toBe('starter') // trial ativo -> permissões efetivas de Starter (lib/effective-plan)
+
+    expect(json.activity).toEqual({
+      leadsPersonalCount: 2,
+      leadsMarketplaceCount: 1,
+      activeCount: 1, // só o 'novo' (l3) continua em aberto
+      fechadosCount: 1,
+      perdidosCount: 1,
+      abandonedCount: 1, // l3 ('novo', created_at antigo face à data real de execução do teste) já passou de ABANDONED_THRESHOLD_DAYS
+      totalCount: 3,
+    })
+
+    // faturação real vem de calcFaturacaoReal sobre os fechados (l1, valor_fechado=500)
+    expect(json.performance.faturacaoReal).toBe(500)
+    expect(json.performance.ticketMedio).toBe(500)
+    expect(json.performance.comValorCount).toBe(1)
+    expect(json.performance.conversionRate).toBe(0.5) // 1 fechado / (1 fechado + 1 perdido)
+
+    expect(json.history).toEqual([
+      { id: 'a1', created_at: '2026-01-05T00:00:00Z', admin_email: 'gilson@x.com', changes: { active: { before: true, after: false } } },
+    ])
+  })
+})

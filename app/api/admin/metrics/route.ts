@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getAuthenticatedAdmin } from '@/lib/admin-auth'
 import {
   fetchMetricsRows,
   computeTotals,
@@ -13,26 +12,6 @@ import {
   computeUniqueVisitors,
   computeByProfessional,
 } from '@/lib/metrics'
-
-async function getAuthenticatedAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: admin } = await supabaseAdmin
-    .from('admins')
-    .select('id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  if (!admin) return null
-
-  return user
-}
 
 export async function GET(req: NextRequest) {
   const admin = await getAuthenticatedAdmin()
