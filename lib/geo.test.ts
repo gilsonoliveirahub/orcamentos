@@ -26,6 +26,13 @@ describe('geocodeZone', () => {
     // "Porto" não deve capturar "Vila Nova de Gaia" nem vice-versa
     expect(geocodeZone('Vila Nova de Gaia')).toEqual({ lat: 41.1239, lng: -8.6118 })
   })
+
+  it('resolves real-world multi-area free text (várias zonas separadas por vírgula)', () => {
+    // Formato real de produção — confirma que "zona" como texto livre já
+    // representa várias áreas servidas sem precisar de estrutura nova.
+    expect(geocodeZone('Lisboa, Margem Sul e Arredores')).toEqual({ lat: 38.7223, lng: -9.1393 })
+    expect(geocodeZone('Cascais, Sintra e Oeiras')).not.toBeNull()
+  })
 })
 
 describe('haversineDistanceKm', () => {
