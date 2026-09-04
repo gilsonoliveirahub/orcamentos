@@ -20,7 +20,7 @@ export default function PrivacidadePage() {
 
       <div className="max-w-3xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-black text-white mb-2">Política de Privacidade</h1>
-        <p className="text-gray-500 text-sm mb-10">Última atualização: 16 de julho de 2026</p>
+        <p className="text-gray-500 text-sm mb-10">Última atualização: 4 de setembro de 2026</p>
 
         <div className="space-y-8 text-gray-300 leading-relaxed">
 
@@ -60,6 +60,7 @@ export default function PrivacidadePage() {
             <ul className="space-y-2 list-disc list-inside">
               <li><strong className="text-white">Profissional destinatário:</strong> ao submeter um pedido, o cliente aceita que os seus dados de contacto sejam partilhados com o profissional destinatário, que é determinado da seguinte forma: (a) se o pedido for feito através do link pessoal de um profissional, os dados vão exclusivamente para esse profissional; (b) se o pedido for feito através do marketplace, os dados vão para o profissional que desbloquear o lead com um crédito. Em nenhum caso os dados são partilhados com múltiplos profissionais simultaneamente.</li>
               <li><strong className="text-white">Stripe (EUA):</strong> processamento de pagamentos. A Stripe opera sob as Cláusulas Contratuais-Tipo (CCT/SCC) aprovadas pela Comissão Europeia, garantindo proteção adequada dos dados transferidos para fora da UE.</li>
+              <li><strong className="text-white">Twilio (EUA):</strong> envio e receção de mensagens via WhatsApp — notificações automáticas de novos pedidos ao profissional (incluindo nome, telefone e serviço pretendido do cliente) e respostas automáticas a quem contacta a plataforma por WhatsApp. A Twilio opera sob as Cláusulas Contratuais-Tipo (CCT/SCC) aprovadas pela Comissão Europeia, garantindo proteção adequada dos dados transferidos para fora da UE.</li>
               <li><strong className="text-white">Supabase:</strong> armazenamento de dados em servidores na União Europeia (Irlanda).</li>
               <li><strong className="text-white">Resend / Amazon SES (Irlanda):</strong> envio de emails transacionais, processado na UE.</li>
             </ul>
