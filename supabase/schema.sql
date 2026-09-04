@@ -1,6 +1,16 @@
 -- ============================================================
 -- FaçoPorTi — Schema completo
 -- Corre no Supabase SQL Editor
+--
+-- NOTA (2026-09-04): este ficheiro é o bootstrap original + reconciliação
+-- de divergências confirmadas (ver auditoria 2026-08-25). NÃO reflete todas
+-- as colunas/funções/tabelas dos restantes supabase/migration_*.sql — cada
+-- um documenta a sua própria alteração e estado de aplicação. O comentário
+-- "NÃO APLICADO em produção" dentro de alguns desses ficheiros pode estar
+-- desatualizado (confirmado pelo menos um caso: migration_reviews_quotes_
+-- leads_rls_lockdown.sql dizia isso mas já estava aplicado) — antes de
+-- assumir o estado de qualquer migração, confirmar diretamente no Supabase
+-- Studio de produção, não confiar só no comentário do ficheiro.
 -- ============================================================
 
 -- ── Tabela de Profissionais ───────────────────────────────────────────────────
@@ -9,6 +19,10 @@ create table if not exists professionals (
   user_id     uuid references auth.users(id) on delete cascade,
   name        text not null,
   specialty   text default 'Pintura',
+  -- Múltiplas especialidades por conta (implementado 2026-05-09, confirmado em
+  -- produção 2026-07-14): `specialty` fica como legacy/fallback singular,
+  -- `specialties` é a fonte usada quando tem pelo menos 1 elemento.
+  specialties text[] default '{}',
   phone       text,
   zone        text,
   slug        text unique,
@@ -24,8 +38,12 @@ create table if not exists professionals (
   extra_furniture_move numeric default 50.00,
   extra_primer        numeric default 2.00,
   min_quote           numeric default 150.00,
-  -- Subscrição
-  plan                text default 'free' check (plan in ('free', 'pro')),
+  -- Subscrição — 'starter' e 'inactive' fazem parte do modelo de negócio real
+  -- (ver app/api/stripe/webhook/route.ts) desde sempre; este check só
+  -- listava 'free'/'pro' e nunca foi corrigido aqui, apesar de a constraint
+  -- em produção já ter sido alterada para aceitar os 4 valores (divergência
+  -- de versionamento confirmada em auditoria 2026-08-25, corrigida aqui).
+  plan                text default 'free' check (plan in ('free', 'starter', 'pro', 'inactive')),
   trial_ends_at       timestamptz,
   -- Timestamps
   created_at  timestamptz default now(),
@@ -118,6 +136,14 @@ alter table professionals add column if not exists updated_at  timestamptz defau
 alter table professionals add column if not exists stripe_customer_id     text;
 alter table professionals add column if not exists stripe_subscription_id text;
 alter table professionals add column if not exists marketplace_credits    integer default 0;
+alter table professionals add column if not exists specialties            text[] default '{}';
+
+-- 'starter'/'inactive' já são valores reais em produção (ver comentário na
+-- definição da coluna acima) — recriar a constraint em bases criadas antes
+-- desta correção. O nome por omissão do Postgres para um CHECK definido
+-- inline na coluna (sem nome explícito) é "professionals_plan_check".
+alter table professionals drop constraint if exists professionals_plan_check;
+alter table professionals add constraint professionals_plan_check check (plan in ('free', 'starter', 'pro', 'inactive'));
 
 alter table leads add column if not exists metadata jsonb default '{}';
 
