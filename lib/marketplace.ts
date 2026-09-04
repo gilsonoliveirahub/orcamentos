@@ -34,6 +34,13 @@ export async function listMarketplaceOpportunities(professionalId: string): Prom
 
   const profCoords = geocodeZone(prof.zone)
 
+  // Sem coordenadas do PRÓPRIO profissional (zona em texto livre não
+  // reconhecida por lib/geo.ts), não há como confirmar o raio de 50km para
+  // nenhum lead — diferente do caso de um lead antigo sem coordenadas
+  // (tratado abaixo), aqui não se pode simplesmente "mostrar mesmo assim":
+  // isso equivaleria a dar acesso ao país inteiro em vez dos 50km previstos.
+  if (!profCoords) return []
+
   const { data: leads } = await supabaseAdmin
     .from('leads')
     .select('id, specialty, zone_requested, created_at, lat, lng')
@@ -52,9 +59,11 @@ export async function listMarketplaceOpportunities(professionalId: string): Prom
 
     const distanceKm = computeDistanceKm(profCoords, leadCoords)
 
-    // Sem coordenadas de um dos dois lados: fallback — mantém visível
-    // (correspondência por zona já feita pelo filtro de specialty; não
-    // perder pedidos só por falta de geocodificação) e assinala isso.
+    // profCoords já está garantido acima; só falta a coordenada do LEAD
+    // (leads antigos sem lat/lng gravado e cuja zone_requested também não
+    // geocodifica) — nesse caso mantém-se visível (correspondência por zona
+    // já feita pelo filtro de specialty; não perder pedidos só por falta de
+    // geocodificação do lado do lead) e assinala isso.
     if (distanceKm === null) {
       withinRadius.push({
         id: lead.id,
@@ -140,12 +149,20 @@ export async function acquireMarketplaceLead(params: { leadId: string; professio
   // fora do raio só por saltar a UI.
   const profCoords = geocodeZone(prof.zone)
 
+  // Zona não reconhecida: a função SQL só valida o raio quando ambas as
+  // coordenadas existem (ver migration_marketplace_v3_atomic.sql), por isso
+  // enviar lat/lng null faria a verificação de raio ser simplesmente
+  // ignorada — na prática, dar acesso ao país inteiro a quem tem uma zona
+  // não reconhecida. Bloqueado aqui, antes de chamar a RPC, para fechar essa
+  // brecha sem alterar a regra de negócio dos 50km nem a função SQL.
+  if (!profCoords) return { ok: false, error: 'out_of_range' }
+
   const { data, error } = await supabaseAdmin.rpc('acquire_marketplace_lead', {
     p_lead_id: leadId,
     p_professional_id: professionalId,
     p_radius_km: MARKETPLACE_RADIUS_KM,
-    p_prof_lat: profCoords?.lat ?? null,
-    p_prof_lng: profCoords?.lng ?? null,
+    p_prof_lat: profCoords.lat,
+    p_prof_lng: profCoords.lng,
   })
 
   if (error || !data) return { ok: false, error: 'not_found' }

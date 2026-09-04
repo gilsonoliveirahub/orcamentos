@@ -97,8 +97,8 @@ describe('listMarketplaceOpportunities', () => {
     expect(result[0].distance_label).toBe('aproximadamente 18 km')
   })
 
-  it('sem coordenadas dos dois lados: mantém visível com "distância indisponível" (nunca perde leads antigos)', async () => {
-    const professional = { specialty: 'Pintura', specialties: [], zone: 'Zona Desconhecida XYZ' } // não reconhecida
+  it('lead antigo sem coordenadas (mas zona do PROFISSIONAL reconhecida): mantém visível com "distância indisponível"', async () => {
+    const professional = { specialty: 'Pintura', specialties: [], zone: 'Lisboa' }
     const leadWithoutCoords = {
       id: 'lead-old',
       specialty: 'Pintura',
@@ -115,6 +115,24 @@ describe('listMarketplaceOpportunities', () => {
     expect(result).toHaveLength(1)
     expect(result[0].distance_km).toBeNull()
     expect(result[0].distance_label).toBe('distância indisponível')
+  })
+
+  it('SEGURANÇA: zona do PROFISSIONAL não reconhecida devolve lista vazia (nunca mostra o país inteiro)', async () => {
+    const professional = { specialty: 'Pintura', specialties: [], zone: 'Zona Desconhecida XYZ' } // não reconhecida
+    const leadDentroDoRaioSeFosseGeocodado = {
+      id: 'lead-perto',
+      specialty: 'Pintura',
+      zone_requested: 'Lisboa',
+      created_at: '2026-07-16T00:00:00Z',
+      lat: LISBOA.lat,
+      lng: LISBOA.lng,
+    }
+    mockSupabase({ professional, leads: [leadDentroDoRaioSeFosseGeocodado] })
+
+    const { listMarketplaceOpportunities } = await import('./marketplace')
+    const result = await listMarketplaceOpportunities('prof-1')
+
+    expect(result).toEqual([])
   })
 
   it('usa specialties[] quando definido, cai para specialty singular quando o array está vazio', async () => {
@@ -291,12 +309,13 @@ describe('acquireMarketplaceLead', () => {
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain('/api/notifications/lead')
   })
 
-  it('zona do profissional não reconhecida: passa lat/lng null à RPC (fallback tratado lá dentro)', async () => {
+  it('SEGURANÇA: zona do profissional não reconhecida bloqueia antes da RPC (nunca envia lat/lng null, que faria a função SQL saltar a verificação de raio)', async () => {
     const rpc = mockZoneAndRpc('Zona Desconhecida XYZ', { data: { ok: true } })
     const { acquireMarketplaceLead } = await import('./marketplace')
-    await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
 
-    expect(rpc).toHaveBeenCalledWith('acquire_marketplace_lead', expect.objectContaining({ p_prof_lat: null, p_prof_lng: null }))
+    expect(result).toEqual({ ok: false, error: 'out_of_range' })
+    expect(rpc).not.toHaveBeenCalled()
   })
 
   it('perde a corrida (lead já adquirido por outro): não descontou nada nem notifica — não há reembolso porque nunca houve cobrança', async () => {
