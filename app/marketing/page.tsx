@@ -346,7 +346,7 @@ export default function MarketingPage() {
           </div>
 
           <div className="text-center mt-10 space-y-1">
-            <p className="text-white/50 text-sm">Leads do marketplace desde 2,5€</p>
+            <p className="text-white/50 text-sm">Leads do marketplace desde 1,50€</p>
             <p className="text-white/30 text-sm">Os pedidos do teu link contam para o plano. O marketplace é opcional.</p>
           </div>
         </div>
