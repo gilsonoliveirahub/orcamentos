@@ -1,7 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta', '/upgrade', '/creditos', '/marketplace']
+// Exportada (só leitura) para app/robots.test.ts poder confirmar que toda
+// rota aqui protegida também está coberta pelo disallow de app/robots.ts —
+// sem isto, as duas listas podiam divergir em silêncio (foi o que aconteceu
+// até 2026-09-05: /config, /onboarding e /conta ficaram de fora do robots.ts).
+export const PROTECTED = ['/dashboard', '/leads', '/stats', '/config', '/cliente', '/acordos', '/admin', '/perfil', '/onboarding', '/conta', '/upgrade', '/creditos', '/marketplace']
 const AUTH_ONLY = ['/login', '/admin/login']
 
 // Compara por segmento de caminho, não por prefixo de texto — "/conta" não
