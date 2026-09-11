@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FaçoPorTi — Orçamentos Automáticos para Profissionais",
   description: "Plataforma de gestão de leads e orçamentos para pintores, eletricistas, canalizadores e outros profissionais independentes em Portugal.",
-  metadataBase: new URL('https://façoporti.com'),
+  metadataBase: new URL('https://www.façoporti.com'),
   openGraph: {
     title: "FaçoPorTi — Orçamentos Automáticos para Profissionais",
     description: "Recebe pedidos de orçamento qualificados pelo teu link pessoal, sem concorrência com outros profissionais. Starter a €19/mês.",
@@ -43,7 +43,11 @@ const organizationJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'FaçoPorTi',
-  url: 'https://façoporti.com',
+  // Punycode ASCII — este objeto vai por JSON.stringify direto para o
+  // <script type="application/ld+json">, nunca passa por new URL() (ao
+  // contrário de metadataBase, que normaliza sozinho). Mesmo motivo do
+  // app/sitemap.ts.
+  url: 'https://www.xn--faoporti-t0a.com',
   description: 'Plataforma de gestão de leads e orçamentos para profissionais independentes em Portugal — pintores, eletricistas, canalizadores e outras especialidades.',
   areaServed: { '@type': 'Country', name: 'Portugal' },
 }

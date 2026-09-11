@@ -2,7 +2,14 @@ import type { MetadataRoute } from 'next'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { specialtyToSlug } from '@/lib/specialty-slug'
 
-const BASE = 'https://façoporti.com'
+// Punycode ASCII (não "https://www.façoporti.com" com ç literal) — o
+// protocolo de sitemap exige URLs em ASCII/URI válido (sitemaps.org), e
+// aqui é interpolação de string simples, nunca passa por um objeto URL()
+// que normalizasse isto sozinho (ao contrário de metadataBase/canonical,
+// que passam por new URL() e já saem corretos). Confirmado em produção:
+// o Search Console falhava a ler o sitemap ("0 páginas descobertas") com
+// o ç literal nos <loc>.
+const BASE = 'https://www.xn--faoporti-t0a.com'
 
 // Páginas públicas fixas — nunca inclui /marketing (duplica a homepage,
 // ver app/robots.ts) nem áreas autenticadas/privadas.
@@ -12,6 +19,7 @@ const STATIC_PAGES: Array<{ path: string; changeFrequency: MetadataRoute.Sitemap
   { path: '/profissionais', changeFrequency: 'daily', priority: 0.8 },
   { path: '/comecar', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/juntar', changeFrequency: 'monthly', priority: 0.5 },
+  { path: '/exclusivo', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/sobre', changeFrequency: 'monthly', priority: 0.4 },
   { path: '/contactos', changeFrequency: 'monthly', priority: 0.4 },
   { path: '/privacidade', changeFrequency: 'yearly', priority: 0.2 },

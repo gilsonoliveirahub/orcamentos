@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Sobre o FaçoPorTi | FaçoPorTi',
   description: 'O FaçoPorTi ajuda profissionais independentes a receber pedidos de clientes de forma simples e organizada, com link pessoal e orçamento estimado automático.',
+  alternates: { canonical: '/sobre' },
 }
 
 export default function SobrePage() {

@@ -12,7 +12,7 @@ import { PROTECTED } from '../proxy'
 describe('app/robots.ts', () => {
   it('usa o dominio canonico real do FaçoPorTi', () => {
     const result = robots()
-    expect(result.sitemap).toBe('https://façoporti.com/sitemap.xml')
+    expect(result.sitemap).toBe('https://www.xn--faoporti-t0a.com/sitemap.xml')
   })
 
   it('permite tudo por omissao (allow: /)', () => {

@@ -68,6 +68,24 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Consolida orcamentos-taupe.vercel.app (domínio técnico da Vercel,
+  // publicamente indexável, servia uma cópia completa do site) no domínio
+  // oficial. Redirect 308 (permanente) condicional por Host — só dispara
+  // neste domínio exato, nunca em façoporti.com/www nem em deployments de
+  // pré-visualização (hostname diferente, ex: orcamentos-git-x-ligadao.vercel.app).
+  // /api/* fica de fora deliberadamente — nenhum webhook (Stripe/Twilio) ou
+  // rota server-to-server aponta para este domínio hoje, mas exclui-se por
+  // segurança para nunca quebrar uma chamada direta que exista no futuro.
+  async redirects() {
+    return [
+      {
+        source: "/:path((?!api(?:/|$)).*)",
+        has: [{ type: "host", value: "orcamentos-taupe.vercel.app" }],
+        destination: "https://www.façoporti.com/:path",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

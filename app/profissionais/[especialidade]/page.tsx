@@ -44,9 +44,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const label = PROFESSIONS[specialty]?.label || specialty
   const title = `${label} em Portugal — ${professionals.length} profissional${professionals.length === 1 ? '' : 'is'} | FaçoPorTi`
-  const description = `Encontre profissionais de ${label.toLowerCase()} verificados no FaçoPorTi. Peça um orçamento diretamente, sem concorrência entre profissionais.`
+  const description = `Encontre profissionais de ${label.toLowerCase()} no FaçoPorTi. Peça um orçamento diretamente, sem concorrência entre profissionais.`
 
-  return { title, description, openGraph: { title, description, type: 'website' } }
+  return {
+    title,
+    description,
+    alternates: { canonical: `/profissionais/${especialidade}` },
+    openGraph: { title, description, type: 'website' },
+  }
 }
 
 export default async function EspecialidadePage({ params }: Props) {
@@ -68,7 +73,8 @@ export default async function EspecialidadePage({ params }: Props) {
       itemListElement: professionals.map((p, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        url: `https://façoporti.com/p/${p.slug}`,
+        // Punycode ASCII — JSON-LD nunca passa por new URL(), ver app/sitemap.ts.
+        url: `https://www.xn--faoporti-t0a.com/p/${p.slug}`,
         name: p.name,
       })),
     },

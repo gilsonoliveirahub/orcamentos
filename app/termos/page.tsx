@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Termos e Condições | FaçoPorTi',
   description: 'Termos e condições de utilização da plataforma FaçoPorTi para profissionais e clientes.',
+  alternates: { canonical: '/termos' },
 }
 
 export default function TermosPage() {

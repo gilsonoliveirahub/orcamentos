@@ -1,7 +1,10 @@
 import type { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-  const base = 'https://façoporti.com'
+  // Punycode ASCII — mesmo motivo do app/sitemap.ts: a diretiva Sitemap: do
+  // robots.txt é lida por máquinas, não deve depender de normalização de
+  // browser. Ver comentário completo em app/sitemap.ts.
+  const base = 'https://www.xn--faoporti-t0a.com'
   return {
     rules: [
       {

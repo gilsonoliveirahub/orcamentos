@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Política de Cookies | FaçoPorTi',
   description: 'Como o FaçoPorTi usa cookies e tecnologias semelhantes na plataforma.',
+  alternates: { canonical: '/cookies' },
 }
 
 export default function CookiesPage() {

@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
 import MarketingPage from './marketing/page'
 import { HOMEPAGE_FAQ } from '@/lib/homepage-faq'
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+}
 
 const faqJsonLd = {
   '@context': 'https://schema.org',
