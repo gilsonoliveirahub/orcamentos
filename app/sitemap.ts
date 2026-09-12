@@ -19,7 +19,6 @@ const STATIC_PAGES: Array<{ path: string; changeFrequency: MetadataRoute.Sitemap
   { path: '/profissionais', changeFrequency: 'daily', priority: 0.8 },
   { path: '/comecar', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/juntar', changeFrequency: 'monthly', priority: 0.5 },
-  { path: '/exclusivo', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/sobre', changeFrequency: 'monthly', priority: 0.4 },
   { path: '/contactos', changeFrequency: 'monthly', priority: 0.4 },
   { path: '/privacidade', changeFrequency: 'yearly', priority: 0.2 },
