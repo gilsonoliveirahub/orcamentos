@@ -15,6 +15,15 @@ export type PriceEstimate = { min: number; max: number; descricao: string }
 // que não têm preços próprios do profissional — ver ProfessionalProfileClient).
 export const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
 
+// Interruptor temporário (Fase 1, decisão de negócio): quando `false`, os
+// fluxos de pedido (/pedir e o link pessoal /p/[slug]) saltam por completo o
+// ecrã de estimativa mín.–máx. ao cliente, para favorecer a conclusão do
+// pedido no arranque da plataforma. Não afeta o cálculo real do orçamento —
+// /api/quote/estimate e /api/quote/generate continuam a correr no servidor
+// depois da submissão, e o profissional continua a ver o orçamento gerado no
+// dashboard normalmente. Reativar: mudar para `true`, nada mais a desfazer.
+export const PUBLIC_ESTIMATE_ENABLED = false
+
 const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstimate> = {
   Pintura: (a) => {
     let area_paredes: number

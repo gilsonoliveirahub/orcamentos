@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track, currentCampaignContext } from '@/lib/track-client'
-import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN } from '@/lib/quote-estimate'
+import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -159,9 +159,15 @@ export default function ProfessionalPublicPage() {
   // /api/quote/estimate, por isso podem mostrar, sem qualquer risco de
   // inconsistência, a mesma pré-visualização já usada em /pedir.
   const isPintura = selectedSpecialty === 'Pintura'
-  const totalSteps = questions.length + (isPintura ? 0 : 1) + 2
-  const isEstimateStep = !isPintura && step === questions.length + 1
-  const isMediaStep = step === questions.length + (isPintura ? 1 : 2)
+  // Pintura salta sempre este passo (preços próprios do profissional, ver
+  // comentário acima); o interruptor PUBLIC_ESTIMATE_ENABLED (Fase 1,
+  // lib/quote-estimate.ts) estende o mesmo salto a todas as especialidades
+  // enquanto estiver desligado. Quando for reativado, skipEstimate volta a
+  // reduzir-se a isPintura sozinho — comportamento da Pintura preservado.
+  const skipEstimate = isPintura || !PUBLIC_ESTIMATE_ENABLED
+  const totalSteps = questions.length + (skipEstimate ? 0 : 1) + 2
+  const isEstimateStep = !skipEstimate && step === questions.length + 1
+  const isMediaStep = step === questions.length + (skipEstimate ? 1 : 2)
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
@@ -517,7 +523,7 @@ export default function ProfessionalPublicPage() {
         )}
         {isMediaStep && (
           <MediaStep
-            current={questions.length + (isPintura ? 1 : 2)}
+            current={questions.length + (skipEstimate ? 1 : 2)}
             total={totalSteps}
             mediaUrls={mediaUrls}
             onMediaChange={setMediaUrls}

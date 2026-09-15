@@ -5,7 +5,7 @@ import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-re
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
-import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN } from '@/lib/quote-estimate'
+import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { GENERIC_ZONE_LABEL } from '@/lib/lead-completeness'
 
@@ -69,7 +69,7 @@ export default function PedirClient() {
     setAnswers(next)
     const filtered = filterQuestions(next)
     if (step < filtered.length) setStep(s => s + 1)
-    else setPhase('estimativa')
+    else setPhase(PUBLIC_ESTIMATE_ENABLED ? 'estimativa' : 'media')
   }
 
   function answerText(key: string, value: any) {
@@ -85,7 +85,10 @@ export default function PedirClient() {
       return
     }
     if (phase === 'estimativa') { setPhase('perguntas'); setStep(totalSteps); return }
-    if (phase === 'media') { setPhase('estimativa'); return }
+    if (phase === 'media') {
+      if (PUBLIC_ESTIMATE_ENABLED) { setPhase('estimativa') } else { setPhase('perguntas'); setStep(totalSteps) }
+      return
+    }
     if (phase === 'contacto') { setPhase('media'); return }
   }
 
