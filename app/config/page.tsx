@@ -4,16 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Save, ArrowLeft, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-
-const HOURLY_PROFESSIONS = ['Canalização', 'Electricidade', 'Limpeza', 'Ar Condicionado', 'Mudanças', 'Carpintaria']
-const M2_PROFESSIONS = ['Remodelação', 'Pavimentos de Madeira', 'Estuque e Pladur', 'Jardinagem']
-
-function getProfessionType(specialty: string) {
-  if (specialty === 'Pintura') return 'pintura'
-  if (HOURLY_PROFESSIONS.includes(specialty)) return 'hourly'
-  if (M2_PROFESSIONS.includes(specialty)) return 'm2'
-  return 'generic' // profissões personalizadas
-}
+import { getProfessionPricingType } from '@/lib/professions'
 
 export default function ConfigPage() {
   const router = useRouter()
@@ -48,7 +39,7 @@ export default function ConfigPage() {
     </div>
   )
 
-  const profType = getProfessionType(professional.specialty)
+  const profType = getProfessionPricingType(professional.specialty)
   const inp = "w-full rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
   const ist = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }
   const card = { background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.07)' }

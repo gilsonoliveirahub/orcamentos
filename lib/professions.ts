@@ -245,6 +245,23 @@ export const SPECIALTY_LIST = [
   'Editor de vídeos',
 ]
 
+// Classificação de preços por especialidade — fonte única (Fase 2 do plano
+// 2026-09-15). Antes disto, app/config/page.tsx tinha a sua própria cópia
+// destas listas, desatualizada desde o rename 'Pavimentos de Madeira' →
+// 'Pavimentos e Revestimentos' (2026-05-09) — qualquer profissional dessa
+// especialidade caía em "generic" e nunca via o campo "Preço por m²".
+export const HOURLY_PROFESSIONS = ['Canalização', 'Electricidade', 'Limpeza', 'Ar Condicionado', 'Mudanças', 'Carpintaria']
+export const M2_PROFESSIONS = ['Remodelação', 'Pavimentos e Revestimentos', 'Estuque e Pladur', 'Jardinagem']
+
+export type ProfessionPricingType = 'pintura' | 'hourly' | 'm2' | 'generic'
+
+export function getProfessionPricingType(specialty: string): ProfessionPricingType {
+  if (specialty === 'Pintura') return 'pintura'
+  if (HOURLY_PROFESSIONS.includes(specialty)) return 'hourly'
+  if (M2_PROFESSIONS.includes(specialty)) return 'm2'
+  return 'generic'
+}
+
 const GENERIC_PROFESSION: ProfessionConfig = {
   emoji: '💼',
   label: 'Outro',

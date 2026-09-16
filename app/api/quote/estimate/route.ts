@@ -67,8 +67,14 @@ export async function POST(req: NextRequest) {
     const specialty = professional.specialty || 'Outro'
     const answers = lead.metadata || {}
 
-    // Usar tabela de preços da especialidade
-    const { min, max, descricao } = estimatePriceRange(specialty, answers)
+    // Usar preço próprio do profissional quando configurado (Fase 2,
+    // 2026-09-15); sem isso, cai na tabela genérica por especialidade.
+    const { min, max, descricao } = estimatePriceRange(specialty, answers, {
+      price_per_m2: professional.price_per_m2,
+      price_per_hour: professional.price_per_hour,
+      travel_cost: professional.travel_cost,
+      min_quote: professional.min_quote,
+    })
     const proposalText = generateUniversalProposal(
       lead.name || 'Cliente',
       professional.name || 'Profissional',

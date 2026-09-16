@@ -4,7 +4,18 @@
 // nenhum import de supabaseAdmin/service role para o bundle do browser.
 // Lógica de cálculo mantida byte a byte igual à original.
 
+import { getProfessionPricingType } from './professions'
+
 export type PriceEstimate = { min: number; max: number; descricao: string }
+
+// Preços próprios do profissional (app/config/page.tsx) — Fase 2 do plano
+// 2026-09-15 ("ligar preços independentes por especialidade ao cálculo").
+export type ProfessionalPricing = {
+  price_per_m2?: number | null
+  price_per_hour?: number | null
+  travel_cost?: number | null
+  min_quote?: number | null
+}
 
 // Margem adicional só na apresentação antecipada ao cliente (nunca gravada em
 // `quotes`, nunca vista pelo profissional) — reduz o risco de a proposta real
@@ -186,7 +197,25 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstima
   },
 }
 
-export function estimatePriceRange(specialty: string, answers: Record<string, any>): PriceEstimate {
+export function estimatePriceRange(specialty: string, answers: Record<string, any>, professionalPricing?: ProfessionalPricing): PriceEstimate {
+  // Fase 2 (2026-09-15): quando o profissional já configurou um preço por m²
+  // para a própria especialidade (app/config/page.tsx, especialidades 'm2':
+  // Remodelação, Pavimentos e Revestimentos/chão flutuante, Estuque e Pladur,
+  // Jardinagem) e a resposta trouxe uma área válida, usa o preço real dele em
+  // vez da tabela genérica abaixo (igual para todos). Sem preço configurado
+  // ou sem área, mantém exatamente o comportamento anterior (fallback).
+  const pricingType = getProfessionPricingType(specialty)
+  if (pricingType === 'm2' && professionalPricing?.price_per_m2) {
+    const area = parseFloat(answers.area_m2)
+    if (!isNaN(area) && area > 0) {
+      // Mesmo espalhamento min→max já usado para Pintura neste ficheiro
+      // (linha "Math.round(min * 1.4)") — não é um número novo.
+      const min = Math.max(Math.round(area * professionalPricing.price_per_m2), professionalPricing.min_quote || 0)
+      const max = Math.round(min * 1.4)
+      return { min, max, descricao: `${specialty} — ${area}m²` }
+    }
+  }
+
   const estimator = PRICE_TABLES[specialty] || PRICE_TABLES['Outro']
   return estimator(answers)
 }
