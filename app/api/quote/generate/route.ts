@@ -46,8 +46,17 @@ export async function POST(req: NextRequest) {
     const quoteInput = {
       area_m2_paredes: area_paredes,
       area_m2_tetos: area_tetos,
-      tipo: (lead.q1_tipo_trabalho || 'interior') as 'interior' | 'exterior' | 'ambos',
-      cor_escura: !!lead.q4_cor_escura,
+      // q1_tipo_trabalho vem do texto exato da opção escolhida no formulário
+      // ('Interior'/'Exterior'/'Ambos', com maiúscula — é o que aparece como
+      // tag no dashboard). calculateQuote compara em minúsculas; sem este
+      // toLowerCase() a comparação falhava sempre e valor_base ficava a 0,
+      // caindo sempre no min_quote (bug real encontrado no lead da Elisa Reuter).
+      tipo: (lead.q1_tipo_trabalho || 'interior').toLowerCase() as 'interior' | 'exterior' | 'ambos',
+      // lead.q4_cor_escura: nome físico da coluna mantido por compatibilidade
+      // (ver nota em dashboard_leads(), supabase/migration_marketplace_v3_atomic.sql
+      // — renomear a coluna exigia reescrever essa função de segurança).
+      // Representa "mudança de cor" (branco↔cor), não literalmente "escura".
+      mudanca_cor: !!lead.q4_cor_escura,
       fissuras: !!lead.q5_fissuras,
       mobilias: !!lead.q6_mobilias,
       primer: !!lead.q7_primer,
@@ -55,7 +64,11 @@ export async function POST(req: NextRequest) {
         price_m2_walls: professional.price_m2_walls || 4,
         price_m2_ceiling: professional.price_m2_ceiling || 5,
         price_m2_exterior: professional.price_m2_exterior || 6,
-        extra_dark_color: professional.extra_dark_color || 1.25,
+        // professional.extra_dark_color: nome físico da coluna mantido por
+        // compatibilidade (mesmo motivo acima). Decisão de negócio 2026-09-16:
+        // deixou de ser "+25% sobre tudo" e passou a "+10% só sobre paredes"
+        // — o antigo valor por omissão (1.25) NÃO se mantém, o novo é 1.10.
+        extra_color_change: professional.extra_dark_color || 1.10,
         extra_cracks: professional.extra_cracks || 6,
         extra_furniture_move: professional.extra_furniture_move || 50,
         extra_primer: professional.extra_primer || 2,
@@ -79,7 +92,7 @@ export async function POST(req: NextRequest) {
         valor_max: quoteResult.valor_max,
         proposal_text: proposalText,
         status: 'rascunho',
-      })
+      }, { onConflict: 'lead_id' })
       .select()
       .single()
 

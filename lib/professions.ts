@@ -34,7 +34,7 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'num_wc', text: 'Quantas casas de banho? (normalmente só teto)', type: 'choice', options: ['0', '1', '2', '3 ou mais'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'area_total_m2', text: 'Área total da habitação em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true, showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'cor_escura', text: 'Qual a situação da cor?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor', 'Cor / Passa a branco'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
+      { key: 'mudanca_de_cor', text: 'Qual será a situação da cor das paredes?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor', 'Cor / Passa a branco'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'primer', text: 'Necessita de primário / preparação de superfície?', type: 'choice', options: ['Sim', 'Não', 'Não sei'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
@@ -292,7 +292,12 @@ export function mapAnswersToLeadFields(answers: Record<string, any>) {
     q3_area_m2: paintingAreas ? paintingAreas.area_paredes
               : answers['area_m2_paredes'] ? parseFloat(answers['area_m2_paredes'])
               : answers['area_m2'] ? parseFloat(answers['area_m2']) : null,
-    q4_cor_escura: answers['cor_escura'] === 'Sim' || answers['cor_escura'] === 'Branco / Passa a cor' || answers['cor_escura'] === 'Cor / Passa a branco',
+    // Nome do campo de saída (q4_cor_escura) mantido por compatibilidade com
+    // a coluna física em `leads` — representa "mudança de cor" desde
+    // 2026-09-16, não literalmente "cor escura" (nunca verificou a cor real).
+    // answers['cor_escura']: fallback para leads antigos, criados antes da
+    // pergunta passar a gravar em 'mudanca_de_cor'.
+    q4_cor_escura: ['Sim', 'Branco / Passa a cor', 'Cor / Passa a branco'].includes(answers['mudanca_de_cor'] ?? answers['cor_escura']),
     q5_fissuras: answers['fissuras'] === 'Sim',
     q6_mobilias: answers['mobilias'] === 'Sim',
     q7_primer: answers['primer'] === 'Sim',

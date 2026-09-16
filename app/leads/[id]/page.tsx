@@ -13,7 +13,7 @@ const PAINT_LABELS: Record<string, string> = {
   q1_tipo_trabalho: 'Tipo de trabalho',
   q2_divisoes: 'Divisões',
   q3_area_m2: 'Área (m²)',
-  q4_cor_escura: 'Cor escura',
+  q4_cor_escura: 'Mudança de cor',
   q5_fissuras: 'Fissuras/buracos',
   q6_mobilias: 'Móveis a mover',
   q7_primer: 'Primário',

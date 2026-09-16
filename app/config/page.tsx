@@ -112,7 +112,7 @@ export default function ConfigPage() {
             </div>
             <div className="rounded-2xl p-5 space-y-4" style={card}>
               <h2 className="font-black text-white text-sm">Extras</h2>
-              <Field label="Cor escura (multiplicador)" field="extra_dark_color" suffix="× base" desc="Ex: 1.25 = +25% sobre o preço base" />
+              <Field label="Mudança de cor (multiplicador)" field="extra_dark_color" suffix="× paredes" desc="Ex: 1.10 = +10% só sobre o valor das paredes (branco↔cor), nunca sobre tetos" />
               <Field label="Tratamento de fissuras" field="extra_cracks" suffix="€/m²" />
               <Field label="Deslocação de móveis" field="extra_furniture_move" suffix="€/divisão" />
               <Field label="Aplicação de primário" field="extra_primer" suffix="€/m²" />

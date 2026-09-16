@@ -386,7 +386,7 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
           <div className="grid grid-cols-2 gap-2 p-4 rounded-2xl"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {[
-              { key: 'q4_cor_escura', label: 'Cor escura' },
+              { key: 'q4_cor_escura', label: 'Mudança de cor' },
               { key: 'q5_fissuras', label: 'Fissuras' },
               { key: 'q6_mobilias', label: 'Móveis a mover' },
               { key: 'q7_primer', label: 'Primário' },

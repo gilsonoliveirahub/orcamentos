@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
         valor_max: max,
         proposal_text: proposalText,
         status: 'rascunho',
-      })
+      }, { onConflict: 'lead_id' })
       .select()
       .single()
 

@@ -37,7 +37,9 @@ describe('POST /api/notifications/lead', () => {
 
     vi.doMock('@/lib/supabase-admin', () => ({
       supabaseAdmin: {
-        from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }),
+        from: (table: string) => table === 'notification_log'
+          ? { insert: async () => ({ error: null }) }
+          : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
       },
     }))
 
@@ -69,7 +71,11 @@ describe('POST /api/notifications/lead', () => {
       professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: null, plan: 'pro', zone: 'Lisboa' },
     }
     vi.doMock('@/lib/supabase-admin', () => ({
-      supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+      supabaseAdmin: {
+        from: (table: string) => table === 'notification_log'
+          ? { insert: async () => ({ error: null }) }
+          : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+      },
     }))
     const emailNovoLead = vi.fn().mockResolvedValue(undefined)
     const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -113,7 +119,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof Free', email: 'proffree@example.com', specialty: 'Pintura', phone: '351944444444', plan: 'free', zone: 'Porto' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -139,7 +149,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof Starter', email: 'profstarter@example.com', specialty: 'Pintura', phone: '351944444444', plan: 'starter', zone: 'Porto' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -166,7 +180,11 @@ describe('POST /api/notifications/lead', () => {
         },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -191,7 +209,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof Inactive', email: 'profinactive@example.com', specialty: 'Pintura', phone: '351944444444', plan: 'inactive', zone: 'Porto' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -215,7 +237,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof Pro', email: 'profpro@example.com', specialty: 'Canalização', phone: '351966666666', plan: 'pro', zone: 'Faro' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -245,7 +271,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'starter', zone: 'Lisboa' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -271,7 +301,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888889', plan: 'pro', zone: 'Lisboa' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -301,7 +335,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'pro', zone: 'Lisboa' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -325,7 +363,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof', email: 'prof@example.com', specialty: 'Pintura', phone: '351988888888', plan: 'pro', zone: 'Lisboa' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)
@@ -349,7 +391,11 @@ describe('POST /api/notifications/lead', () => {
         professionals: { name: 'Prof Pro', email: 'profpro@example.com', specialty: 'Pintura', phone: '351900000000', plan: 'pro', zone: 'Braga' },
       }
       vi.doMock('@/lib/supabase-admin', () => ({
-        supabaseAdmin: { from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }) },
+        supabaseAdmin: {
+          from: (table: string) => table === 'notification_log'
+            ? { insert: async () => ({ error: null }) }
+            : { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) },
+        },
       }))
       const emailNovoLead = vi.fn().mockResolvedValue(undefined)
       const emailNovoLeadBloqueado = vi.fn().mockResolvedValue(undefined)

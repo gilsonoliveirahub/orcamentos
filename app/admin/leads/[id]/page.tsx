@@ -30,7 +30,7 @@ const RESPOSTAS: Array<{ key: keyof LeadDetail['lead']; label: string }> = [
   { key: 'q1_tipo_trabalho', label: 'Tipo de trabalho' },
   { key: 'q2_divisoes', label: 'Divisões' },
   { key: 'q3_area_m2', label: 'Área (m²)' },
-  { key: 'q4_cor_escura', label: 'Cor escura' },
+  { key: 'q4_cor_escura', label: 'Mudança de cor' },
   { key: 'q5_fissuras', label: 'Fissuras' },
   { key: 'q6_mobilias', label: 'Mobílias a mover' },
   { key: 'q7_primer', label: 'Primer' },

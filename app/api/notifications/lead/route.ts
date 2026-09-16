@@ -7,6 +7,29 @@ import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
 
 export const dynamic = 'force-dynamic'
 
+// Antes disto, uma falha de envio (email ou WhatsApp) ficava só num
+// console.warn/console.error — nunca visível para o profissional nem
+// persistida. Foi assim que o domínio de email ficou meses sem verificação
+// na Resend sem ninguém dar por isso (lead da Elisa Reuter, 2026-09-16).
+// Esta função nunca lança — uma falha ao registar o log não pode impedir a
+// resposta da rota.
+async function logNotification(params: {
+  leadId: string
+  professionalId: string | null
+  channel: 'email' | 'whatsapp'
+  status: 'sent' | 'failed' | 'skipped'
+  reason?: string | null
+}) {
+  const { error } = await supabaseAdmin.from('notification_log').insert({
+    lead_id: params.leadId,
+    professional_id: params.professionalId,
+    channel: params.channel,
+    status: params.status,
+    reason: params.reason ?? null,
+  })
+  if (error) console.error(`[notifications/lead] falha ao registar notification_log: ${error.message}`)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { lead_id } = await req.json()
@@ -39,13 +62,19 @@ export async function POST(req: NextRequest) {
     const authorized = isLeadAuthorized(lead)
 
     if (!authorized) {
-      await emailNovoLeadBloqueado({
-        profName: prof.name,
-        profEmail: prof.email,
-        profSpecialty: prof.specialty,
-        zoneApprox: lead.zone_requested || prof.zone || null,
-        isFreePlan,
-      })
+      try {
+        await emailNovoLeadBloqueado({
+          profName: prof.name,
+          profEmail: prof.email,
+          profSpecialty: prof.specialty,
+          zoneApprox: lead.zone_requested || prof.zone || null,
+          isFreePlan,
+        })
+        await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'email', status: 'sent' })
+      } catch (err: any) {
+        console.error(`[notifications/lead] email (bloqueado) não enviado (lead ${lead.id}): ${err.message}`)
+        await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'email', status: 'failed', reason: err.message })
+      }
 
       if (prof.phone && isPro) {
         const ctaUrl = isFreePlan ? `${appUrl}/upgrade` : `${appUrl}/dashboard`
@@ -57,6 +86,7 @@ export async function POST(req: NextRequest) {
         if (result.status !== 'sent') {
           console.warn(`[notifications/lead] WhatsApp (bloqueado) não enviado (lead ${lead.id}): ${result.reason}`)
         }
+        await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'whatsapp', status: result.status, reason: result.status === 'sent' ? null : result.reason })
       }
 
       return NextResponse.json({ ok: true, blocked: true })
@@ -79,22 +109,28 @@ export async function POST(req: NextRequest) {
         return `<tr><td style="padding:8px;color:#64748b;font-size:13px;text-transform:capitalize">${label}</td><td style="padding:8px;color:#fff">${val}</td></tr>`
       }).join('')
 
-    await emailNovoLead({
-      profName: prof.name,
-      profEmail: prof.email,
-      profSpecialty: prof.specialty,
-      leadId: lead.id,
-      leadName: lead.name || '—',
-      leadPhone: lead.phone || '—',
-      leadEmail: lead.email,
-      servico,
-      area: area ? String(area) : undefined,
-      prazo,
-      notas,
-      source: lead.source || 'pessoal',
-      extraRows,
-      mediaCount,
-    })
+    try {
+      await emailNovoLead({
+        profName: prof.name,
+        profEmail: prof.email,
+        profSpecialty: prof.specialty,
+        leadId: lead.id,
+        leadName: lead.name || '—',
+        leadPhone: lead.phone || '—',
+        leadEmail: lead.email,
+        servico,
+        area: area ? String(area) : undefined,
+        prazo,
+        notas,
+        source: lead.source || 'pessoal',
+        extraRows,
+        mediaCount,
+      })
+      await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'email', status: 'sent' })
+    } catch (err: any) {
+      console.error(`[notifications/lead] email não enviado (lead ${lead.id}): ${err.message}`)
+      await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'email', status: 'failed', reason: err.message })
+    }
 
     // WhatsApp ao profissional — exclusivo do plano Pro (decisão de negócio)
     if (prof.phone && isPro) {
@@ -109,6 +145,7 @@ export async function POST(req: NextRequest) {
       if (result.status !== 'sent') {
         console.warn(`[notifications/lead] WhatsApp não enviado (lead ${lead.id}): ${result.reason}`)
       }
+      await logNotification({ leadId: lead.id, professionalId: lead.professional_id, channel: 'whatsapp', status: result.status, reason: result.status === 'sent' ? null : result.reason })
     }
 
     return NextResponse.json({ ok: true })

@@ -45,8 +45,14 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstima
     }
     const tipo = (a.tipo_trabalho || a.q1_tipo_trabalho || 'interior').toLowerCase()
     const priceParedes = tipo.includes('exterior') ? 6 : 4
-    const base = area_paredes * priceParedes + area_tetos * 5
-    const extras = a.cor_escura || a.q4_cor_escura ? base * 0.25 : 0
+    const valorParedes = area_paredes * priceParedes
+    const base = valorParedes + area_tetos * 5
+    // a.mudanca_de_cor: chave nova da pergunta (ver lib/professions.ts).
+    // a.cor_escura: fallback para leads antigos, criados antes do rename.
+    // a.q4_cor_escura: fallback se vier já o booleano da coluna (compatibilidade).
+    // Decisão de negócio 2026-09-16: +10% (não +25%), só sobre paredes (não sobre tetos).
+    const mudancaCor = a.mudanca_de_cor || a.cor_escura || a.q4_cor_escura
+    const extras = mudancaCor ? valorParedes * 0.10 : 0
     const min = Math.max(Math.round(base + extras), 150)
     const descricao = `Pintura ${tipo} — ${area_paredes}m² paredes${area_tetos > 0 ? ` + ${area_tetos}m² tetos` : ''}`
     return { min, max: Math.round(min * 1.4), descricao }

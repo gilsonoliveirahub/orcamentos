@@ -138,8 +138,11 @@ export async function POST(req: NextRequest) {
           const quoteInput = {
             area_m2_paredes: area_paredes,
             area_m2_tetos: area_tetos,
-            tipo: (lead.q1_tipo_trabalho || 'interior') as 'interior' | 'exterior' | 'ambos',
-            cor_escura: !!lead.q4_cor_escura,
+            tipo: (lead.q1_tipo_trabalho || 'interior').toLowerCase() as 'interior' | 'exterior' | 'ambos',
+            // lead.q4_cor_escura: nome físico mantido por compatibilidade
+            // (ver mesma nota em app/api/quote/generate/route.ts) — representa
+            // "mudança de cor", não literalmente "escura".
+            mudanca_cor: !!lead.q4_cor_escura,
             fissuras: !!lead.q5_fissuras,
             mobilias: !!lead.q6_mobilias,
             primer: !!lead.q7_primer,
@@ -147,7 +150,10 @@ export async function POST(req: NextRequest) {
               price_m2_walls: professional.price_m2_walls || 4,
               price_m2_ceiling: professional.price_m2_ceiling || 5,
               price_m2_exterior: professional.price_m2_exterior || 6,
-              extra_dark_color: professional.extra_dark_color || 1.25,
+              // professional.extra_dark_color: nome físico mantido por
+              // compatibilidade. Decisão de negócio 2026-09-16: +10% só sobre
+              // paredes (não +25% sobre tudo) — o novo valor por omissão é 1.10.
+              extra_color_change: professional.extra_dark_color || 1.10,
               extra_cracks: professional.extra_cracks || 6,
               extra_furniture_move: professional.extra_furniture_move || 50,
               extra_primer: professional.extra_primer || 2,
