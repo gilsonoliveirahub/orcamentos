@@ -95,6 +95,7 @@ create table if not exists quotes (
   professional_id uuid references professionals(id),
   -- Cálculo
   area_m2         numeric,
+  horas_estimadas numeric,
   valor_base      numeric,
   extras_total    numeric,
   valor_final     numeric,

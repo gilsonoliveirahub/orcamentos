@@ -197,6 +197,52 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstima
   },
 }
 
+// Movido de app/api/quote/estimate/route.ts (era local, não reutilizável) —
+// agora também usado por app/api/quote/hours/route.ts (Fase 2, profissões
+// "por hora": horas_estimadas × price_per_hour). Lógica de texto mantida
+// igual, só ganhou o ramo min===max para não dizer "Entre €500 e €500"
+// quando o profissional já indicou um valor preciso (não um intervalo).
+export function generateUniversalProposal(
+  leadName: string,
+  profName: string,
+  specialty: string,
+  descricao: string,
+  min: number,
+  max: number,
+  answers: Record<string, any>
+): string {
+  const hoje = new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
+  const prazoText = answers.prazo?.includes('Emergência') ? 'Urgência confirmada — disponível hoje'
+    : answers.prazo?.includes('semana') ? 'Posso começar esta semana'
+    : 'Posso agendar para breve'
+  const valorText = min === max ? `*€${min}*` : `Entre *€${min}* e *€${max}*`
+
+  return `Olá ${leadName} 👋
+
+Obrigado por entrar em contacto. Aqui está a minha proposta:
+
+📋 *ORÇAMENTO — ${specialty.toUpperCase()}*
+Data: ${hoje}
+Profissional: ${profName}
+
+🔧 *Serviço*: ${descricao}
+${Object.entries(answers)
+  .filter(([k, v]) => v && k !== 'notas' && k !== 'prazo' && k !== 'media_urls')
+  .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${v}`)
+  .join('\n')}
+
+💰 *Valor Estimado*
+${valorText}
+_(valor final confirmado após visita/avaliação)_
+
+⏰ *Disponibilidade*
+${prazoText}
+
+${answers.notas ? `📝 *Notas*: ${answers.notas}\n\n` : ''}Que dia lhe dá jeito para combinar os detalhes? 🗓️
+
+_${profName} — FaçoPorTi_`
+}
+
 export function estimatePriceRange(specialty: string, answers: Record<string, any>, professionalPricing?: ProfessionalPricing): PriceEstimate {
   // Fase 2 (2026-09-15): quando o profissional já configurou um preço por m²
   // para a própria especialidade (app/config/page.tsx, especialidades 'm2':

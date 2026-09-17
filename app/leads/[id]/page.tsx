@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
-import { PROFESSIONS } from '@/lib/professions'
+import { PROFESSIONS, getProfessionPricingType } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
 import { computeLeadCompleteness } from '@/lib/lead-completeness'
 import { summarizeMedia } from '@/lib/media-summary'
@@ -44,6 +44,8 @@ export default function LeadDetail() {
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [actionError, setActionError] = useState('')
+  const [horasInput, setHorasInput] = useState('')
+  const [settingHours, setSettingHours] = useState(false)
   const [, startTransition] = useTransition()
 
   async function loadData() {
@@ -95,6 +97,27 @@ export default function LeadDetail() {
     if (!res.ok) setActionError('Não foi possível gerar o orçamento. Tente novamente.')
     await loadData()
     setGenerating(false)
+  }
+
+  // Profissões "por hora" — decisão de negócio 2026-09-16: não perguntar ao
+  // cliente quantas horas o trabalho leva, o profissional indica aqui, no
+  // rascunho da proposta. Calcula e atualiza valores + texto na mesma
+  // operação (nunca um sem o outro — ver lib/calculator.test.ts para o bug
+  // real que isto evita repetir).
+  async function handleSetHours() {
+    setSettingHours(true)
+    setActionError('')
+    const res = await fetch('/api/quote/hours', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: id, horas: horasInput }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: null }))
+      setActionError(error || 'Não foi possível calcular com essas horas.')
+    }
+    await loadData()
+    setSettingHours(false)
   }
 
   async function handleStatusChange(newStatus: string) {
@@ -225,6 +248,7 @@ export default function LeadDetail() {
   // de sólido antes de decidir avançar.
   const completeness = computeLeadCompleteness(lead)
   const mediaSummary = summarizeMedia(mediaUrls)
+  const isHourlyProfession = getProfessionPricingType(specialty) === 'hourly'
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -375,6 +399,41 @@ export default function LeadDetail() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Horas estimadas — só profissões "por hora" (o cliente nunca é
+            perguntado sobre isto; quem estima é o profissional) */}
+        {isHourlyProfession && (
+          <div className="rounded-2xl p-5" style={cardStyle}>
+            <h2 className="text-sm font-bold text-gray-400 mb-3">Horas estimadas para este trabalho</h2>
+            <p className="text-xs text-gray-600 mb-3">
+              O cliente não foi perguntado sobre duração — indica aqui quantas horas estimas, para calcular preço por hora × horas (respeitando o teu valor mínimo).
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={horasInput}
+                onChange={e => setHorasInput(e.target.value)}
+                placeholder="ex: 3"
+                className="w-28 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              />
+              <span className="text-gray-500 text-sm">horas</span>
+              <button
+                onClick={handleSetHours}
+                disabled={settingHours || !horasInput}
+                className="font-bold px-4 py-2.5 rounded-xl text-sm text-white transition-all"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', opacity: settingHours || !horasInput ? 0.6 : 1 }}
+              >
+                {settingHours ? 'A calcular...' : 'Calcular proposta'}
+              </button>
+            </div>
+            {quote?.horas_estimadas != null && (
+              <p className="text-xs text-gray-600 mt-3">Última estimativa: {quote.horas_estimadas}h → €{quote.valor_final}</p>
+            )}
           </div>
         )}
 

@@ -1,49 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
-import { estimatePriceRange } from '@/lib/quote-estimate'
+import { estimatePriceRange, generateUniversalProposal } from '@/lib/quote-estimate'
 
 export const dynamic = 'force-dynamic'
-
-function generateUniversalProposal(
-  leadName: string,
-  profName: string,
-  specialty: string,
-  descricao: string,
-  min: number,
-  max: number,
-  answers: Record<string, any>
-): string {
-  const hoje = new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
-  const prazoText = answers.prazo?.includes('Emergência') ? 'Urgência confirmada — disponível hoje'
-    : answers.prazo?.includes('semana') ? 'Posso começar esta semana'
-    : 'Posso agendar para breve'
-
-  return `Olá ${leadName} 👋
-
-Obrigado por entrar em contacto. Aqui está a minha proposta:
-
-📋 *ORÇAMENTO — ${specialty.toUpperCase()}*
-Data: ${hoje}
-Profissional: ${profName}
-
-🔧 *Serviço*: ${descricao}
-${Object.entries(answers)
-  .filter(([k, v]) => v && k !== 'notas' && k !== 'prazo' && k !== 'media_urls')
-  .map(([k, v]) => `• ${k.replace(/_/g, ' ')}: ${v}`)
-  .join('\n')}
-
-💰 *Valor Estimado*
-Entre *€${min}* e *€${max}*
-_(valor final confirmado após visita/avaliação)_
-
-⏰ *Disponibilidade*
-${prazoText}
-
-${answers.notas ? `📝 *Notas*: ${answers.notas}\n\n` : ''}Que dia lhe dá jeito para combinar os detalhes? 🗓️
-
-_${profName} — FaçoPorTi_`
-}
 
 export async function POST(req: NextRequest) {
   try {

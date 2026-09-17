@@ -37,5 +37,12 @@ export function computeLeadCompleteness(lead: LeadForCompleteness): { checks: Co
   checks.push({ key: 'notas', label: 'Descrição com detalhe', met: notas.trim().length >= MIN_NOTES_LENGTH })
   checks.push({ key: 'media', label: 'Fotos ou vídeo anexados', met: mediaUrls.length > 0 })
 
+  // Pintura — cliente escolheu pintar paredes das casas de banho mas não
+  // sabe os m² (decisão de negócio 2026-09-16: nunca inventar essa área,
+  // só sinalizar aqui para confirmar no local antes de orçamentar).
+  if (metadata.casas_banho_pintura === 'Paredes e tetos' && metadata.casas_banho_m2_paredes === 'Não sei') {
+    checks.push({ key: 'casas_banho_area', label: 'Área das casas de banho confirmada', met: false })
+  }
+
   return { checks, missingCount: checks.filter(c => !c.met).length }
 }
