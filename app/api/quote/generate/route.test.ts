@@ -188,6 +188,52 @@ describe('POST /api/quote/generate — precisão de area_tetos (movido do client
     expect(inserted[0].proposal_text).toContain(`€${expected.valor_max}`)
   })
 
+  it('P1: usa os preços de Pintura configurados em professional_pricing para esta especialidade, não o legacy partilhado', async () => {
+    const lead = {
+      id: 'lead-h', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      q3_area_m2: 100, q1_tipo_trabalho: 'interior',
+      professionals: {
+        ...professional, // legacy: price_m2_walls 4
+        professional_pricing: [{ specialty: 'Pintura', price_m2_walls: 9, price_m2_ceiling: 5, price_m2_exterior: 6, min_quote: 150 }],
+      },
+    }
+    const { inserted } = mockLeadAndQuotes(lead)
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-h' }))
+
+    const expected = calculateQuote({
+      area_m2_paredes: 100, area_m2_tetos: 0, tipo: 'interior', mudanca_cor: false, fissuras: false, mobilias: false, primer: false,
+      prices: { ...prices, price_m2_walls: 9 },
+    })
+    expect(inserted[0]).toMatchObject({ valor_base: expected.valor_base, valor_final: expected.valor_final })
+    // Confirma que não usou o legacy (4€/m²), que daria um valor_base menor.
+    expect(inserted[0].valor_base).not.toBe(400) // 100m² × 4€/m² legacy
+  })
+
+  it('P1: subserviço "paredes exterior" nunca contamina o cálculo de um trabalho interior, mesmo configurados em simultâneo', async () => {
+    const lead = {
+      id: 'lead-i', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      q3_area_m2: 100, q1_tipo_trabalho: 'interior', // pedido interior
+      professionals: {
+        ...professional,
+        professional_pricing: [
+          { specialty: 'Pintura', subservico: 'paredes_interior', price_per_m2: 9 },
+          { specialty: 'Pintura', subservico: 'paredes_exterior', price_per_m2: 50 }, // nunca deve ser usado aqui
+        ],
+      },
+    }
+    const { inserted } = mockLeadAndQuotes(lead)
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-i' }))
+
+    // 100m² × 9€/m² (paredes_interior) = 900€ de base — nunca 100×50=5000€
+    // (paredes_exterior) nem o legacy (4€/m²).
+    expect(inserted[0].valor_base).toBe(900)
+    expect(inserted[0].valor_base).not.toBe(400) // 100m² × 4€/m² legacy
+  })
+
   it('lead antigo sem metadata, q8_teto=false: area_tetos=0, como antes', async () => {
     const lead = {
       id: 'lead-d', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,

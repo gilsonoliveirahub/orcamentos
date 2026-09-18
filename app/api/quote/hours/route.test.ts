@@ -109,6 +109,38 @@ describe('POST /api/quote/hours — profissões "por hora" (Fase 2, 2026-09-16)'
     expect(json.quote.proposal_text).not.toContain('ELECTRICIDADE')
   })
 
+  it('P1: usa o price_per_hour configurado para a especialidade do lead, não o de outra especialidade nem o legacy partilhado', async () => {
+    // Profissional principal é Canalização mas tem Electricidade também
+    // ativa, com preço/hora diferente configurado para cada. Este lead
+    // pediu Electricidade — tem de usar 45€/h, não os 30€/h legacy nem os
+    // 25€/h configurados para Canalização.
+    const lead = {
+      ...baseLead,
+      specialty: 'Electricidade',
+      professionals: {
+        ...baseLead.professionals,
+        professional_pricing: [
+          { specialty: 'Canalização', price_per_hour: 25, min_quote: 40 },
+          { specialty: 'Electricidade', price_per_hour: 45, min_quote: 60 },
+        ],
+      },
+    }
+    const { upserts } = mockLeadAndQuotes(lead)
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-1', horas: 2 }))
+    // 2h × 45€/h = 90€
+    expect(upserts[0].valor_final).toBe(90)
+  })
+
+  it('P1: sem linha em professional_pricing para esta especialidade, cai no price_per_hour legacy (compatibilidade)', async () => {
+    const lead = { ...baseLead, professionals: { ...baseLead.professionals, professional_pricing: [] } }
+    const { upserts } = mockLeadAndQuotes(lead)
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-1', horas: 5 }))
+    // 5h × 30€/h (legacy) = 150€ — mesmo resultado do teste original acima
+    expect(upserts[0].valor_final).toBe(150)
+  })
+
   it('recusa recalcular quando a proposta já foi enviada ao cliente (status=enviado)', async () => {
     mockLeadAndQuotes(baseLead, { status: 'enviado', value_source: 'calculated' })
     const { POST } = await import('./route')

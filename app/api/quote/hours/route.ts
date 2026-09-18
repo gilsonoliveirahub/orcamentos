@@ -4,6 +4,7 @@ import { isLeadAuthorized } from '@/lib/lead-authorization'
 import { generateUniversalProposal } from '@/lib/quote-estimate'
 import { getLeadSpecialty } from '@/lib/professions'
 import { checkQuoteRecalculationAllowed } from '@/lib/quote-guard'
+import { buildPricingIndex, resolveSubservicePricing, resolveRequestedSubservico } from '@/lib/professional-pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('*, professionals(*)')
+      .select('*, professionals(*, professional_pricing(*))')
       .eq('id', lead_id)
       .single()
 
@@ -43,17 +44,28 @@ export async function POST(req: NextRequest) {
     if (guard.blocked) return NextResponse.json({ error: 'blocked', message: guard.message }, { status: 409 })
 
     const professional = lead.professionals || {}
-    const pricePerHour = professional.price_per_hour || 0
+    // Especialidade REALMENTE pedida pelo cliente — nunca a "principal" do
+    // profissional. Precisa de vir antes do preço porque um profissional com
+    // várias especialidades pode ter um preço/hora diferente para cada uma
+    // (P1, 2026-09-18: professional_pricing) — sem isto, um profissional com
+    // Canalização + Electricidade cobraria sempre o mesmo preço às duas.
+    const specialty = getLeadSpecialty(lead) || lead.q1_tipo_trabalho || 'Serviço'
+    const answers = lead.metadata || {}
+    // P1 (2026-09-18, revisto para subserviços): profissional → especialidade
+    // do lead → subserviço pedido (se identificável) → preço geral da
+    // especialidade → colunas legacy (compatibilidade). Nenhuma profissão
+    // "por hora" tem subserviços definidos ainda (só Pintura e Pavimentos e
+    // Revestimentos, ver SPECIALTY_SUBSERVICES) — resolveRequestedSubservico
+    // devolve null aqui, caindo direto no preço geral da especialidade.
+    const pricingIndex = buildPricingIndex(professional.professional_pricing)
+    const subservico = resolveRequestedSubservico(specialty, answers)
+    const pricing = resolveSubservicePricing(professional, pricingIndex[specialty], subservico)
+    const pricePerHour = pricing.price_per_hour || 0
     if (!pricePerHour) {
       return NextResponse.json({ error: 'Define primeiro o teu preço por hora em /config' }, { status: 400 })
     }
 
-    const valor = Math.max(Math.round(pricePerHour * horasNum * 100) / 100, professional.min_quote || 0)
-    const answers = lead.metadata || {}
-    // Especialidade REALMENTE pedida pelo cliente — nunca a "principal" do
-    // profissional (só usada aqui para o texto da proposta, mas tem de estar
-    // correta para um profissional com várias especialidades).
-    const specialty = getLeadSpecialty(lead) || lead.q1_tipo_trabalho || 'Serviço'
+    const valor = Math.max(Math.round(pricePerHour * horasNum * 100) / 100, pricing.min_quote || 0)
     const descricao = `${horasNum}h × €${pricePerHour}/hora`
     const proposalText = generateUniversalProposal(
       lead.name || 'Cliente',

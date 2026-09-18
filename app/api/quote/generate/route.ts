@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
-import { calcPaintingAreas } from '@/lib/professions'
+import { calcPaintingAreas, getLeadSpecialty } from '@/lib/professions'
 import { checkQuoteRecalculationAllowed } from '@/lib/quote-guard'
+import { buildPricingIndex, resolveSpecialtyPricing, resolvePaintingAreaPrices } from '@/lib/professional-pricing'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
 
     const { data: lead } = await supabase
       .from('leads')
-      .select('*, professionals(*)')
+      .select('*, professionals(*, professional_pricing(*))')
       .eq('id', lead_id)
       .single()
 
@@ -38,6 +39,20 @@ export async function POST(req: NextRequest) {
 
     const professional = lead.professionals || {}
     const metadata = lead.metadata || {}
+    // P1 (2026-09-18, revisto para subserviços): preços de Pintura por
+    // ÁREA — paredes/tetos/exterior são subserviços distintos
+    // (paredes_interior/tetos/paredes_exterior), cada um podendo ter o seu
+    // próprio price_per_m2, sem misturar o de um com o de outro. Sem linha
+    // por subserviço, cai na linha geral da especialidade e depois nas
+    // colunas legacy de `professionals` (compatibilidade — ver
+    // lib/professional-pricing.ts). Extras (mudança de cor, fissuras,
+    // deslocação, primário) e min_quote continuam ao nível da especialidade
+    // — não fazem parte dos exemplos de subserviço dados, ficam na linha
+    // geral.
+    const specialty = getLeadSpecialty(lead)
+    const pricingIndex = buildPricingIndex(professional.professional_pricing)
+    const pricing = resolveSpecialtyPricing(professional, pricingIndex[specialty])
+    const areaPrices = resolvePaintingAreaPrices(professional, pricingIndex[specialty])
 
     // q3_area_m2 já é o valor exato de paredes calculado na criação do lead
     // (ver mapAnswersToLeadFields, que grava sempre paintingAreas.area_paredes
@@ -72,18 +87,19 @@ export async function POST(req: NextRequest) {
       mobilias: !!lead.q6_mobilias,
       primer: !!lead.q7_primer,
       prices: {
-        price_m2_walls: professional.price_m2_walls || 4,
-        price_m2_ceiling: professional.price_m2_ceiling || 5,
-        price_m2_exterior: professional.price_m2_exterior || 6,
-        // professional.extra_dark_color: nome físico da coluna mantido por
-        // compatibilidade (mesmo motivo acima). Decisão de negócio 2026-09-16:
-        // deixou de ser "+25% sobre tudo" e passou a "+10% só sobre paredes"
-        // — o antigo valor por omissão (1.25) NÃO se mantém, o novo é 1.10.
-        extra_color_change: professional.extra_dark_color || 1.10,
-        extra_cracks: professional.extra_cracks || 6,
-        extra_furniture_move: professional.extra_furniture_move || 50,
-        extra_primer: professional.extra_primer || 2,
-        min_quote: professional.min_quote || 150,
+        price_m2_walls: areaPrices.price_m2_walls || 4,
+        price_m2_ceiling: areaPrices.price_m2_ceiling || 5,
+        price_m2_exterior: areaPrices.price_m2_exterior || 6,
+        // pricing.extra_dark_color: nome físico do campo mantido por
+        // compatibilidade (mesmo motivo da coluna original). Decisão de
+        // negócio 2026-09-16: deixou de ser "+25% sobre tudo" e passou a
+        // "+10% só sobre paredes" — o antigo valor por omissão (1.25) NÃO se
+        // mantém, o novo é 1.10.
+        extra_color_change: pricing.extra_dark_color || 1.10,
+        extra_cracks: pricing.extra_cracks || 6,
+        extra_furniture_move: pricing.extra_furniture_move || 50,
+        extra_primer: pricing.extra_primer || 2,
+        min_quote: pricing.min_quote || 150,
       },
     }
 

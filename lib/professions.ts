@@ -313,6 +313,23 @@ export function getLeadSpecialty(
   return lead.specialty || lead.metadata?._service_specialty || lead.professionals?.specialty || 'Pintura'
 }
 
+/**
+ * P1 (2026-09-18): especialidades ativas de um profissional, para decidir
+ * quais configurar em /config e quais mostrar em /perfil — nunca assumir só
+ * `specialty` (singular) quando `specialties` já existe. Mesma prioridade de
+ * `getLeadSpecialty` acima, aplicada agora à identidade do profissional em
+ * vez de à do lead: `specialties[]` é a fonte quando tem pelo menos 1
+ * elemento (múltiplas especialidades, 2026-05-09); `specialty` só como
+ * fallback para contas antigas sem esse array preenchido.
+ */
+export function getActiveSpecialties(
+  professional: { specialty?: string | null; specialties?: string[] | null } | null | undefined
+): string[] {
+  if (!professional) return []
+  if (professional.specialties && professional.specialties.length > 0) return professional.specialties
+  return professional.specialty ? [professional.specialty] : []
+}
+
 /** Calcula áreas de pintura a partir das divisões e altura */
 export function calcPaintingAreas(answers: Record<string, any>): { area_paredes: number; area_tetos: number } {
   const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }

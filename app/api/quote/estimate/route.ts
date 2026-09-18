@@ -4,6 +4,7 @@ import { isLeadAuthorized } from '@/lib/lead-authorization'
 import { estimatePriceRange, generateUniversalProposal } from '@/lib/quote-estimate'
 import { getLeadSpecialty } from '@/lib/professions'
 import { checkQuoteRecalculationAllowed } from '@/lib/quote-guard'
+import { buildPricingIndex, resolveSubservicePricing, resolveRequestedSubservico } from '@/lib/professional-pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const { data: lead } = await supabaseAdmin
       .from('leads')
-      .select('*, professionals(*)')
+      .select('*, professionals(*, professional_pricing(*))')
       .eq('id', lead_id)
       .single()
 
@@ -43,13 +44,21 @@ export async function POST(req: NextRequest) {
     const specialty = getLeadSpecialty(lead)
     const answers = lead.metadata || {}
 
-    // Usar preço próprio do profissional quando configurado (Fase 2,
-    // 2026-09-15); sem isso, cai na tabela genérica por especialidade.
+    // P1 (2026-09-18, revisto para subserviços no mesmo dia): ordem de
+    // resolução do preço — profissional → especialidade do lead →
+    // subserviço pedido (quando o questionário permite identificá-lo, ex:
+    // 'Chão flutuante novo' → subserviço 'chao_flutuante') → preço geral da
+    // especialidade → colunas legacy de `professionals` (compatibilidade).
+    // Sem nenhum dos três, cai na tabela genérica por especialidade, exatamente
+    // como antes (ver lib/professional-pricing.ts).
+    const pricingIndex = buildPricingIndex(professional.professional_pricing)
+    const subservico = resolveRequestedSubservico(specialty, answers)
+    const pricing = resolveSubservicePricing(professional, pricingIndex[specialty], subservico)
     const estimate = estimatePriceRange(specialty, answers, {
-      price_per_m2: professional.price_per_m2,
-      price_per_hour: professional.price_per_hour,
-      travel_cost: professional.travel_cost,
-      min_quote: professional.min_quote,
+      price_per_m2: pricing.price_per_m2,
+      price_per_hour: pricing.price_per_hour,
+      travel_cost: pricing.travel_cost,
+      min_quote: pricing.min_quote,
     })
 
     // P0 (2026-09-18): sem fórmula própria para esta especialidade e sem
