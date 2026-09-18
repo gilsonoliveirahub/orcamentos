@@ -301,8 +301,10 @@ export default function MarketingPage() {
                   informação — 15% de desconto (19×12×0.85). Só texto, sem
                   seletor nem checkout: os 2 Price IDs anuais no Stripe
                   ainda não existem, ver app/api/stripe/checkout/route.ts.
-                  Lote separado quando existirem. */}
-              <p className="text-white/30 text-xs mb-1">ou €193,80/ano + IVA (-15%)</p>
+                  "Em breve" (2026-09-19) para nunca dar a entender que já é
+                  possível comprar — nenhum botão/link associado a este
+                  texto. Lote separado quando os Price IDs existirem. */}
+              <p className="text-white/30 text-xs mb-1">ou €193,80/ano + IVA (-15%) · <span className="text-white/50 font-semibold">Em breve</span></p>
               <p className="text-white/40 text-sm mb-8">Para começar</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -328,7 +330,7 @@ export default function MarketingPage() {
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
               <div className="text-4xl font-bold mb-1">€39<span className="text-lg font-normal text-white/40">/mês + IVA</span></div>
-              <p className="text-white/30 text-xs mb-1">ou €397,80/ano + IVA (-15%)</p>
+              <p className="text-white/30 text-xs mb-1">ou €397,80/ano + IVA (-15%) · <span className="text-white/50 font-semibold">Em breve</span></p>
               <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[

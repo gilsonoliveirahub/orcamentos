@@ -73,6 +73,22 @@ describe('POST /api/stripe/checkout', () => {
     expect(sessionsCreate.mock.calls[0][0]).not.toHaveProperty('customer')
   })
 
+  it('2026-09-19: enviar cycle="annual" não tem efeito nenhum — a rota ainda não suporta ciclo anual, usa sempre o Price ID mensal', async () => {
+    const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session-annual-attempt' })
+    mockStripe({ sessionsCreate })
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter', cycle: 'annual' }))
+    const json = await res.json()
+
+    expect(json.url).toBe('https://checkout.stripe.com/session-annual-attempt')
+    // Nunca rejeita nem trata cycle de forma especial — o campo é
+    // simplesmente ignorado, o Price ID usado continua o mensal fixo.
+    expect(sessionsCreate.mock.calls[0][0].line_items[0].price).toBe(STARTER_PRICE_ID)
+    expect(sessionsCreate.mock.calls[0][0].metadata).not.toHaveProperty('cycle')
+  })
+
   it('reassinatura depois de um cancelamento (stripe_subscription_id limpo mas stripe_customer_id mantido): reutiliza o Customer existente, sem criar um duplicado', async () => {
     const retrieve = vi.fn()
     const update = vi.fn()

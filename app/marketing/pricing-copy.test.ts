@@ -45,3 +45,25 @@ describe('coerência do preço mínimo do marketplace na homepage (P2, 2026-09-1
     expect(faqText).toMatch(/desde 7,43€ por lead, IVA incluído/)
   })
 })
+
+// 2026-09-19: opção anual (Starter 193,80€ + IVA, Pro 397,80€ + IVA, -15%)
+// mostrada só como informação na homepage — sem Price ID no Stripe ainda,
+// por isso tem de estar marcada "Em breve" e não pode ter nenhum botão/link
+// que inicie uma compra. Fica aqui e não em checkout/route.test.ts porque é
+// especificamente sobre a apresentação pública, não sobre a API.
+describe('planos anuais — só informação, marcados "Em breve" (2026-09-19)', () => {
+  it('mostra os dois valores anuais exatos', () => {
+    expect(marketingSource).toMatch(/€193,80\/ano \+ IVA \(-15%\)/)
+    expect(marketingSource).toMatch(/€397,80\/ano \+ IVA \(-15%\)/)
+  })
+
+  it('cada menção ao valor anual vem marcada "Em breve", para nunca parecer compra ativa', () => {
+    const matches = marketingSource.match(/ano \+ IVA \(-15%\)[\s\S]{0,80}?Em breve/g) || []
+    expect(matches).toHaveLength(2)
+  })
+
+  it('não existe nenhum seletor de ciclo (mensal/anual) nem qualquer referência a "annual"/"cycle" na página pública', () => {
+    expect(marketingSource).not.toMatch(/cycle/i)
+    expect(marketingSource).not.toMatch(/\bannual\b/i)
+  })
+})
