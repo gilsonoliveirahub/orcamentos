@@ -6,7 +6,7 @@ function fakeRequest(body: unknown): NextRequest {
   return { json: async () => body } as unknown as NextRequest
 }
 
-function mockLeadAndQuotes(lead: Record<string, unknown>) {
+function mockLeadAndQuotes(lead: Record<string, unknown>, existingQuote: Record<string, unknown> | null = null) {
   const inserted: Record<string, unknown>[] = []
   vi.doMock('@/lib/supabase-admin', () => ({
     supabaseAdmin: {
@@ -14,6 +14,8 @@ function mockLeadAndQuotes(lead: Record<string, unknown>) {
         if (table === 'leads') return { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }
         if (table === 'quotes') {
           return {
+            // Leitura da quote existente (guard P0 contra recálculo indevido).
+            select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: existingQuote }) }) }),
             upsert: (payload: Record<string, unknown>) => {
               inserted.push(payload)
               return { select: () => ({ single: async () => ({ data: { id: 'quote-1', ...payload } }) }) }
@@ -61,21 +63,44 @@ describe('POST /api/quote/generate — proteção contra acesso direto a lead bl
       q3_area_m2: 50, q1_tipo_trabalho: 'interior',
       professionals: { price_m2_walls: 4, price_m2_ceiling: 5, price_m2_exterior: 6, min_quote: 150 },
     }
-    const inserted: Record<string, unknown>[] = []
-    vi.doMock('@/lib/supabase-admin', () => ({
-      supabaseAdmin: {
-        from: (table: string) => {
-          if (table === 'leads') return { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }
-          if (table === 'quotes') return { insert: (payload: Record<string, unknown>) => { inserted.push(payload); return { select: () => ({ single: async () => ({ data: { id: 'quote-1', ...payload } }) }) } } }
-          throw new Error(`tabela inesperada: ${table}`)
-        },
-      },
-    }))
+    mockLeadAndQuotes(lead)
 
     const { POST } = await import('./route')
     const res = await POST(fakeRequest({ lead_id: 'lead-3' }))
 
     expect(res.status).not.toBe(403)
+  })
+
+  it('recusa recalcular quando a proposta já foi enviada ao cliente (status=enviado)', async () => {
+    const lead = {
+      id: 'lead-f', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      q3_area_m2: 50, q1_tipo_trabalho: 'interior',
+      professionals: { price_m2_walls: 4, price_m2_ceiling: 5, price_m2_exterior: 6, min_quote: 150 },
+    }
+    mockLeadAndQuotes(lead, { status: 'enviado', value_source: 'calculated' })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-f' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(json.error).toBe('blocked')
+  })
+
+  it('recusa recalcular quando o valor foi editado manualmente (value_source=manual)', async () => {
+    const lead = {
+      id: 'lead-g', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      q3_area_m2: 50, q1_tipo_trabalho: 'interior',
+      professionals: { price_m2_walls: 4, price_m2_ceiling: 5, price_m2_exterior: 6, min_quote: 150 },
+    }
+    mockLeadAndQuotes(lead, { status: 'rascunho', value_source: 'manual' })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-g' }))
+    const json = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(json.error).toBe('blocked')
   })
 })
 
@@ -100,7 +125,7 @@ describe('POST /api/quote/generate — precisão de area_tetos (movido do client
 
     // area_paredes=94 (já vem do lead), area_tetos=12 (calcPaintingAreas via area_total_m2)
     const expected = calculateQuote({ area_m2_paredes: 94, area_m2_tetos: 12, tipo: 'interior', mudanca_cor: false, fissuras: false, mobilias: false, primer: false, prices })
-    expect(inserted[0]).toMatchObject({ valor_base: expected.valor_base, valor_final: expected.valor_final, valor_min: expected.valor_min, valor_max: expected.valor_max })
+    expect(inserted[0]).toMatchObject({ valor_base: expected.valor_base, valor_final: expected.valor_final, valor_min: expected.valor_min, valor_max: expected.valor_max, value_source: 'calculated' })
   })
 
   it('formulário antigo (metadata.area_m2_tetos, sem altura_paredes): usa o valor exato em vez do heurístico de 30%', async () => {

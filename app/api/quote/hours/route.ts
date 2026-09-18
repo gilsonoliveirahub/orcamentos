@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
 import { generateUniversalProposal } from '@/lib/quote-estimate'
+import { getLeadSpecialty } from '@/lib/professions'
+import { checkQuoteRecalculationAllowed } from '@/lib/quote-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +32,16 @@ export async function POST(req: NextRequest) {
     if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
     if (!isLeadAuthorized(lead)) return NextResponse.json({ error: 'Pedido ainda bloqueado' }, { status: 403 })
 
+    // P0 (2026-09-18): nunca sobrescrever um valor já editado manualmente
+    // pelo profissional, nem uma proposta já enviada/aceite pelo cliente.
+    const { data: existingQuote } = await supabaseAdmin
+      .from('quotes')
+      .select('status, value_source')
+      .eq('lead_id', lead_id)
+      .maybeSingle()
+    const guard = checkQuoteRecalculationAllowed(existingQuote)
+    if (guard.blocked) return NextResponse.json({ error: 'blocked', message: guard.message }, { status: 409 })
+
     const professional = lead.professionals || {}
     const pricePerHour = professional.price_per_hour || 0
     if (!pricePerHour) {
@@ -38,7 +50,10 @@ export async function POST(req: NextRequest) {
 
     const valor = Math.max(Math.round(pricePerHour * horasNum * 100) / 100, professional.min_quote || 0)
     const answers = lead.metadata || {}
-    const specialty = professional.specialty || lead.q1_tipo_trabalho || 'Serviço'
+    // Especialidade REALMENTE pedida pelo cliente — nunca a "principal" do
+    // profissional (só usada aqui para o texto da proposta, mas tem de estar
+    // correta para um profissional com várias especialidades).
+    const specialty = getLeadSpecialty(lead) || lead.q1_tipo_trabalho || 'Serviço'
     const descricao = `${horasNum}h × €${pricePerHour}/hora`
     const proposalText = generateUniversalProposal(
       lead.name || 'Cliente',
@@ -64,6 +79,7 @@ export async function POST(req: NextRequest) {
         valor_max: valor,
         proposal_text: proposalText,
         status: 'rascunho',
+        value_source: 'calculated',
       }, { onConflict: 'lead_id' })
       .select()
       .single()

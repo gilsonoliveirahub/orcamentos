@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { calculateQuote, generateProposalText } from '@/lib/calculator'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
 import { calcPaintingAreas } from '@/lib/professions'
+import { checkQuoteRecalculationAllowed } from '@/lib/quote-guard'
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +25,16 @@ export async function POST(req: NextRequest) {
     // contornar a proteção de dados pessoais chamando esta rota
     // diretamente, sem passar pelo gate de /api/leads/open.
     if (!isLeadAuthorized(lead)) return NextResponse.json({ error: 'Pedido ainda bloqueado' }, { status: 403 })
+
+    // P0 (2026-09-18): nunca sobrescrever um valor já editado manualmente
+    // pelo profissional, nem uma proposta já enviada/aceite pelo cliente.
+    const { data: existingQuote } = await supabase
+      .from('quotes')
+      .select('status, value_source')
+      .eq('lead_id', lead_id)
+      .maybeSingle()
+    const guard = checkQuoteRecalculationAllowed(existingQuote)
+    if (guard.blocked) return NextResponse.json({ error: 'blocked', message: guard.message }, { status: 409 })
 
     const professional = lead.professionals || {}
     const metadata = lead.metadata || {}
@@ -92,6 +103,7 @@ export async function POST(req: NextRequest) {
         valor_max: quoteResult.valor_max,
         proposal_text: proposalText,
         status: 'rascunho',
+        value_source: 'calculated',
       }, { onConflict: 'lead_id' })
       .select()
       .single()

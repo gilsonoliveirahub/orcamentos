@@ -202,7 +202,7 @@ describe('listMarketplaceOpportunities', () => {
 
 describe('acquireMarketplaceLead', () => {
   beforeEach(() => vi.resetModules())
-  afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('@/lib/supabase-admin'); vi.unstubAllGlobals() })
+  afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('@/lib/supabase-admin'); vi.doUnmock('@/lib/notify-lead'); vi.unstubAllGlobals() })
 
   // Tudo (plano, crédito, especialidade, raio, desconto e associação) é
   // decidido dentro da função SQL acquire_marketplace_lead(), numa única
@@ -263,7 +263,7 @@ describe('acquireMarketplaceLead', () => {
 
   it('accepting_leads ausente (coluna ainda não existe / nunca definida): trata como disponível', async () => {
     mockZoneAndRpc('Lisboa', { data: { ok: true } })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated: vi.fn().mockResolvedValue({ ok: true }) }))
 
     const { acquireMarketplaceLead } = await import('./marketplace')
     const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
@@ -291,7 +291,12 @@ describe('acquireMarketplaceLead', () => {
   })
 
   it('aquisição com sucesso: passa as coordenadas do profissional (calculadas a partir da zona na BD) e dispara notificação', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    // P0 (2026-09-18): a notificação pós-aquisição deixou de ser um `fetch`
+    // à própria API (não confiável em ambiente serverless sem `await`) e
+    // passou a uma chamada direta, em processo, e aguardada, a
+    // notifyLeadCreated() — ver lib/notify-lead.ts.
+    const notifyLeadCreated = vi.fn().mockResolvedValue({ ok: true })
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated }))
     const rpc = mockZoneAndRpc('Lisboa', { data: { ok: true } })
 
     const { acquireMarketplaceLead, MARKETPLACE_RADIUS_KM } = await import('./marketplace')
@@ -305,8 +310,21 @@ describe('acquireMarketplaceLead', () => {
       p_prof_lat: expect.closeTo(38.7223, 2),
       p_prof_lng: expect.closeTo(-9.1393, 2),
     })
-    expect(fetch).toHaveBeenCalledTimes(1)
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain('/api/notifications/lead')
+    expect(notifyLeadCreated).toHaveBeenCalledTimes(1)
+    expect(notifyLeadCreated).toHaveBeenCalledWith('lead-1')
+  })
+
+  it('notificação pós-aquisição falha: não afeta o resultado da aquisição (já confirmada na RPC), erro só é registado', async () => {
+    const notifyLeadCreated = vi.fn().mockRejectedValue(new Error('falha ao notificar'))
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated }))
+    mockZoneAndRpc('Lisboa', { data: { ok: true } })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { acquireMarketplaceLead } = await import('./marketplace')
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+
+    expect(result).toEqual({ ok: true, leadId: 'lead-1' })
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('notificação pós-aquisição falhou'))
   })
 
   it('SEGURANÇA: zona do profissional não reconhecida bloqueia antes da RPC (nunca envia lat/lng null, que faria a função SQL saltar a verificação de raio)', async () => {
@@ -319,14 +337,15 @@ describe('acquireMarketplaceLead', () => {
   })
 
   it('perde a corrida (lead já adquirido por outro): não descontou nada nem notifica — não há reembolso porque nunca houve cobrança', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    const notifyLeadCreated = vi.fn().mockResolvedValue({ ok: true })
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated }))
     mockZoneAndRpc('Lisboa', { data: { ok: false, error: 'taken' } })
 
     const { acquireMarketplaceLead } = await import('./marketplace')
     const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
 
     expect(result).toEqual({ ok: false, error: 'taken' })
-    expect(fetch).not.toHaveBeenCalled() // não notifica uma aquisição que falhou
+    expect(notifyLeadCreated).not.toHaveBeenCalled() // não notifica uma aquisição que falhou
   })
 
   it('concorrência: duas aquisições simultâneas do mesmo lead — só uma ganha, a outra nunca perde crédito', async () => {
@@ -335,7 +354,7 @@ describe('acquireMarketplaceLead', () => {
     // chegarem ao ponto de decisão antes de qualquer uma escrever, mas a
     // decisão em si (ler leadOwner, só depois escrever) corre sem mais nenhum
     // yield — tal como a transação real do Postgres serializa por baixo.
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated: vi.fn().mockResolvedValue({ ok: true }) }))
     let leadOwner: string | null = null
     const creditsByProf: Record<string, number> = { 'prof-a': 3, 'prof-b': 3 }
 

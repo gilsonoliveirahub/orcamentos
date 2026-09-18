@@ -11,6 +11,7 @@ export default function ConfigPage() {
   const [professional, setProfessional] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -27,8 +28,17 @@ export default function ConfigPage() {
 
   async function handleSave() {
     setSaving(true)
-    await supabase.from('professionals').update(professional).eq('id', professional.id)
+    setSaveError('')
+    // P0 (2026-09-18): antes disto, uma falha do UPDATE (ex: coluna
+    // inexistente, RLS, rede) era ignorada em silêncio — o profissional via
+    // sempre "Guardado!" mesmo quando nada foi gravado. Agora só mostra
+    // sucesso depois de confirmar que o Supabase não devolveu erro.
+    const { error } = await supabase.from('professionals').update(professional).eq('id', professional.id)
     setSaving(false)
+    if (error) {
+      setSaveError('Não foi possível guardar. Tente novamente — se o problema persistir, contacte o suporte.')
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -153,6 +163,13 @@ export default function ConfigPage() {
           </code>
           <p className="text-xs text-gray-600 mt-1">Cola este URL na Evolution API ou Twilio</p>
         </div>
+
+        {/* Erro ao guardar — nunca esconder uma falha atrás de "Guardado!" */}
+        {saveError && (
+          <div className="rounded-2xl p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <p className="text-sm" style={{ color: '#f87171' }}>{saveError}</p>
+          </div>
+        )}
 
         {/* Guardar */}
         <button

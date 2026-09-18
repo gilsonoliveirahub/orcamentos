@@ -6,7 +6,17 @@
 
 import { getProfessionPricingType } from './professions'
 
-export type PriceEstimate = { min: number; max: number; descricao: string }
+// Correção P0 (2026-09-18): antes, qualquer especialidade sem entrada
+// própria em PRICE_TABLES (Pavimentos e Revestimentos, Estuque e Pladur, Ar
+// Condicionado, Editor de vídeos, ou qualquer profissão personalizada) caía
+// silenciosamente no fallback 'Outro' (100€–500€ fixo, sem qualquer relação
+// com a resposta do cliente). Removido por completo — sem preço do
+// profissional e sem fórmula própria, o resultado é `available: false`,
+// nunca um número inventado (regra de negócio: "Estimativa indisponível —
+// avalie o pedido e indique o seu preço.").
+export type PriceEstimate =
+  | { available: true; min: number; max: number; descricao: string }
+  | { available: false; descricao: string }
 
 // Preços próprios do profissional (app/config/page.tsx) — Fase 2 do plano
 // 2026-09-15 ("ligar preços independentes por especialidade ao cálculo").
@@ -35,7 +45,7 @@ export const PUBLIC_ESTIMATE_MAX_MARGIN = 1.15
 // dashboard normalmente. Reativar: mudar para `true`, nada mais a desfazer.
 export const PUBLIC_ESTIMATE_ENABLED = false
 
-const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstimate> = {
+const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: number; max: number; descricao: string }> = {
   Pintura: (a) => {
     let area_paredes: number
     let area_tetos: number
@@ -191,10 +201,6 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => PriceEstima
     const mult = estado[a.estado as string] || 1
     return { min: Math.round(min * mult), max: Math.round(max * mult), descricao: `${a.tipo_trabalho} (${area}m²)` }
   },
-
-  Outro: (a) => {
-    return { min: 100, max: 500, descricao: a.tipo_trabalho || 'Trabalho a orçamentar' }
-  },
 }
 
 // Movido de app/api/quote/estimate/route.ts (era local, não reutilizável) —
@@ -258,10 +264,15 @@ export function estimatePriceRange(specialty: string, answers: Record<string, an
       // (linha "Math.round(min * 1.4)") — não é um número novo.
       const min = Math.max(Math.round(area * professionalPricing.price_per_m2), professionalPricing.min_quote || 0)
       const max = Math.round(min * 1.4)
-      return { min, max, descricao: `${specialty} — ${area}m²` }
+      return { available: true, min, max, descricao: `${specialty} — ${area}m²` }
     }
   }
 
-  const estimator = PRICE_TABLES[specialty] || PRICE_TABLES['Outro']
-  return estimator(answers)
+  const estimator = PRICE_TABLES[specialty]
+  if (estimator) return { available: true, ...estimator(answers) }
+
+  // Sem fórmula própria para esta especialidade e sem preço do profissional
+  // (ou sem área respondida, no caso 'm2' acima) — nunca inventar um
+  // intervalo genérico (ver nota em PriceEstimate).
+  return { available: false, descricao: answers.tipo_trabalho || 'Trabalho a orçamentar' }
 }

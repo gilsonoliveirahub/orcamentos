@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
-import { PROFESSIONS, getProfessionPricingType } from '@/lib/professions'
+import { PROFESSIONS, getProfessionPricingType, getLeadSpecialty } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
 import { computeLeadCompleteness } from '@/lib/lead-completeness'
 import { summarizeMedia } from '@/lib/media-summary'
@@ -85,7 +85,11 @@ export default function LeadDetail() {
   async function handleGenerateQuote() {
     setGenerating(true)
     setActionError('')
-    const specialty = lead?.professionals?.specialty || 'Pintura'
+    // Especialidade REALMENTE pedida pelo cliente neste lead — nunca a
+    // especialidade "principal" do profissional (ver lib/professions.ts,
+    // getLeadSpecialty). Um profissional com várias especialidades pode
+    // receber pedidos de qualquer uma delas.
+    const specialty = getLeadSpecialty(lead)
     const endpoint = specialty === 'Pintura' ? '/api/quote/generate' : '/api/quote/estimate'
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -93,8 +97,14 @@ export default function LeadDetail() {
       body: JSON.stringify({ lead_id: id }),
     })
     // Sem esta verificação, um erro do servidor deixava o botão "A calcular..."
-    // terminar em silêncio, sem orçamento nenhum e sem explicação.
-    if (!res.ok) setActionError('Não foi possível gerar o orçamento. Tente novamente.')
+    // terminar em silêncio, sem orçamento nenhum e sem explicação. A partir de
+    // agora a rota também pode recusar de propósito (proposta já enviada/
+    // aceite, ou valor editado manualmente) — nesse caso devolve uma
+    // mensagem clara em vez do genérico "tente novamente".
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setActionError(data.message || 'Não foi possível gerar o orçamento. Tente novamente.')
+    }
     await loadData()
     setGenerating(false)
   }
@@ -202,7 +212,7 @@ export default function LeadDetail() {
     { id: 'perdido', label: 'Perdido', color: '#ef4444' },
   ]
 
-  const specialty = lead.professionals?.specialty || 'Pintura'
+  const specialty = getLeadSpecialty(lead)
   const isPaint = specialty === 'Pintura'
 
   // Build answers list: prefer metadata (new), fall back to legacy paint fields
@@ -443,15 +453,17 @@ export default function LeadDetail() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-gray-400">Orçamento Gerado</h2>
               <div className="flex items-center gap-2">
-                <a
-                  href={`/quotes/${quote.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
-                >
-                  <FileDown size={12} /> Descarregar PDF
-                </a>
+                {quote.valor_final != null && (
+                  <a
+                    href={`/quotes/${quote.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
+                  >
+                    <FileDown size={12} /> Descarregar PDF
+                  </a>
+                )}
                 <button
                   onClick={handleGenerateQuote}
                   disabled={generating}
@@ -462,23 +474,35 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            <div className="flex items-baseline gap-1 mb-4">
-              <Euro size={18} className="text-emerald-400 mb-0.5" />
-              <span className="text-3xl font-black text-emerald-400">{quote.valor_min}–{quote.valor_max}</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              {[
-                { label: 'Mínimo', value: quote.valor_min, color: '#34d399' },
-                { label: 'Estimado', value: quote.valor_final, color: '#818cf8' },
-                { label: 'Máximo', value: quote.valor_max, color: '#fbbf24' },
-              ].map(item => (
-                <div key={item.label} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                  <div className="text-lg font-bold" style={{ color: item.color }}>€{item.value}</div>
-                  <div className="text-xs text-gray-500">{item.label}</div>
+            {quote.valor_final == null ? (
+              // Sem preço do profissional para esta profissão/subserviço e
+              // sem referência elegível — nunca inventar um intervalo
+              // genérico (ver diagnóstico do fallback 100€–500€ removido).
+              <div className="rounded-xl p-4" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                <p className="text-sm font-semibold" style={{ color: '#fbbf24' }}>Estimativa indisponível</p>
+                <p className="text-xs text-gray-400 mt-1">Avalie o pedido e indique o seu preço diretamente ao cliente. Configure um preço para esta especialidade em /config para passar a ter uma estimativa automática.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-1 mb-4">
+                  <Euro size={18} className="text-emerald-400 mb-0.5" />
+                  <span className="text-3xl font-black text-emerald-400">{quote.valor_min}–{quote.valor_max}</span>
                 </div>
-              ))}
-            </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[
+                    { label: 'Mínimo', value: quote.valor_min, color: '#34d399' },
+                    { label: 'Estimado', value: quote.valor_final, color: '#818cf8' },
+                    { label: 'Máximo', value: quote.valor_max, color: '#fbbf24' },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <div className="text-lg font-bold" style={{ color: item.color }}>€{item.value}</div>
+                      <div className="text-xs text-gray-500">{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {quote.proposal_text && (
               <div>

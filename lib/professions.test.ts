@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcPaintingAreas, getProfessionPricingType } from './professions'
+import { calcPaintingAreas, getProfessionPricingType, getLeadSpecialty } from './professions'
 import { computeLeadCompleteness } from './lead-completeness'
 
 const baseAnswers = {
@@ -94,5 +94,45 @@ describe('getProfessionPricingType', () => {
     expect(getProfessionPricingType('Canalização')).toBe('hourly')
     expect(getProfessionPricingType('Pavimentos e Revestimentos')).toBe('m2')
     expect(getProfessionPricingType('Editor de vídeos')).toBe('generic')
+  })
+})
+
+// P0 (2026-09-18): profissional com várias especialidades tem de receber o
+// cálculo/questionário da especialidade REALMENTE pedida pelo cliente, nunca
+// da especialidade "principal"/primeira do profissional.
+describe('getLeadSpecialty — especialidade do lead, nunca a "principal" do profissional', () => {
+  it('lead do marketplace: usa lead.specialty, mesmo quando diverge da especialidade principal do profissional', () => {
+    const lead = { specialty: 'Jardinagem', professionals: { specialty: 'Pintura' } }
+    expect(getLeadSpecialty(lead)).toBe('Jardinagem')
+  })
+
+  it('lead do link pessoal com várias especialidades: usa metadata._service_specialty quando lead.specialty não existe', () => {
+    const lead = { specialty: null, metadata: { _service_specialty: 'Pavimentos e Revestimentos' }, professionals: { specialty: 'Pintura' } }
+    expect(getLeadSpecialty(lead)).toBe('Pavimentos e Revestimentos')
+  })
+
+  it('lead.specialty tem sempre prioridade sobre metadata._service_specialty quando ambos existem', () => {
+    const lead = { specialty: 'Canalização', metadata: { _service_specialty: 'Electricidade' }, professionals: { specialty: 'Pintura' } }
+    expect(getLeadSpecialty(lead)).toBe('Canalização')
+  })
+
+  it('lead antigo sem specialty nem metadata._service_specialty: cai no último recurso, professionals.specialty', () => {
+    const lead = { specialty: null, metadata: {}, professionals: { specialty: 'Estuque e Pladur' } }
+    expect(getLeadSpecialty(lead)).toBe('Estuque e Pladur')
+  })
+
+  it('sem nenhuma informação (lead muito antigo, sem professionals): default histórico "Pintura"', () => {
+    expect(getLeadSpecialty({ specialty: null, metadata: null, professionals: null })).toBe('Pintura')
+    expect(getLeadSpecialty(null)).toBe('Pintura')
+    expect(getLeadSpecialty(undefined)).toBe('Pintura')
+  })
+
+  it('caso concreto do diagnóstico: profissional com Pintura + Pavimentos e Revestimentos, lead pediu Pavimentos', () => {
+    const lead = {
+      specialty: null,
+      metadata: { _service_specialty: 'Pavimentos e Revestimentos', tipo_servico: 'Chão flutuante novo' },
+      professionals: { specialty: 'Pintura', specialties: ['Pintura', 'Pavimentos e Revestimentos'] },
+    }
+    expect(getLeadSpecialty(lead)).toBe('Pavimentos e Revestimentos')
   })
 })

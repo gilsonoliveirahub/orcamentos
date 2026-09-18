@@ -5,7 +5,7 @@ function fakeRequest(body: unknown): NextRequest {
   return { json: async () => body } as unknown as NextRequest
 }
 
-function mockLeadAndQuotes(lead: Record<string, unknown>) {
+function mockLeadAndQuotes(lead: Record<string, unknown>, existingQuote: Record<string, unknown> | null = null) {
   const upserts: Record<string, unknown>[] = []
   vi.doMock('@/lib/supabase-admin', () => ({
     supabaseAdmin: {
@@ -13,6 +13,8 @@ function mockLeadAndQuotes(lead: Record<string, unknown>) {
         if (table === 'leads') return { select: () => ({ eq: () => ({ single: async () => ({ data: lead }) }) }) }
         if (table === 'quotes') {
           return {
+            // Leitura da quote existente (guard P0 contra recálculo indevido).
+            select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: existingQuote }) }) }),
             upsert: (payload: Record<string, unknown>) => {
               upserts.push(payload)
               return { select: () => ({ single: async () => ({ data: { id: 'quote-1', ...payload }, error: null }) }) }
@@ -60,7 +62,7 @@ describe('POST /api/quote/hours — profissões "por hora" (Fase 2, 2026-09-16)'
     const json = await res.json()
 
     // 5h × 30€/h = 150€, acima do mínimo (50€)
-    expect(upserts[0]).toMatchObject({ valor_final: 150, valor_min: 150, valor_max: 150, horas_estimadas: 5 })
+    expect(upserts[0]).toMatchObject({ valor_final: 150, valor_min: 150, valor_max: 150, horas_estimadas: 5, value_source: 'calculated' })
     expect(json.quote.proposal_text).toContain('€150')
     // min===max: nunca deve dizer "Entre €150 e €150"
     expect(json.quote.proposal_text).not.toContain('Entre')
@@ -89,5 +91,39 @@ describe('POST /api/quote/hours — profissões "por hora" (Fase 2, 2026-09-16)'
     await POST(fakeRequest({ lead_id: 'lead-1', horas: 4 }))
     expect(upserts).toHaveLength(2)
     expect(upserts[1].valor_final).toBe(120) // 4h × 30€
+  })
+
+  it('usa lead.specialty (o que o cliente pediu) no texto da proposta, nunca a especialidade "principal" do profissional', async () => {
+    // Profissional é "principal" Electricidade, mas este lead concreto
+    // (ex: adquirido no marketplace) pediu Canalização.
+    const lead = {
+      ...baseLead,
+      specialty: 'Canalização',
+      professionals: { ...baseLead.professionals, specialty: 'Electricidade' },
+    }
+    mockLeadAndQuotes(lead)
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', horas: 2 }))
+    const json = await res.json()
+    expect(json.quote.proposal_text).toContain('CANALIZAÇÃO')
+    expect(json.quote.proposal_text).not.toContain('ELECTRICIDADE')
+  })
+
+  it('recusa recalcular quando a proposta já foi enviada ao cliente (status=enviado)', async () => {
+    mockLeadAndQuotes(baseLead, { status: 'enviado', value_source: 'calculated' })
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', horas: 3 }))
+    const json = await res.json()
+    expect(res.status).toBe(409)
+    expect(json.error).toBe('blocked')
+  })
+
+  it('recusa recalcular quando o valor foi editado manualmente (value_source=manual)', async () => {
+    mockLeadAndQuotes(baseLead, { status: 'rascunho', value_source: 'manual' })
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ lead_id: 'lead-1', horas: 3 }))
+    const json = await res.json()
+    expect(res.status).toBe(409)
+    expect(json.error).toBe('blocked')
   })
 })

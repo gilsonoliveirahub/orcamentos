@@ -2,13 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { recordRequestCompleted, clientIpFrom, sanitizeUtm, extractHostname, normalizeOriginChannel } from '@/lib/analytics'
 import { computeClientConsentFields, upsertClientMarketingConsent } from '@/lib/marketing-consent'
+import { notifyLeadCreated } from '@/lib/notify-lead'
 
 export const dynamic = 'force-dynamic'
+
+// Código Postgres para violação de constraint UNIQUE (usado abaixo para
+// distinguir "duas submissões em corrida pela mesma idempotency_key" de
+// qualquer outro erro de escrita real).
+const UNIQUE_VIOLATION = '23505'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { professional_id, source, marketing_opt_in, referrer, utm_source, utm_medium, utm_campaign, ...fields } = body
+    const { professional_id, source, marketing_opt_in, referrer, utm_source, utm_medium, utm_campaign, idempotency_key, ...fields } = body
+
+    // P0 (2026-09-18): proteção idempotente contra duplo clique, retry de
+    // rede ou repetição da mesma requisição — o cliente (ProfessionalProfileClient.tsx)
+    // gera uma chave única por submissão e reenvia sempre a mesma em caso de
+    // nova tentativa. Se já existir um lead com esta chave, devolve-o
+    // diretamente em vez de criar um segundo (a notificação já foi disparada
+    // na primeira vez, não é repetida aqui).
+    if (typeof idempotency_key === 'string' && idempotency_key) {
+      const { data: existing } = await supabaseAdmin
+        .from('leads')
+        .select()
+        .eq('idempotency_key', idempotency_key)
+        .maybeSingle()
+      if (existing) return NextResponse.json({ lead: existing })
+    }
+
     // consent_version/consent_source nunca vêm do cliente — só o booleano da
     // checkbox; a versão e a origem ('p_slug', esta rota é usada por /p/[slug])
     // são sempre definidas aqui, no servidor.
@@ -39,11 +61,31 @@ export async function POST(req: NextRequest) {
 
     const { data: lead, error } = await supabaseAdmin
       .from('leads')
-      .insert({ ...fields, professional_id, source: source || 'pessoal', locked, ...consentFields })
+      .insert({
+        ...fields,
+        professional_id,
+        source: source || 'pessoal',
+        locked,
+        ...(idempotency_key ? { idempotency_key } : {}),
+        ...consentFields,
+      })
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      // Duas submissões com a mesma chave chegaram a correr em paralelo
+      // (ex: duplo clique muito rápido) — a segunda perde a corrida do
+      // INSERT, mas o lead já existe: devolve-o em vez de um erro 400.
+      if (error.code === UNIQUE_VIOLATION && idempotency_key) {
+        const { data: existing } = await supabaseAdmin
+          .from('leads')
+          .select()
+          .eq('idempotency_key', idempotency_key)
+          .maybeSingle()
+        if (existing) return NextResponse.json({ lead: existing })
+      }
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
 
     // O contacto relacionado com o orçamento pedido nunca depende disto —
     // isto só atualiza a fonte de verdade de consentimento por email para
@@ -73,6 +115,20 @@ export async function POST(req: NextRequest) {
       utmCampaign: utmCampaignClean,
       originChannel: normalizeOriginChannel(referrerDomain, utmSourceClean),
     })
+
+    // P0 (2026-09-18): a notificação do link pessoal deixou de ser um
+    // `fetch('/api/notifications/lead')` sem `await` disparado no cliente
+    // logo antes de mostrar "pedido enviado" — se o browser fechasse ou
+    // perdesse rede nesse instante, a notificação nunca chegava a sair, sem
+    // qualquer aviso. Chamada agora diretamente aqui, no servidor, dentro do
+    // mesmo pedido que cria o lead — só falha se o próprio envio falhar
+    // (registado em notification_log por notifyLeadCreated), nunca por o
+    // browser do cliente ter continuado ou não.
+    try {
+      await notifyLeadCreated(lead.id)
+    } catch (err: any) {
+      console.error(`[leads/public] notificação falhou (lead ${lead.id}): ${err.message}`)
+    }
 
     return NextResponse.json({ lead })
   } catch (err: any) {

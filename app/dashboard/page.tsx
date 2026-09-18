@@ -19,6 +19,7 @@ import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
 import ClosedValueModal from '@/components/ClosedValueModal'
 import { isAbandonedLead } from '@/lib/reliability'
 import { shouldShowStaleLeadsReminder } from '@/lib/stale-leads-reminder'
+import { getLeadSpecialty } from '@/lib/professions'
 
 const STALE_REMINDER_DISMISSED_KEY = 'facoporti_stale_leads_reminder_dismissed_at'
 
@@ -185,7 +186,14 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
             <button
               onClick={async (e) => {
                 e.stopPropagation()
-                const endpoint = lead.q3_area_m2 ? '/api/quote/generate' : '/api/quote/estimate'
+                // Antes: `lead.q3_area_m2 ? generate : estimate` — critério
+                // frágil que só funcionava por acaso (só Pintura preenche
+                // q3_area_m2) e divergia do critério real usado em
+                // app/leads/[id]/page.tsx. Unificado: a especialidade
+                // realmente pedida pelo cliente decide sempre a rota,
+                // nunca um campo legacy usado como proxy.
+                const specialty = getLeadSpecialty(lead)
+                const endpoint = specialty === 'Pintura' ? '/api/quote/generate' : '/api/quote/estimate'
                 await fetch(endpoint, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },

@@ -504,7 +504,17 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
 
 // ── Estimativa indicativa ────────────────────────────────────────────────────
 function EstimateStep({ specialty, answers, onNext, onBack }: any) {
-  const { min, max: maxInterno } = estimatePriceRange(specialty, answers)
+  // P0 (2026-09-18): estimatePriceRange já não devolve sempre min/max — sem
+  // fórmula própria nem preço do profissional, devolve `available:false`
+  // (nunca mais o fallback genérico 100€–500€). Este ecrã está inteiramente
+  // desativado por PUBLIC_ESTIMATE_ENABLED=false (decisão de negócio já em
+  // vigor, ver mais abaixo) — o fallback para 0/0 aqui é só para o
+  // TypeScript continuar a compilar este caminho morto, não uma escolha de
+  // produto; se o ecrã for reativado no futuro, tratar `available:false`
+  // como um caso de UI próprio nessa altura.
+  const estimate = estimatePriceRange(specialty, answers)
+  const min = estimate.available ? estimate.min : 0
+  const maxInterno = estimate.available ? estimate.max : 0
   const maxPublico = Math.round(maxInterno * PUBLIC_ESTIMATE_MAX_MARGIN)
 
   return (

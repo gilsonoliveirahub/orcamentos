@@ -19,6 +19,13 @@ export default function ProfessionalPublicPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
   const requestStartedTracked = useRef(false)
+  // P0 (2026-09-18): chave de idempotência da submissão — gerada uma única
+  // vez (na primeira tentativa) e reutilizada em qualquer nova tentativa
+  // (duplo clique, retry depois de "Não foi possível enviar o pedido").
+  // Nunca regenerada durante a mesma visita, para que o servidor consiga
+  // reconhecer "isto é a mesma submissão outra vez" e nunca criar um
+  // segundo lead — ver app/api/leads/public/route.ts.
+  const idempotencyKeyRef = useRef<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -189,6 +196,10 @@ export default function ProfessionalPublicPage() {
     // Starter / 30 Pro por ciclo) só se aplica à ABERTURA do lead pelo
     // profissional, não à criação (ver lib/personal-link-limits.ts).
     const legacyFields = mapAnswersToLeadFields(answers)
+    // Gerada só na primeira tentativa desta submissão — uma nova tentativa
+    // (o utilizador clica de novo depois de ver "Não foi possível enviar")
+    // reenvia sempre a mesma chave, nunca uma nova.
+    if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID()
 
     try {
       const res = await fetch('/api/leads/public', {
@@ -202,6 +213,7 @@ export default function ProfessionalPublicPage() {
           status: 'novo',
           source,
           marketing_opt_in: marketingOptIn,
+          idempotency_key: idempotencyKeyRef.current,
           ...legacyFields,
           metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
           ...currentCampaignContext(),
@@ -237,11 +249,11 @@ export default function ProfessionalPublicPage() {
         }).catch(() => {})
       }
 
-      fetch('/api/notifications/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id }),
-      }).catch(() => {})
+      // P0 (2026-09-18): a notificação ao profissional deixou de depender
+      // de um fetch sem `await` disparado a partir daqui — agora é enviada
+      // pelo próprio servidor, dentro do mesmo pedido que cria o lead (ver
+      // app/api/leads/public/route.ts), antes de a resposta chegar a este
+      // `await fetch('/api/leads/public', ...)` acima. Nada a fazer aqui.
 
       setSubmitted(true)
     } catch {
@@ -687,7 +699,12 @@ function EstimateStep({ current, total, specialty, answers, onNext, onBack }: {
   onNext: () => void
   onBack: () => void
 }) {
-  const { min, max: maxInterno } = estimatePriceRange(specialty, answers)
+  // P0 (2026-09-18): ver nota equivalente em app/pedir/PedirClient.tsx —
+  // este ecrã está inteiramente desativado por PUBLIC_ESTIMATE_ENABLED=false,
+  // o fallback 0/0 é só para manter o TypeScript feliz num caminho morto.
+  const estimate = estimatePriceRange(specialty, answers)
+  const min = estimate.available ? estimate.min : 0
+  const maxInterno = estimate.available ? estimate.max : 0
   const maxPublico = Math.round(maxInterno * PUBLIC_ESTIMATE_MAX_MARGIN)
 
   return (

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { geocodeZone, computeDistanceKm, formatDistanceKm } from '@/lib/geo'
 import { professionalSpecialties } from '@/lib/professional-specialties'
+import { notifyLeadCreated } from '@/lib/notify-lead'
 
 export const MARKETPLACE_RADIUS_KM = 50
 
@@ -170,16 +171,24 @@ export async function acquireMarketplaceLead(params: { leadId: string; professio
   const result = data as AcquireRpcResult
   if (!result.ok) return { ok: false, error: result.error }
 
-  // Só o profissional que adquiriu recebe a notificação completa — reutiliza
-  // a mesma rota já usada quando um lead era atribuído automaticamente
-  // (calcula isBlocked/isFreePlan; como o plano já foi confirmado pago e o
-  // lead acabou de ficar locked=false, o resultado é sempre a notificação
+  // Só o profissional que adquiriu recebe a notificação completa (calcula
+  // isBlocked/isFreePlan; como o plano já foi confirmado pago e o lead
+  // acabou de ficar locked=false, o resultado é sempre a notificação
   // completa, nunca a redigida).
-  fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'}/api/notifications/lead`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lead_id: leadId }),
-  }).catch(() => {})
+  //
+  // P0 (2026-09-18): antes disto era um `fetch` à própria API sem `await` —
+  // em ambiente serverless a função pode terminar assim que devolve a
+  // resposta ao chamador, cancelando uma promessa pendente antes de o
+  // pedido HTTP sequer sair. Chamada agora diretamente, em processo, e
+  // aguardada — mesmo padrão já usado em app/api/leads/public/route.ts.
+  // Uma falha aqui não deve impedir a aquisição já confirmada (o lead já
+  // ficou atribuído na RPC acima); por isso o erro é apanhado e registado,
+  // nunca propagado.
+  try {
+    await notifyLeadCreated(leadId)
+  } catch (err: any) {
+    console.error(`[marketplace] notificação pós-aquisição falhou (lead ${leadId}): ${err.message}`)
+  }
 
   return { ok: true, leadId }
 }

@@ -281,6 +281,38 @@ export function getProfession(specialty: string): ProfessionConfig {
   return PROFESSIONS[specialty] || GENERIC_PROFESSION
 }
 
+/**
+ * Especialidade realmente pedida pelo cliente neste lead — nunca a
+ * especialidade "principal"/primeira do profissional. Um profissional com
+ * várias especialidades ativas (ex: Pintura + Pavimentos e Revestimentos)
+ * pode receber pedidos de qualquer uma delas; usar sempre esta função para
+ * decidir qual fórmula/questionário mostrar, nunca `professional.specialty`
+ * nem `specialties[0]` diretamente.
+ *
+ * Ordem de prioridade:
+ * 1. `lead.specialty` — coluna própria, gravada pelo fluxo do marketplace
+ *    (app/api/leads/marketplace/route.ts) e usada pela RPC de aquisição.
+ * 2. `lead.metadata._service_specialty` — gravado pelo link pessoal quando
+ *    o cliente escolhe entre as especialidades do profissional (ver
+ *    app/p/[slug]/ProfessionalProfileClient.tsx).
+ * 3. `lead.professionals.specialty` — só como último recurso, para leads
+ *    antigos sem nenhum dos dois campos acima. Nunca a fonte preferida.
+ * 4. 'Pintura' — default histórico, só quando não há nenhuma informação.
+ */
+export function getLeadSpecialty(
+  lead:
+    | {
+        specialty?: string | null
+        metadata?: Record<string, any> | null
+        professionals?: { specialty?: string | null } | null
+      }
+    | null
+    | undefined
+): string {
+  if (!lead) return 'Pintura'
+  return lead.specialty || lead.metadata?._service_specialty || lead.professionals?.specialty || 'Pintura'
+}
+
 /** Calcula áreas de pintura a partir das divisões e altura */
 export function calcPaintingAreas(answers: Record<string, any>): { area_paredes: number; area_tetos: number } {
   const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
