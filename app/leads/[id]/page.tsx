@@ -46,6 +46,12 @@ export default function LeadDetail() {
   const [actionError, setActionError] = useState('')
   const [horasInput, setHorasInput] = useState('')
   const [settingHours, setSettingHours] = useState(false)
+  // P2 (2026-09-18): "permitir ao profissional rever, alterar ou substituir
+  // o valor" — o profissional pode sempre corrigir o valor à mão, calculado
+  // ou não, através de /api/quote/manual (nunca sobrescrito depois por um
+  // recálculo automático, ver lib/quote-guard.ts).
+  const [manualValueInput, setManualValueInput] = useState('')
+  const [settingManualValue, setSettingManualValue] = useState(false)
   const [, startTransition] = useTransition()
 
   async function loadData() {
@@ -128,6 +134,28 @@ export default function LeadDetail() {
     }
     await loadData()
     setSettingHours(false)
+  }
+
+  // P2 (2026-09-18): valor manual — substitui (ou define, se ainda não
+  // houvesse nenhum) o valor da proposta, marcado como value_source:
+  // 'manual' no servidor. Disponível para qualquer profissão, não só as
+  // "por hora" acima.
+  async function handleSetManualValue() {
+    setSettingManualValue(true)
+    setActionError('')
+    const res = await fetch('/api/quote/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: id, valor_final: manualValueInput }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setActionError(data.message || data.error || 'Não foi possível guardar o valor.')
+    } else {
+      setManualValueInput('')
+    }
+    await loadData()
+    setSettingManualValue(false)
   }
 
   async function handleStatusChange(newStatus: string) {
@@ -504,6 +532,35 @@ export default function LeadDetail() {
               </>
             )}
 
+            {/* P2 (2026-09-18): o profissional pode sempre rever, corrigir ou
+                substituir o valor à mão — calculado ou não, disponível ou
+                não. Fica marcado como manual, nenhum recálculo automático o
+                sobrescreve depois (lib/quote-guard.ts). */}
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="text-xs text-gray-500 mb-2">Definir/corrigir o valor manualmente</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={manualValueInput}
+                  onChange={e => setManualValueInput(e.target.value)}
+                  placeholder={quote.valor_final != null ? String(quote.valor_final) : 'ex: 350'}
+                  className="w-32 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+                <span className="text-gray-500 text-sm">€</span>
+                <button
+                  onClick={handleSetManualValue}
+                  disabled={settingManualValue || !manualValueInput}
+                  className="font-bold px-4 py-2.5 rounded-xl text-sm text-white transition-all"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', opacity: settingManualValue || !manualValueInput ? 0.6 : 1 }}
+                >
+                  {settingManualValue ? 'A guardar...' : 'Guardar valor'}
+                </button>
+              </div>
+            </div>
+
             {quote.proposal_text && (
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -550,6 +607,29 @@ export default function LeadDetail() {
                 {generating ? 'A calcular...' : 'Gerar Orçamento'}
               </button>
             )}
+            {/* P2 (2026-09-18): mesmo sem cálculo automático, o profissional
+                pode indicar logo um valor próprio. */}
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={manualValueInput}
+                onChange={e => setManualValueInput(e.target.value)}
+                placeholder="ex: 350"
+                className="w-32 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              />
+              <span className="text-gray-500 text-sm">€</span>
+              <button
+                onClick={handleSetManualValue}
+                disabled={settingManualValue || !manualValueInput}
+                className="font-bold px-4 py-2.5 rounded-xl text-sm text-white transition-all"
+                style={{ background: 'rgba(255,255,255,0.08)', opacity: settingManualValue || !manualValueInput ? 0.6 : 1 }}
+              >
+                {settingManualValue ? 'A guardar...' : 'Definir valor manual'}
+              </button>
+            </div>
           </div>
         )}
 

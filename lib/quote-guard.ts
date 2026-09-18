@@ -39,3 +39,24 @@ export function checkQuoteRecalculationAllowed(existingQuote: ExistingQuoteForGu
 
   return { blocked: false }
 }
+
+// P2 (2026-09-18): guarda para a EDIÇÃO MANUAL do valor (rota
+// /api/quote/manual — "permitir ao profissional rever, alterar ou
+// substituir o valor"). Diferente de checkQuoteRecalculationAllowed acima:
+// uma edição manual pode sempre substituir um valor calculado OU um valor
+// manual anterior (é o próprio profissional a decidir, não um recálculo
+// automático) — só continua bloqueada depois de a proposta já ter sido
+// enviada/aceite pelo cliente, porque nesse ponto alterar o valor
+// silenciosamente já afeta o que o cliente viu.
+export function checkManualEditAllowed(existingQuote: ExistingQuoteForGuard): QuoteGuardResult {
+  if (!existingQuote) return { blocked: false }
+
+  if (existingQuote.status === 'enviado' || existingQuote.status === 'aceite') {
+    return {
+      blocked: true,
+      message: 'Esta proposta já foi enviada ao cliente — para alterar o valor depois de enviada, contacte o cliente diretamente.',
+    }
+  }
+
+  return { blocked: false }
+}

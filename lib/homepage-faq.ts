@@ -14,7 +14,7 @@ export const HOMEPAGE_FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Quando pago por uma lead?',
-    a: 'Pagas com créditos sempre que recebes um lead do marketplace — desde 1,50€ por lead. Pedidos que chegam pelo teu link pessoal estão incluídos no plano mensal, sem custo adicional, até ao limite mensal do teu plano.',
+    a: 'Pagas com créditos sempre que recebes um lead do marketplace — desde 7,43€ por lead, IVA incluído. Pedidos que chegam pelo teu link pessoal estão incluídos no plano mensal, sem custo adicional, até ao limite mensal do teu plano.',
   },
   {
     q: 'O que está incluído no plano mensal?',

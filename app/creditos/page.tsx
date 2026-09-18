@@ -4,12 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle, Zap } from 'lucide-react'
-
-const PACKS = [
-  { id: 'pack10', credits: 10, price: 20, per: 2.00, label: 'Básico' },
-  { id: 'pack25', credits: 25, price: 45, per: 1.80, label: 'Popular', highlight: true },
-  { id: 'pack50', credits: 50, price: 75, per: 1.50, label: 'Pro' },
-]
+import { CREDIT_PACKS, formatEur } from '@/lib/marketplace-credits'
 
 export default function CreditosPage() {
   const router = useRouter()
@@ -77,13 +72,13 @@ export default function CreditosPage() {
             <Zap size={18} className="text-indigo-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-bold text-white mb-1">O que são créditos marketplace?</p>
-              <p className="text-xs text-gray-400">Quando um cliente chega ao teu perfil pelo site FaçoPorTi (e não pelo teu link pessoal), esse lead custa 1 crédito. Se não tiveres créditos, o lead chega bloqueado — vês que existe mas não vês os contactos. Compra créditos para desbloquear.</p>
+              <p className="text-xs text-gray-400">Quando um cliente chega ao teu perfil pelo site FaçoPorTi (e não pelo teu link pessoal), esse lead custa 1 crédito. Se não tiveres créditos, o lead chega bloqueado — vês que existe mas não vês os contactos. Compra créditos para desbloquear. Os créditos não têm validade — nunca expiram.</p>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          {PACKS.map(pack => (
+          {CREDIT_PACKS.map(pack => (
             <div key={pack.id} className="rounded-2xl p-5 flex items-center justify-between"
               style={{
                 background: pack.highlight ? 'rgba(201,168,76,0.06)' : 'rgba(255,255,255,0.03)',
@@ -91,17 +86,17 @@ export default function CreditosPage() {
               }}>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-black text-white text-lg">{pack.credits} créditos</span>
+                  <span className="font-black text-white text-lg">{pack.credits} crédito{pack.credits > 1 ? 's' : ''}</span>
                   {pack.highlight && (
                     <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: '#c9a84c', color: '#000' }}>
                       MELHOR VALOR
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">€{pack.per.toFixed(2)} por lead · {pack.label}</p>
+                <p className="text-xs text-gray-500">€{formatEur(pack.perLeadEur)} por lead · {pack.discountLabel} · {pack.label}</p>
               </div>
               <div className="text-right">
-                <div className="text-xl font-black text-white mb-2">€{pack.price}</div>
+                <div className="text-xl font-black text-white mb-2">€{formatEur(pack.totalEur)}</div>
                 <button
                   onClick={() => handleBuy(pack.id)}
                   disabled={paying !== null}
@@ -120,7 +115,7 @@ export default function CreditosPage() {
         </div>
 
         <p className="text-center text-xs text-gray-600 mt-6">
-          Pagamento único · Sem validade · Pagamento seguro via Stripe
+          Pagamento único · IVA incluído · Sem validade · Pagamento seguro via Stripe
         </p>
       </div>
     </div>

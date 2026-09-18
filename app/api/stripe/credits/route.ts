@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getCreditPack, creditPackAmountCents } from '@/lib/marketplace-credits'
 
 export const dynamic = 'force-dynamic'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
 
-const PACKS = {
-  pack10: { credits: 10, amount: 2000, label: '10 leads do site — €20' },
-  pack25: { credits: 25, amount: 4500, label: '25 leads do site — €45' },
-  pack50: { credits: 50, amount: 7500, label: '50 leads do site — €75' },
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { professional_id, pack } = await req.json()
 
-    const selectedPack = PACKS[pack as keyof typeof PACKS]
+    // P2 (2026-09-18): pacotes e preços vêm de lib/marketplace-credits.ts
+    // (fonte única, com os 4 pacotes ditados por Gilson, todos já com IVA
+    // incluído) — nunca duplicados aqui. `price_data` inline (sem Price ID
+    // fixo do Stripe) porque são pagamentos únicos, não subscrições — o
+    // mesmo padrão já usado antes dos 20€/45€/75€ antigos, só os valores
+    // mudam.
+    const selectedPack = getCreditPack(pack)
     if (!selectedPack) return NextResponse.json({ error: 'Pack inválido' }, { status: 400 })
 
     const { data: prof } = await supabaseAdmin
@@ -37,8 +38,10 @@ export async function POST(req: NextRequest) {
         {
           price_data: {
             currency: 'eur',
-            product_data: { name: selectedPack.label },
-            unit_amount: selectedPack.amount,
+            product_data: {
+              name: `${selectedPack.credits} crédito${selectedPack.credits > 1 ? 's' : ''} FaçoPorTi (IVA incluído)`,
+            },
+            unit_amount: creditPackAmountCents(selectedPack),
           },
           quantity: 1,
         },

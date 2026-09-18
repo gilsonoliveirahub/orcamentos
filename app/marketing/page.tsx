@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { track } from '@/lib/track-client'
 import { HOMEPAGE_FAQ } from '@/lib/homepage-faq'
+import { CREDIT_PACKS, formatEur } from '@/lib/marketplace-credits'
 
 export default function MarketingPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -295,7 +296,13 @@ export default function MarketingPage() {
             {/* Starter */}
             <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
               <h3 className="text-2xl font-bold mb-2">Starter</h3>
-              <div className="text-4xl font-bold mb-1">€19<span className="text-lg font-normal text-white/40">/mês</span></div>
+              <div className="text-4xl font-bold mb-1">€19<span className="text-lg font-normal text-white/40">/mês + IVA</span></div>
+              {/* P2 (2026-09-18): opção anual ditada e aprovada como
+                  informação — 15% de desconto (19×12×0.85). Só texto, sem
+                  seletor nem checkout: os 2 Price IDs anuais no Stripe
+                  ainda não existem, ver app/api/stripe/checkout/route.ts.
+                  Lote separado quando existirem. */}
+              <p className="text-white/30 text-xs mb-1">ou €193,80/ano + IVA (-15%)</p>
               <p className="text-white/40 text-sm mb-8">Para começar</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -320,7 +327,8 @@ export default function MarketingPage() {
             <div className="bg-[#c9a84c]/5 border border-[#c9a84c]/30 rounded-3xl p-8 relative">
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <div className="text-4xl font-bold mb-1">€39<span className="text-lg font-normal text-white/40">/mês</span></div>
+              <div className="text-4xl font-bold mb-1">€39<span className="text-lg font-normal text-white/40">/mês + IVA</span></div>
+              <p className="text-white/30 text-xs mb-1">ou €397,80/ano + IVA (-15%)</p>
               <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -331,7 +339,6 @@ export default function MarketingPage() {
                   { label: 'PDF de orçamento', soon: true },
                   { label: 'Estatísticas avançadas', soon: false },
                   { label: 'Suporte prioritário', soon: false },
-                  { label: 'Leads do marketplace a preço mais baixo', soon: false },
                 ].map((f) => (
                   <li key={f.label} className="flex items-center gap-3 text-white/80 text-sm">
                     <span className="text-[#c9a84c]">✓</span> {f.label}
@@ -345,9 +352,29 @@ export default function MarketingPage() {
             </div>
           </div>
 
-          <div className="text-center mt-10 space-y-1">
-            <p className="text-white/50 text-sm">Leads do marketplace desde 1,50€</p>
-            <p className="text-white/30 text-sm">Os pedidos do teu link contam para o plano. O marketplace é opcional.</p>
+          {/* P2 (2026-09-18): créditos do marketplace — página pública,
+              mostra os 4 pacotes ditados por Gilson, todos com IVA
+              incluído. Fonte única em lib/marketplace-credits.ts, partilhada
+              com /creditos (UI autenticada) e a checkout do Stripe — nunca
+              duplicar estes números. */}
+          <div className="mt-20">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl md:text-3xl font-bold mb-2">Créditos do marketplace</h3>
+              <p className="text-white/50 text-sm">Leads exclusivos desde €{formatEur(CREDIT_PACKS[CREDIT_PACKS.length - 1].perLeadEur)} — IVA incluído.</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {CREDIT_PACKS.map((pack) => (
+                <div key={pack.id} className="bg-white/3 border rounded-2xl p-5 text-center"
+                  style={pack.highlight ? { borderColor: 'rgba(201,168,76,0.4)', background: 'rgba(201,168,76,0.06)' } : { borderColor: 'rgba(255,255,255,0.08)' }}>
+                  <div className="text-lg font-bold text-white">{pack.credits} crédito{pack.credits > 1 ? 's' : ''}</div>
+                  <div className="text-2xl font-bold text-[#c9a84c] my-1">€{formatEur(pack.totalEur)}</div>
+                  <div className="text-white/40 text-xs">€{formatEur(pack.perLeadEur)}/lead · {pack.discountLabel}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-white/30 text-sm mt-6">
+              Todos os preços já incluem IVA. Os créditos não expiram — cada crédito desbloqueia um lead do marketplace. Os pedidos do teu link pessoal contam para o plano, não para os créditos. O marketplace é opcional.
+            </p>
           </div>
         </div>
       </section>
