@@ -128,6 +128,23 @@ describe('POST /api/quote/generate — precisão de area_tetos (movido do client
     expect(inserted[0]).toMatchObject({ valor_base: expected.valor_base, valor_final: expected.valor_final, valor_min: expected.valor_min, valor_max: expected.valor_max, value_source: 'calculated' })
   })
 
+  it('P4 (2026-09-19): área de parede indicada diretamente (sem altura_paredes) — recupera o teto exato, nunca o heurístico de 30%', async () => {
+    const lead = {
+      id: 'lead-direct', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,
+      q3_area_m2: 65, q1_tipo_trabalho: 'interior', q8_teto: true,
+      metadata: { area_paredes_pintar_m2: '65', area_total_m2: '12' },
+      professionals: professional,
+    }
+    const { inserted } = mockLeadAndQuotes(lead)
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-direct' }))
+
+    // area_paredes=65 (área direta), area_tetos=12 (exato, não os 0.3*65=19.5 do heurístico)
+    const expected = calculateQuote({ area_m2_paredes: 65, area_m2_tetos: 12, tipo: 'interior', mudanca_cor: false, fissuras: false, mobilias: false, primer: false, prices })
+    expect(inserted[0]).toMatchObject({ valor_base: expected.valor_base, valor_final: expected.valor_final })
+  })
+
   it('formulário antigo (metadata.area_m2_tetos, sem altura_paredes): usa o valor exato em vez do heurístico de 30%', async () => {
     const lead = {
       id: 'lead-b', source: 'pessoal', opened_at: '2026-07-01T00:00:00Z', locked: false,

@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play } from 'lucide-react'
-import { getProfession, PROFESSIONS, mapAnswersToLeadFields, type Question, type ProfessionConfig } from '@/lib/professions'
+import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play, Mic, Square } from 'lucide-react'
+import { getProfession, PROFESSIONS, mapAnswersToLeadFields, matchesShowIf, generateAnswersSummary, formatCodigoPostal, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
+import { useDictation } from '@/lib/useDictation'
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -30,6 +31,12 @@ export default function ProfessionalPublicPage() {
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  // P4 (2026-09-19): resumo final automático e editável (lib/professions.ts,
+  // generateAnswersSummary), gerado só na primeira vez que se chega ao
+  // passo de resumo — ver isResumoStep abaixo.
+  const [resumo, setResumo] = useState('')
+  const [resumoInitialized, setResumoInitialized] = useState(false)
+  const [codigoPostal, setCodigoPostal] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -150,11 +157,7 @@ export default function ProfessionalPublicPage() {
 
   const allQuestions = profession.questions
   function filterQuestions(ans: Record<string, any>) {
-    return allQuestions.filter(q => {
-      if (!q.showIf) return true
-      const val = ans[q.showIf.key]
-      return Array.isArray(q.showIf.value) ? q.showIf.value.includes(val) : val === q.showIf.value
-    })
+    return allQuestions.filter(q => matchesShowIf(q.showIf, ans))
   }
   const questions = filterQuestions(answers)
   // Pintura usa os preços próprios do profissional (calculateQuote com
@@ -172,9 +175,11 @@ export default function ProfessionalPublicPage() {
   // enquanto estiver desligado. Quando for reativado, skipEstimate volta a
   // reduzir-se a isPintura sozinho — comportamento da Pintura preservado.
   const skipEstimate = isPintura || !PUBLIC_ESTIMATE_ENABLED
-  const totalSteps = questions.length + (skipEstimate ? 0 : 1) + 2
+  // P4 (2026-09-19): +1 pelo novo passo de resumo, entre media e contacto.
+  const totalSteps = questions.length + (skipEstimate ? 0 : 1) + 3
   const isEstimateStep = !skipEstimate && step === questions.length + 1
   const isMediaStep = step === questions.length + (skipEstimate ? 1 : 2)
+  const isResumoStep = step === questions.length + (skipEstimate ? 2 : 3)
   const isContactStep = step === totalSteps
 
   function answerAndAdvance(key: string, value: any) {
@@ -215,7 +220,16 @@ export default function ProfessionalPublicPage() {
           marketing_opt_in: marketingOptIn,
           idempotency_key: idempotencyKeyRef.current,
           ...legacyFields,
-          metadata: { ...answers, _service_specialty: selectedSpecialty, ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}) },
+          // P4 (2026-09-19): resumo final (auto-gerado, editável pelo
+          // cliente) e código postal — guardados no metadata, sem alterar o
+          // esquema da tabela `leads` nem os campos legacy já existentes.
+          metadata: {
+            ...answers,
+            _service_specialty: selectedSpecialty,
+            ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}),
+            ...(resumo.trim() ? { resumo_cliente: resumo.trim() } : {}),
+            ...(codigoPostal.trim() ? { codigo_postal: codigoPostal.trim() } : {}),
+          },
           ...currentCampaignContext(),
         }),
       })
@@ -539,6 +553,25 @@ export default function ProfessionalPublicPage() {
             total={totalSteps}
             mediaUrls={mediaUrls}
             onMediaChange={setMediaUrls}
+            onNext={() => {
+              // P4 (2026-09-19): gera o resumo automático só na primeira vez
+              // que se avança daqui — se o cliente voltar atrás e avançar de
+              // novo, o texto já editado não é substituído.
+              if (!resumoInitialized) {
+                setResumo(generateAnswersSummary(profession, answers))
+                setResumoInitialized(true)
+              }
+              setStep(s => s + 1)
+            }}
+            onBack={() => setStep(s => s - 1)}
+          />
+        )}
+        {isResumoStep && (
+          <ResumoStep
+            current={questions.length + (skipEstimate ? 2 : 3)}
+            total={totalSteps}
+            resumo={resumo}
+            onResumoChange={setResumo}
             onNext={() => setStep(s => s + 1)}
             onBack={() => setStep(s => s - 1)}
           />
@@ -549,6 +582,7 @@ export default function ProfessionalPublicPage() {
             phone={phone}
             email={email}
             marketingOptIn={marketingOptIn}
+            codigoPostal={codigoPostal}
             total={totalSteps}
             submitting={submitting}
             submitError={submitError}
@@ -556,6 +590,7 @@ export default function ProfessionalPublicPage() {
             onPhoneChange={setPhone}
             onEmailChange={setEmail}
             onMarketingOptInChange={setMarketingOptIn}
+            onCodigoPostalChange={setCodigoPostal}
             onBack={() => setStep(s => s - 1)}
             onSubmit={handleSubmit}
           />
@@ -630,8 +665,8 @@ function MediaStep({
   return (
     <div>
       <ProgressBar current={current} total={total} />
-      <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
-      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a preparar um orçamento mais preciso, mas não substitui uma avaliação presencial quando for necessária.</p>
+      <h2 className="text-xl font-black text-white mb-1">Fotos, vídeos e/ou planta</h2>
+      <p className="text-gray-400 text-sm mb-6">Opcional — fotos do espaço ou uma planta ajudam o profissional a preparar um orçamento mais preciso, mas não substituem uma avaliação presencial quando for necessária.</p>
 
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
@@ -679,6 +714,40 @@ function MediaStep({
         style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}
       >
         {mediaUrls.length > 0 ? 'Continuar' : 'Saltar'} <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
+// ── Resumo final — automático e editável (P4, 2026-09-19) ─────────────────────
+function ResumoStep({ current, total, resumo, onResumoChange, onNext, onBack }: {
+  current: number
+  total: number
+  resumo: string
+  onResumoChange: (value: string) => void
+  onNext: () => void
+  onBack: () => void
+}) {
+  return (
+    <div>
+      <ProgressBar current={current} total={total} />
+      <p className="text-sm text-gray-500 mb-4">
+        Isto é um resumo automático do que respondeu. Pode corrigir, acrescentar ou apagar o que quiser antes de enviar.
+      </p>
+      <textarea
+        value={resumo}
+        onChange={e => onResumoChange(e.target.value)}
+        rows={10}
+        className="w-full rounded-2xl px-5 py-4 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+      />
+      <button onClick={onNext}
+        className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+        Confirmar <ChevronRight size={18} />
       </button>
       <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
         <ChevronLeft size={15} /> Voltar
@@ -771,6 +840,13 @@ function QuestionStep({
   const [selected, setSelected] = useState<string[]>(Array.isArray(answer) ? answer : [])
   const [outroVal, setOutroVal] = useState('')
   const [outroMode, setOutroMode] = useState(false)
+  // P4 (2026-09-19): tem de ser chamado incondicionalmente, ANTES de
+  // qualquer "return" antecipado por tipo de pergunta (multiselect/choice)
+  // abaixo — hooks nunca podem ser condicionais (Rules of Hooks). Esta
+  // instância de QuestionStep é reutilizada entre perguntas (mesma posição
+  // na árvore), por isso uma chamada só dentro do ramo 'text' fazia o
+  // número de hooks variar consoante o tipo da pergunta anterior/seguinte.
+  const dictation = useDictation(setText)
 
   function toggleMulti(opt: string) {
     setSelected(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt])
@@ -825,7 +901,8 @@ function QuestionStep({
     return (
       <div>
         <ProgressBar current={current} total={total} />
-        <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+        <h2 className={`text-xl font-black text-white ${question.desc ? 'mb-2' : 'mb-6'}`}>{question.text}</h2>
+        {question.desc && <p className="text-sm text-gray-500 mb-4">{question.desc}</p>}
         <div className="space-y-3">
           {question.options.map(opt => (
             <button
@@ -883,21 +960,40 @@ function QuestionStep({
   const minLen = question.minLength || 0
   const meetsMin = !minLen || text.length >= minLen
   const canContinue = meetsMin && (text.length > 0 || question.optional)
+  // P4 (2026-09-19): microfone só no campo final de descrição ('notas') —
+  // nunca noutro campo. Ditado só preenche o textarea (editável a seguir),
+  // nunca avança/envia sozinho. `dictation` já vem do hook chamado
+  // incondicionalmente no topo do componente.
+  const isNotasField = question.key === 'notas'
 
   return (
     <div>
       <ProgressBar current={current} total={total} />
-      <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+      <h2 className={`text-xl font-black text-white ${question.desc ? 'mb-2' : 'mb-6'}`}>{question.text}</h2>
+      {question.desc && <p className="text-sm text-gray-500 mb-4">{question.desc}</p>}
       {question.type === 'text' && !question.unit ? (
-        <textarea
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder={question.placeholder || ''}
-          rows={4}
-          className="w-full rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-          autoFocus
-        />
+        <div className="relative">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={question.placeholder || ''}
+            rows={4}
+            className="w-full rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+            autoFocus
+          />
+          {isNotasField && dictation.supported && (
+            <button
+              type="button"
+              onClick={() => dictation.toggle(text)}
+              title={dictation.listening ? 'Parar ditado' : 'Ditar por voz'}
+              className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all"
+              style={{ background: dictation.listening ? '#ef4444' : 'rgba(255,255,255,0.1)', color: '#fff' }}
+            >
+              {dictation.listening ? <Square size={14} /> : <Mic size={16} />}
+            </button>
+          )}
+        </div>
       ) : (
         <input
           type={question.type === 'number' ? 'number' : 'text'}
@@ -910,6 +1006,9 @@ function QuestionStep({
         />
       )}
       {question.unit && <p className="text-xs text-gray-600 mt-1">{question.unit}</p>}
+      {isNotasField && dictation.listening && (
+        <p className="text-xs mt-2" style={{ color: '#ef4444' }}>🎤 A ouvir... pode corrigir o texto a qualquer momento.</p>
+      )}
       {minLen > 0 && (
         <p className="text-xs mt-2 transition-colors" style={{ color: meetsMin ? '#34d399' : text.length > 0 ? '#fbbf24' : '#6b7280' }}>
           {text.length}/{minLen} caracteres mínimos
@@ -937,13 +1036,14 @@ function QuestionStep({
 // ── Dados de contacto ─────────────────────────────────────────────────────────
 
 function ContactStep({
-  name, phone, email, marketingOptIn, total, submitting, submitError,
-  onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit,
+  name, phone, email, marketingOptIn, codigoPostal, total, submitting, submitError,
+  onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onCodigoPostalChange, onBack, onSubmit,
 }: {
   name: string
   phone: string
   email: string
   marketingOptIn: boolean
+  codigoPostal: string
   total: number
   submitting: boolean
   submitError: string
@@ -951,6 +1051,7 @@ function ContactStep({
   onPhoneChange: (v: string) => void
   onEmailChange: (v: string) => void
   onMarketingOptInChange: (v: boolean) => void
+  onCodigoPostalChange: (v: string) => void
   onBack: () => void
   onSubmit: () => void
 }) {
@@ -994,6 +1095,18 @@ function ContactStep({
             className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
           />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Código postal <span className="text-gray-600 normal-case">(opcional)</span></label>
+          <input
+            value={codigoPostal}
+            onChange={e => onCodigoPostalChange(formatCodigoPostal(e.target.value))}
+            placeholder="1000-001"
+            inputMode="numeric"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+          />
+          <p className="text-xs text-gray-600 mt-1">Ajuda o profissional a avaliar a distância antes de responder.</p>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={rgpd} onChange={e => setRgpd(e.target.checked)}

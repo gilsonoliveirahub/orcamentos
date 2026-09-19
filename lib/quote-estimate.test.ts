@@ -1,6 +1,28 @@
 import { describe, it, expect } from 'vitest'
 import { estimatePriceRange } from './quote-estimate'
 
+// P4 (2026-09-19): área de parede indicada diretamente pelo cliente — usada
+// tal e qual pela tabela genérica de Pintura, nunca recalculada a partir de
+// divisões/altura mesmo que essas respostas também existam.
+describe('estimatePriceRange — Pintura com área de parede direta (P4, 2026-09-19)', () => {
+  it('usa area_paredes_pintar_m2 diretamente, tipo interior', () => {
+    const result = estimatePriceRange('Pintura', { area_paredes_pintar_m2: '65', tipo_trabalho: 'Interior' })
+    expect(result.available).toBe(true)
+    if (!result.available) throw new Error('unreachable')
+    // 65m² × 4€/m² (interior) = 260€
+    expect(result.min).toBe(260)
+  })
+
+  it('tem prioridade sobre altura_paredes/num_quartos mesmo que ambos estejam presentes', () => {
+    const direto = estimatePriceRange('Pintura', {
+      area_paredes_pintar_m2: '65', tipo_trabalho: 'Interior',
+      altura_paredes: '2.4m', num_quartos: '4 ou mais', tem_sala: 'Sim', tem_hall: 'Sim',
+    })
+    if (!direto.available) throw new Error('unreachable')
+    expect(direto.min).toBe(260) // não o valor maior que o cálculo por divisões daria
+  })
+})
+
 describe('estimatePriceRange — preço próprio do profissional por especialidade (Fase 2, 2026-09-15)', () => {
   it('usa price_per_m2 do profissional para especialidade "m2" (ex: Pavimentos e Revestimentos / chão flutuante) quando configurado', () => {
     const result = estimatePriceRange(

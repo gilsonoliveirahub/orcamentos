@@ -1,17 +1,18 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2 } from 'lucide-react'
+import { ChevronRight, ChevronLeft, MapPin, Camera, X, Loader2, Mic, Square } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields } from '@/lib/professions'
+import { PROFESSIONS, SPECIALTY_LIST, getProfession, mapAnswersToLeadFields, matchesShowIf, generateAnswersSummary, formatCodigoPostal } from '@/lib/professions'
 import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { GENERIC_ZONE_LABEL } from '@/lib/lead-completeness'
+import { useDictation } from '@/lib/useDictation'
 
 const ZONAS = ['Lisboa', 'Porto', 'Setúbal', 'Braga', 'Aveiro', 'Coimbra', 'Faro', 'Évora', GENERIC_ZONE_LABEL]
 
-type Phase = 'profissao' | 'zona' | 'zona-detalhe' | 'perguntas' | 'estimativa' | 'media' | 'contacto' | 'enviado'
+type Phase = 'profissao' | 'zona' | 'zona-detalhe' | 'perguntas' | 'estimativa' | 'media' | 'resumo' | 'contacto' | 'enviado'
 
 export default function PedirClient() {
   const [phase, setPhase] = useState<Phase>('profissao')
@@ -21,6 +22,14 @@ export default function PedirClient() {
   const [step, setStep] = useState(1)
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
+  // P4 (2026-09-19): resumo final automático (lib/professions.ts,
+  // generateAnswersSummary) — mostrado ao cliente antes do envio, editável
+  // livremente. Só é inicializado quando se entra na fase 'resumo' (ver
+  // handleSubmit e a transição de fase abaixo), nunca reescrito depois de o
+  // cliente começar a editar.
+  const [resumo, setResumo] = useState('')
+  const [resumoInitialized, setResumoInitialized] = useState(false)
+  const [codigoPostal, setCodigoPostal] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -37,11 +46,7 @@ export default function PedirClient() {
   const profession = specialty ? getProfession(specialty) : null
   const allQuestions = profession?.questions || []
   function filterQuestions(ans: Record<string, any>) {
-    return allQuestions.filter(q => {
-      if (!q.showIf) return true
-      const val = ans[q.showIf.key]
-      return Array.isArray(q.showIf.value) ? q.showIf.value.includes(val) : val === q.showIf.value
-    })
+    return allQuestions.filter(q => matchesShowIf(q.showIf, ans))
   }
   const questions = filterQuestions(answers)
   const totalSteps = questions.length
@@ -89,7 +94,19 @@ export default function PedirClient() {
       if (PUBLIC_ESTIMATE_ENABLED) { setPhase('estimativa') } else { setPhase('perguntas'); setStep(totalSteps) }
       return
     }
-    if (phase === 'contacto') { setPhase('media'); return }
+    if (phase === 'resumo') { setPhase('media'); return }
+    if (phase === 'contacto') { setPhase('resumo'); return }
+  }
+
+  // P4 (2026-09-19): entra na fase de resumo e gera o texto automático uma
+  // única vez (na primeira vez que se chega aqui) — se o cliente voltar
+  // atrás e voltar a avançar, o resumo já editado não é substituído.
+  function goToResumo() {
+    if (!resumoInitialized) {
+      setResumo(generateAnswersSummary(profession!, answers))
+      setResumoInitialized(true)
+    }
+    setPhase('resumo')
   }
 
   async function handleSubmit() {
@@ -112,7 +129,15 @@ export default function PedirClient() {
           status: 'novo',
           marketing_opt_in: marketingOptIn,
           ...legacyFields,
-          metadata: mediaUrls.length > 0 ? { ...answers, media_urls: mediaUrls } : answers,
+          // P4 (2026-09-19): resumo final (auto-gerado, editável pelo
+          // cliente) e código postal — guardados no metadata, sem alterar o
+          // esquema da tabela `leads` nem os campos legacy já existentes.
+          metadata: {
+            ...answers,
+            ...(mediaUrls.length > 0 ? { media_urls: mediaUrls } : {}),
+            ...(resumo.trim() ? { resumo_cliente: resumo.trim() } : {}),
+            ...(codigoPostal.trim() ? { codigo_postal: codigoPostal.trim() } : {}),
+          },
           ...currentCampaignContext(),
         }),
       })
@@ -176,7 +201,8 @@ export default function PedirClient() {
               {phase === 'zona-detalhe' && 'Localidade'}
               {phase === 'perguntas' && `${PROFESSIONS[specialty]?.emoji} ${PROFESSIONS[specialty]?.label || specialty}`}
               {phase === 'estimativa' && 'A sua estimativa'}
-              {phase === 'media' && 'Fotos e/ou vídeos'}
+              {phase === 'media' && 'Fotos, vídeos e/ou planta'}
+              {phase === 'resumo' && 'Resumo do pedido'}
               {phase === 'contacto' && 'Os seus dados'}
             </h1>
             {phase === 'profissao' && (
@@ -299,6 +325,16 @@ export default function PedirClient() {
           <MediaStep
             mediaUrls={mediaUrls}
             onMediaChange={setMediaUrls}
+            onNext={goToResumo}
+            onBack={goBack}
+          />
+        )}
+
+        {/* Resumo final — automático e editável (P4, 2026-09-19) */}
+        {phase === 'resumo' && (
+          <ResumoStep
+            resumo={resumo}
+            onResumoChange={setResumo}
             onNext={() => setPhase('contacto')}
             onBack={goBack}
           />
@@ -308,6 +344,7 @@ export default function PedirClient() {
         {phase === 'contacto' && (
           <ContactStep
             name={name} phone={phone} email={email} marketingOptIn={marketingOptIn}
+            codigoPostal={codigoPostal} onCodigoPostalChange={setCodigoPostal}
             submitting={submitting} submitError={submitError}
             onNameChange={setName}
             onPhoneChange={setPhone}
@@ -341,6 +378,13 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
   const [selected, setSelected] = useState<string[]>(Array.isArray(answer) ? answer : [])
   const [outroVal, setOutroVal] = useState('')
   const [outroMode, setOutroMode] = useState(false)
+  // P4 (2026-09-19): tem de ser chamado incondicionalmente, ANTES de
+  // qualquer "return" antecipado por tipo de pergunta (multiselect/choice)
+  // abaixo — hooks nunca podem ser condicionais (Rules of Hooks). Esta
+  // instância de QuestionStep é reutilizada entre perguntas (mesma posição
+  // na árvore), por isso uma chamada só dentro do ramo 'text' fazia o
+  // número de hooks variar consoante o tipo da pergunta anterior/seguinte.
+  const dictation = useDictation(setText)
 
   function toggleMulti(opt: string) {
     setSelected(prev => prev.includes(opt) ? prev.filter(o => o !== opt) : [...prev, opt])
@@ -397,7 +441,8 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
     return (
       <div>
         <ProgressBar current={current} total={total} />
-        <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+        <h2 className={`text-xl font-black text-white ${question.desc ? 'mb-2' : 'mb-6'}`}>{question.text}</h2>
+        {question.desc && <p className="text-sm text-gray-500 mb-4">{question.desc}</p>}
         <div className="space-y-3">
           {question.options.map((opt: string) => (
             <button key={opt} onClick={() => opt === 'Outro' ? setOutroMode(true) : onAnswer(opt)}
@@ -454,21 +499,43 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
   const minLen = question.minLength || 0
   const meetsMin = !minLen || text.length >= minLen
   const canContinue = meetsMin && (text.length > 0 || question.optional)
+  // P4 (2026-09-19): microfone só no campo final de descrição ('notas') —
+  // nunca noutro campo de texto. Ditado só preenche o textarea (editável a
+  // seguir), nunca avança/envia sozinho. `dictation` já vem do hook chamado
+  // incondicionalmente no topo do componente.
+  const isNotasField = question.key === 'notas'
 
   return (
     <div>
       <ProgressBar current={current} total={total} />
-      <h2 className="text-xl font-black text-white mb-6">{question.text}</h2>
+      <h2 className={`text-xl font-black text-white ${question.desc ? 'mb-2' : 'mb-6'}`}>{question.text}</h2>
+      {question.desc && <p className="text-sm text-gray-500 mb-4">{question.desc}</p>}
       {question.type === 'text' && !question.unit ? (
-        <textarea
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder={question.placeholder || ''}
-          rows={4}
-          className="w-full rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-          autoFocus
-        />
+        <div className="relative">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={question.placeholder || ''}
+            rows={4}
+            className="w-full rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+            autoFocus
+          />
+          {isNotasField && dictation.supported && (
+            <button
+              type="button"
+              onClick={() => dictation.toggle(text)}
+              title={dictation.listening ? 'Parar ditado' : 'Ditar por voz'}
+              className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all"
+              style={{
+                background: dictation.listening ? '#ef4444' : 'rgba(255,255,255,0.1)',
+                color: '#fff',
+              }}
+            >
+              {dictation.listening ? <Square size={14} /> : <Mic size={16} />}
+            </button>
+          )}
+        </div>
       ) : (
         <input
           type={question.type === 'number' ? 'number' : 'text'}
@@ -481,6 +548,9 @@ function QuestionStep({ question, current, total, answer, onAnswer, onTextNext, 
         />
       )}
       {question.unit && <p className="text-xs text-gray-600 mt-1">{question.unit}</p>}
+      {isNotasField && dictation.listening && (
+        <p className="text-xs mt-2" style={{ color: '#ef4444' }}>🎤 A ouvir... pode corrigir o texto a qualquer momento.</p>
+      )}
       {minLen > 0 && (
         <p className="text-xs mt-2 transition-colors" style={{ color: meetsMin ? '#34d399' : text.length > 0 ? '#fbbf24' : '#6b7280' }}>
           {text.length}/{minLen} caracteres mínimos
@@ -574,8 +644,8 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
 
   return (
     <div>
-      <h2 className="text-xl font-black text-white mb-1">Fotos e/ou vídeos</h2>
-      <p className="text-gray-400 text-sm mb-6">Opcional — ajuda o profissional a dar um orçamento mais preciso, mas não substitui uma avaliação presencial quando for necessária.</p>
+      <h2 className="text-xl font-black text-white mb-1">Fotos, vídeos e/ou planta</h2>
+      <p className="text-gray-400 text-sm mb-6">Opcional — fotos do espaço ou uma planta ajudam o profissional a dar um orçamento mais preciso, mas não substituem uma avaliação presencial quando for necessária.</p>
       {mediaUrls.length > 0 && (
         <div className="grid grid-cols-3 gap-2 mb-4">
           {mediaUrls.map((url: string) => (
@@ -613,8 +683,34 @@ function MediaStep({ mediaUrls, onMediaChange, onNext, onBack }: any) {
   )
 }
 
+// ── Resumo final — automático e editável (P4, 2026-09-19) ─────────────────────
+function ResumoStep({ resumo, onResumoChange, onNext, onBack }: any) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500 mb-4">
+        Isto é um resumo automático do que respondeu. Pode corrigir, acrescentar ou apagar o que quiser antes de enviar.
+      </p>
+      <textarea
+        value={resumo}
+        onChange={e => onResumoChange(e.target.value)}
+        rows={10}
+        className="w-full rounded-2xl px-5 py-4 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+      />
+      <button onClick={onNext}
+        className="w-full mt-4 flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white"
+        style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>
+        Confirmar <ChevronRight size={18} />
+      </button>
+      <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm mt-4 transition-colors">
+        <ChevronLeft size={15} /> Voltar
+      </button>
+    </div>
+  )
+}
+
 // ── Contacto ──────────────────────────────────────────────────────────────────
-function ContactStep({ name, phone, email, marketingOptIn, submitting, submitError, onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onBack, onSubmit }: any) {
+function ContactStep({ name, phone, email, marketingOptIn, codigoPostal, submitting, submitError, onNameChange, onPhoneChange, onEmailChange, onMarketingOptInChange, onCodigoPostalChange, onBack, onSubmit }: any) {
   const [rgpd, setRgpd] = useState(false)
   const ready = name.trim().length > 1 && phone.trim().length >= 9 && rgpd
   return (
@@ -639,6 +735,13 @@ function ContactStep({ name, phone, email, marketingOptIn, submitting, submitErr
           <input value={email} onChange={e => onEmailChange(e.target.value)} placeholder="joao@email.com" type="email"
             className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Código postal <span className="text-gray-600 normal-case">(opcional)</span></label>
+          <input value={codigoPostal} onChange={e => onCodigoPostalChange(formatCodigoPostal(e.target.value))} placeholder="1000-001" inputMode="numeric"
+            className="w-full rounded-2xl px-5 py-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }} />
+          <p className="text-xs text-gray-600 mt-1">Ajuda o profissional a avaliar a distância antes de responder.</p>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
           <input type="checkbox" checked={rgpd} onChange={e => setRgpd(e.target.checked)}

@@ -1,5 +1,10 @@
 export type AnswerType = 'choice' | 'multiselect' | 'number' | 'text'
 
+export interface ShowIfCondition {
+  key: string
+  value: string | string[]
+}
+
 export interface Question {
   key: string
   text: string
@@ -9,7 +14,25 @@ export interface Question {
   unit?: string
   optional?: boolean
   minLength?: number
-  showIf?: { key: string; value: string | string[] }
+  // P4 (2026-09-19): texto de apoio mostrado sob a pergunta — usado para
+  // esclarecer ambiguidades reais (ex: área da habitação vs. área
+  // efetivamente a pintar), nunca para repetir o que a pergunta já diz.
+  desc?: string
+  // Um único objeto (como sempre foi) ou uma lista — todas as condições da
+  // lista têm de ser verdadeiras para a pergunta aparecer (AND). Extensão
+  // aditiva: showIf de um só objeto continua a funcionar exatamente como
+  // antes (ver matchesShowIf abaixo).
+  showIf?: ShowIfCondition | ShowIfCondition[]
+}
+
+/** Avalia showIf (um objeto ou lista de objetos, AND) contra as respostas atuais. */
+export function matchesShowIf(showIf: Question['showIf'], answers: Record<string, any>): boolean {
+  if (!showIf) return true
+  const conditions = Array.isArray(showIf) ? showIf : [showIf]
+  return conditions.every(({ key, value }) => {
+    const val = answers[key]
+    return Array.isArray(value) ? value.includes(val) : val === value
+  })
 }
 
 export interface ProfessionConfig {
@@ -27,18 +50,82 @@ export const PROFESSIONS: Record<string, ProfessionConfig> = {
       { key: 'tipo_trabalho', text: 'Que tipo de pintura precisa?', type: 'choice', options: ['Interior', 'Exterior', 'Ambos'] },
 
       // — Perguntas de paredes/tetos —
-      { key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais', 'Outro'], unit: 'm', showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'num_quartos', text: 'Quantos quartos vão ser pintados?', type: 'choice', options: ['0', '1', '2', '3', '4 ou mais'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'tem_sala', text: 'Inclui sala?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'tem_cozinha', text: 'Inclui cozinha? (normalmente só teto)', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'num_wc', text: 'Quantas casas de banho?', type: 'choice', options: ['0', '1', '2', '3 ou mais'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
+      // P4 (2026-09-19): alternativa direta à área, mantendo intacto o
+      // caminho por divisões/altura para quem não sabe a área (rule: "manter
+      // a alternativa baseada nas divisões e altura"). 'sabe_area_pintura'
+      // tem de vir ANTES das perguntas de divisões na lista (a ordem do
+      // array é a ordem do wizard) para já estar respondida quando
+      // matchesShowIf avalia se as mostra.
+      {
+        key: 'sabe_area_pintura', text: 'Sabe quantos m² de PAREDE vão ser pintados?', type: 'choice',
+        options: ['Sim, sei a área a pintar', 'Não sei — prefiro indicar as divisões'],
+        desc: 'Isto não é a área da casa (m² de habitação) — é a área de parede a pintar, que é normalmente maior (paredes têm mais superfície do que o chão). Se não tiver a certeza, escolha a segunda opção.',
+        showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+      },
+      {
+        key: 'area_paredes_pintar_m2', text: 'Quantos m² de parede vão ser pintados?', type: 'number',
+        placeholder: 'ex: 65', unit: 'm²',
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Sim, sei a área a pintar' },
+        ],
+      },
+      {
+        key: 'altura_paredes', text: 'Qual a altura das paredes?', type: 'choice', options: ['2.2m', '2.4m', '2.7m', '3m ou mais', 'Outro'], unit: 'm',
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
+      {
+        key: 'num_quartos', text: 'Quantos quartos vão ser pintados?', type: 'choice', options: ['0', '1', '2', '3', '4 ou mais'],
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
+      {
+        key: 'tem_sala', text: 'Inclui sala?', type: 'choice', options: ['Sim', 'Não'],
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
+      {
+        key: 'tem_cozinha', text: 'Inclui cozinha? (normalmente só teto)', type: 'choice', options: ['Sim', 'Não'],
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
+      {
+        key: 'num_wc', text: 'Quantas casas de banho?', type: 'choice', options: ['0', '1', '2', '3 ou mais'],
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
       { key: 'casas_banho_pintura', text: 'As casas de banho serão pintadas?', type: 'choice', options: ['Apenas tetos', 'Paredes e tetos', 'Não serão pintadas'], showIf: { key: 'num_wc', value: ['1', '2', '3 ou mais'] } },
       { key: 'casas_banho_m2_paredes', text: 'Sabe aproximadamente quantos m² de parede têm a(s) casa(s) de banho?', type: 'choice', options: ['Sei os m²', 'Não sei'], showIf: { key: 'casas_banho_pintura', value: 'Paredes e tetos' } },
       { key: 'casas_banho_m2', text: 'Quantos m² aproximadamente?', type: 'number', placeholder: 'ex: 15', unit: 'm²', showIf: { key: 'casas_banho_m2_paredes', value: 'Sei os m²' } },
-      { key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'area_total_m2', text: 'Área total da habitação em m²? (para os tetos — coloque 0 se não incluir tetos)', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true, showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
+      {
+        key: 'tem_hall', text: 'Inclui hall / corredor?', type: 'choice', options: ['Sim', 'Não'],
+        showIf: [
+          { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+          { key: 'sabe_area_pintura', value: 'Não sei — prefiro indicar as divisões' },
+        ],
+      },
+      {
+        key: 'area_total_m2', text: 'Área do teto a pintar, em m²', type: 'number', placeholder: 'ex: 80 ou 0', unit: 'm²', optional: true,
+        desc: 'Pergunta independente da área de parede acima — é só para o teto. Normalmente igual à área da habitação (m² do imóvel), a não ser que só parte da casa tenha teto a pintar. Coloque 0 se não incluir tetos.',
+        showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+      },
       { key: 'mudanca_de_cor', text: 'Qual será a situação da cor das paredes?', type: 'choice', options: ['Branco / Manter branco', 'Cor / Manter cor', 'Branco / Passa a cor', 'Cor / Passa a branco'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
-      { key: 'exclusoes', text: 'Existem paredes ou superfícies que não vão ser pintadas (papel de parede, móveis fixos, etc.)?', type: 'choice', options: ['Não', 'Sim, sei quantos m²', 'Sim, mas não sei quantos m²'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
+      {
+        key: 'exclusoes', text: 'Existem paredes ou superfícies que não vão ser pintadas (papel de parede, móveis fixos, etc.)?', type: 'choice', options: ['Não', 'Sim, sei quantos m²', 'Sim, mas não sei quantos m²'],
+        desc: 'Não descontamos portas/janelas automaticamente — só o que indicar aqui.',
+        showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] },
+      },
       { key: 'exclusoes_m2', text: 'Aproximadamente quantos m² não serão pintados?', type: 'number', placeholder: 'ex: 8', unit: 'm²', showIf: { key: 'exclusoes', value: 'Sim, sei quantos m²' } },
       { key: 'fissuras', text: 'As paredes têm fissuras ou danos?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
       { key: 'mobilias', text: 'Há móveis que precisem de ser movidos?', type: 'choice', options: ['Sim', 'Não'], showIf: { key: 'subtipo_pintura', value: ['Pintura de paredes/tetos', 'Ambos (paredes e madeiras)'] } },
@@ -282,6 +369,40 @@ export function getProfession(specialty: string): ProfessionConfig {
 }
 
 /**
+ * P4 (2026-09-19): resumo automático das respostas do cliente, em texto
+ * simples — base do ecrã "resumo final automático e editável" antes do
+ * envio (o cliente pode reescrever livremente antes de confirmar, ver
+ * ResumoStep em app/pedir/PedirClient.tsx e ProfessionalProfileClient.tsx).
+ * Usa o texto de cada pergunta (sem "?") como label, na mesma ordem do
+ * questionário; ignora perguntas sem resposta e a própria 'notas' (essa já
+ * tem o seu próprio campo, mostrado à parte). Nunca inventa nada que o
+ * cliente não tenha respondido.
+ */
+/**
+ * P4 (2026-09-19): formata como XXXX-XXX (código postal português) à medida
+ * que se escreve — campo sempre opcional, texto livre por baixo do formato,
+ * nunca bloqueia outros formatos. Partilhado por app/pedir/PedirClient.tsx e
+ * app/p/[slug]/ProfessionalProfileClient.tsx.
+ */
+export function formatCodigoPostal(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 7)
+  return digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits
+}
+
+export function generateAnswersSummary(profession: ProfessionConfig, answers: Record<string, any>): string {
+  const lines: string[] = []
+  for (const q of profession.questions) {
+    if (q.key === 'notas') continue
+    const val = answers[q.key]
+    if (val === undefined || val === null || val === '') continue
+    const label = q.text.replace(/\?$/, '')
+    const formatted = Array.isArray(val) ? val.join(', ') : typeof val === 'boolean' ? (val ? 'Sim' : 'Não') : String(val)
+    lines.push(`${label}: ${formatted}`)
+  }
+  return lines.join('\n')
+}
+
+/**
  * Especialidade realmente pedida pelo cliente neste lead — nunca a
  * especialidade "principal"/primeira do profissional. Um profissional com
  * várias especialidades ativas (ex: Pintura + Pavimentos e Revestimentos)
@@ -332,6 +453,20 @@ export function getActiveSpecialties(
 
 /** Calcula áreas de pintura a partir das divisões e altura */
 export function calcPaintingAreas(answers: Record<string, any>): { area_paredes: number; area_tetos: number } {
+  const area_tetos = answers['area_total_m2'] ? Math.max(parseFloat(answers['area_total_m2']) || 0, 0) : 0
+
+  // P4 (2026-09-19): "permitir introduzir diretamente a área a pintar" —
+  // quando o cliente respondeu 'area_paredes_pintar_m2' (pergunta
+  // 'sabe_area_pintura' = 'Sim, sei a área a pintar'), esse valor É a área
+  // de parede a pintar, ponto final — nunca recalculado a partir de
+  // divisões/altura, e nunca descontado automaticamente (portas/janelas só
+  // saem se o cliente indicar em 'exclusoes_m2', tratado à parte). Mínimo de
+  // 10m² só para nunca gravar 0/negativo por erro de digitação.
+  if (answers['area_paredes_pintar_m2']) {
+    const area_paredes = Math.max(parseFloat(answers['area_paredes_pintar_m2']) || 0, 10)
+    return { area_paredes, area_tetos }
+  }
+
   const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
   const height = heightMap[answers['altura_paredes']] || parseFloat(answers['altura_paredes']) || 2.4
 
@@ -358,20 +493,20 @@ export function calcPaintingAreas(answers: Record<string, any>): { area_paredes:
   // Exclusões (papel de parede, móveis fixos, etc.) — decisão de negócio
   // 2026-09-16: só desconta quando o cliente indicou mesmo um valor em m²;
   // "Sim, mas não sei quantos m²" não desconta nada (evitava inventar um
-  // número), fica só registado na resposta para o profissional ler.
+  // número), fica só registado na resposta para o profissional ler. Nunca
+  // portas/janelas automaticamente — só o que o cliente indicar aqui.
   const exclusaoM2 = answers['exclusoes'] === 'Sim, sei quantos m²'
     ? Math.max(parseFloat(answers['exclusoes_m2']) || 0, 0)
     : 0
 
   const area_paredes = Math.max(Math.round(perimeter * height * 0.85) + wcWallArea - exclusaoM2, 10)
-  const area_tetos = answers['area_total_m2'] ? Math.max(parseFloat(answers['area_total_m2']) || 0, 0) : 0
 
   return { area_paredes, area_tetos }
 }
 
 /** Mapeia as respostas para os campos legacy da tabela leads (compatibilidade) */
 export function mapAnswersToLeadFields(answers: Record<string, any>) {
-  const usesNewPaintingForm = !!answers['altura_paredes']
+  const usesNewPaintingForm = !!answers['altura_paredes'] || !!answers['area_paredes_pintar_m2']
   const paintingAreas = usesNewPaintingForm ? calcPaintingAreas(answers) : null
 
   return {

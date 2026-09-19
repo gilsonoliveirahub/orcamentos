@@ -49,7 +49,12 @@ const PRICE_TABLES: Record<string, (answers: Record<string, any>) => { min: numb
   Pintura: (a) => {
     let area_paredes: number
     let area_tetos: number
-    if (a.altura_paredes) {
+    if (a.area_paredes_pintar_m2) {
+      // P4 (2026-09-19): área de parede indicada diretamente pelo cliente —
+      // usada tal e qual, nunca recalculada nem descontada automaticamente.
+      area_paredes = Math.max(parseFloat(a.area_paredes_pintar_m2) || 0, 10)
+      area_tetos = parseFloat(a.area_total_m2) || 0
+    } else if (a.altura_paredes) {
       // novo formato: calcula a partir das divisões
       const heightMap: Record<string, number> = { '2.2m': 2.2, '2.4m': 2.4, '2.7m': 2.7, '3m ou mais': 3.0 }
       const height = heightMap[a.altura_paredes] || parseFloat(a.altura_paredes) || 2.4

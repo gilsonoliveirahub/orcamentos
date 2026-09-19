@@ -261,6 +261,11 @@ export default function LeadDetail() {
       tipo_imovel: 'Tipo de imóvel',
       elevador: 'Elevador disponível',
       notas: 'Notas adicionais',
+      // P4 (2026-09-19)
+      resumo_cliente: 'Resumo do cliente (revisto por ele antes de enviar)',
+      codigo_postal: 'Código postal',
+      sabe_area_pintura: 'Sabia a área de parede a pintar?',
+      area_paredes_pintar_m2: 'Área de parede a pintar (m², indicada diretamente)',
     }
     for (const [k, v] of Object.entries(metadata)) {
       if (!v || k === 'media_urls') continue

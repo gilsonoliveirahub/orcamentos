@@ -56,15 +56,17 @@ export async function POST(req: NextRequest) {
 
     // q3_area_m2 já é o valor exato de paredes calculado na criação do lead
     // (ver mapAnswersToLeadFields, que grava sempre paintingAreas.area_paredes
-    // quando o formulário novo é usado). q8_teto, no entanto, é só um
-    // booleano ("tem teto?") — perde o valor numérico real. Para leads que
-    // usaram o formulário novo (metadata.altura_paredes presente), recupera
-    // o valor exato com calcPaintingAreas(metadata) — a mesma função que o
-    // cliente usava antes de este cálculo passar a correr aqui. Para
-    // metadata mais simples (formulário antigo) ou leads sem metadata
-    // (anteriores a esta funcionalidade), mantém os fallbacks já existentes.
+    // quando o formulário novo é usado — pelas divisões OU pela área de
+    // parede indicada diretamente, P4 2026-09-19). q8_teto, no entanto, é só
+    // um booleano ("tem teto?") — perde o valor numérico real. Para leads que
+    // usaram o formulário novo (metadata.altura_paredes OU
+    // metadata.area_paredes_pintar_m2 presente), recupera o valor exato com
+    // calcPaintingAreas(metadata) — a mesma função que o cliente usava antes
+    // de este cálculo passar a correr aqui. Para metadata mais simples
+    // (formulário antigo) ou leads sem metadata (anteriores a esta
+    // funcionalidade), mantém os fallbacks já existentes.
     const area_paredes = lead.q3_area_m2 || 50
-    const area_tetos = metadata.altura_paredes
+    const area_tetos = (metadata.altura_paredes || metadata.area_paredes_pintar_m2)
       ? calcPaintingAreas(metadata).area_tetos
       : metadata.area_m2_tetos
       ? parseFloat(metadata.area_m2_tetos) || 0
