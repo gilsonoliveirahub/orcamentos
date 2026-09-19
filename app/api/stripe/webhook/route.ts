@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailNovoPagamento } from '@/lib/email'
+import { classifyPriceId } from '@/lib/stripe-plans'
 
 export const dynamic = 'force-dynamic'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' })
-
-// Mesmo price ID usado em /api/stripe/checkout — mantido aqui como
-// constante nomeada para nunca voltar a divergir silenciosamente.
-const PRO_PRICE_ID = 'price_1TPAOELFTn4mze6dDaYx6snk'
 
 // A partir da API 2025-03-31 do Stripe, current_period_start/end deixaram
 // de existir no topo da Subscription e passaram para cada item da
@@ -78,9 +75,17 @@ export async function POST(req: NextRequest) {
           valor: valorEur,
         }).catch(() => {})
       } else {
-        const plan = session.metadata?.plan || 'starter'
-        const valorEur = plan === 'pro' ? '€39/mês' : '€19/mês'
         const sub = session.subscription ? await stripe.subscriptions.retrieve(session.subscription as string) : null
+        // P5 (2026-09-19): classifica pelo Price ID REAL da subscrição
+        // (lib/stripe-plans.ts, cobre os 4 preços) — só cai no metadata da
+        // sessão se, por algum motivo, o Price ID não for reconhecido.
+        // Nunca confunde Starter/Pro nem mensal/anual.
+        const classified = sub ? classifyPriceId(sub.items.data[0]?.price?.id) : null
+        const plan = classified?.plan || session.metadata?.plan || 'starter'
+        const cycle = classified?.cycle || session.metadata?.cycle || 'monthly'
+        const valorEur = cycle === 'annual'
+          ? (plan === 'pro' ? '€397,80/ano + IVA' : '€193,80/ano + IVA')
+          : (plan === 'pro' ? '€39/mês + IVA' : '€19/mês + IVA')
         await supabaseAdmin
           .from('professionals')
           .update({
@@ -111,7 +116,11 @@ export async function POST(req: NextRequest) {
     const subId = (invoice as any).subscription as string | null
     if (subId) {
       const sub = await stripe.subscriptions.retrieve(subId)
-      const plan = sub.metadata?.plan || (sub.items.data[0]?.price?.id === PRO_PRICE_ID ? 'pro' : 'starter')
+      // P5 (2026-09-19): classifica pelo Price ID real (cobre os 4 preços,
+      // mensal e anual) — só cai no metadata se o Price ID não for
+      // reconhecido por nenhum dos dois (nunca deveria acontecer com os
+      // preços atuais).
+      const plan = classifyPriceId(sub.items.data[0]?.price?.id)?.plan || sub.metadata?.plan || 'starter'
       await supabaseAdmin
         .from('professionals')
         .update({ plan, pending_plan: null, ...subscriptionPeriod(sub) })
@@ -142,7 +151,7 @@ export async function POST(req: NextRequest) {
   // Stripe realmente tem.
   if (event.type === 'customer.subscription.updated') {
     const sub = event.data.object as Stripe.Subscription
-    const plan = sub.metadata?.plan || (sub.items.data[0]?.price?.id === PRO_PRICE_ID ? 'pro' : 'starter')
+    const plan = classifyPriceId(sub.items.data[0]?.price?.id)?.plan || sub.metadata?.plan || 'starter'
     await supabaseAdmin
       .from('professionals')
       .update({ plan, ...subscriptionPeriod(sub) })

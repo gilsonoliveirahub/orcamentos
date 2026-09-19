@@ -46,24 +46,37 @@ describe('coerência do preço mínimo do marketplace na homepage (P2, 2026-09-1
   })
 })
 
-// 2026-09-19: opção anual (Starter 193,80€ + IVA, Pro 397,80€ + IVA, -15%)
-// mostrada só como informação na homepage — sem Price ID no Stripe ainda,
-// por isso tem de estar marcada "Em breve" e não pode ter nenhum botão/link
-// que inicie uma compra. Fica aqui e não em checkout/route.test.ts porque é
-// especificamente sobre a apresentação pública, não sobre a API.
-describe('planos anuais — só informação, marcados "Em breve" (2026-09-19)', () => {
-  it('mostra os dois valores anuais exatos', () => {
-    expect(marketingSource).toMatch(/€193,80\/ano \+ IVA \(-15%\)/)
-    expect(marketingSource).toMatch(/€397,80\/ano \+ IVA \(-15%\)/)
+// P5 (2026-09-19): planos anuais ficaram funcionais (Price IDs criados no
+// Stripe) — a página pública ganha um seletor Mensal/Anual real (troca os
+// valores mostrados) e o "Em breve" (P2, texto informativo sem checkout)
+// sai. Fica aqui e não em checkout/route.test.ts porque é especificamente
+// sobre a apresentação pública, não sobre a API.
+describe('planos anuais — seletor funcional, "Em breve" removido (P5, 2026-09-19)', () => {
+  it('existe um seletor Mensal/Anual (estado pricingCycle + os dois botões)', () => {
+    expect(marketingSource).toMatch(/pricingCycle/)
+    expect(marketingSource).toMatch(/Mensal/)
+    expect(marketingSource).toMatch(/Anual/)
   })
 
-  it('cada menção ao valor anual vem marcada "Em breve", para nunca parecer compra ativa', () => {
-    const matches = marketingSource.match(/ano \+ IVA \(-15%\)[\s\S]{0,80}?Em breve/g) || []
-    expect(matches).toHaveLength(2)
+  it('mostra o desconto de 15% junto ao seletor', () => {
+    expect(marketingSource).toMatch(/-15%/)
   })
 
-  it('não existe nenhum seletor de ciclo (mensal/anual) nem qualquer referência a "annual"/"cycle" na página pública', () => {
-    expect(marketingSource).not.toMatch(/cycle/i)
-    expect(marketingSource).not.toMatch(/\bannual\b/i)
+  it('mostra os dois valores anuais exatos, com "+ IVA"', () => {
+    expect(marketingSource).toMatch(/€193,80/)
+    expect(marketingSource).toMatch(/€397,80/)
+    expect(marketingSource).toMatch(/\/ano \+ IVA/)
+    expect(marketingSource).toMatch(/\/mês \+ IVA/)
+  })
+
+  it('já não mostra "Em breve" junto aos planos — o checkout anual está funcional', () => {
+    // Capital "Em breve" era especificamente o texto do P2 junto ao anual —
+    // distingue do "em breve" minúsculo, não relacionado, que já existia
+    // antes numa funcionalidade Pro à parte (PDF de orçamento).
+    expect(marketingSource).not.toMatch(/Em breve/)
+  })
+
+  it('não altera os pacotes de créditos (continuam a vir de CREDIT_PACKS, sem seletor de ciclo aplicado a eles)', () => {
+    expect(marketingSource).toMatch(/CREDIT_PACKS/)
   })
 })

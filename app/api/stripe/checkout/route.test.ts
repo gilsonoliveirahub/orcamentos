@@ -4,6 +4,10 @@ import type { NextRequest } from 'next/server'
 const ORIGINAL_ENV = { ...process.env }
 const STARTER_PRICE_ID = 'price_1TPAO4LFTn4mze6d70qkDWAj'
 const PRO_PRICE_ID = 'price_1TPAOELFTn4mze6dDaYx6snk'
+// P5 (2026-09-19): Price IDs anuais reais, criados por Gilson no Stripe —
+// usados só nos testes que precisam da env var configurada.
+const STARTER_ANNUAL_PRICE_ID = 'price_1UHAsXLFTn4mze6dU5uk5YkJ'
+const PRO_ANNUAL_PRICE_ID = 'price_1UHAuTLFTn4mze6d29nsPNiC'
 
 function fakeRequest(body: unknown): NextRequest {
   return { json: async () => body } as unknown as NextRequest
@@ -73,8 +77,79 @@ describe('POST /api/stripe/checkout', () => {
     expect(sessionsCreate.mock.calls[0][0]).not.toHaveProperty('customer')
   })
 
-  it('2026-09-19: enviar cycle="annual" não tem efeito nenhum — a rota ainda não suporta ciclo anual, usa sempre o Price ID mensal', async () => {
-    const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session-annual-attempt' })
+  // P5 (2026-09-19): planos anuais. Os 4 pares plano/ciclo, cada um com o
+  // Price ID certo — nunca inventado, sempre de lib/stripe-plans.ts.
+  describe('os 4 pares plano/ciclo', () => {
+    const cases: Array<{ plan: string; cycle: string; priceId: string }> = [
+      { plan: 'starter', cycle: 'monthly', priceId: STARTER_PRICE_ID },
+      { plan: 'pro', cycle: 'monthly', priceId: PRO_PRICE_ID },
+      { plan: 'starter', cycle: 'annual', priceId: STARTER_ANNUAL_PRICE_ID },
+      { plan: 'pro', cycle: 'annual', priceId: PRO_ANNUAL_PRICE_ID },
+    ]
+
+    for (const { plan, cycle, priceId } of cases) {
+      it(`plan=${plan} cycle=${cycle} -> usa ${priceId}, com automatic_tax ativo`, async () => {
+        process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
+        process.env.STRIPE_PRICE_PRO_ANNUAL = PRO_ANNUAL_PRICE_ID
+        const sessionsCreate = vi.fn().mockResolvedValue({ url: `https://checkout.stripe.com/${plan}-${cycle}` })
+        mockStripe({ sessionsCreate })
+        mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+        const { POST } = await import('./route')
+        const res = await POST(fakeRequest({ professional_id: 'prof-1', plan, cycle }))
+        const json = await res.json()
+
+        expect(json.url).toBe(`https://checkout.stripe.com/${plan}-${cycle}`)
+        const call = sessionsCreate.mock.calls[0][0]
+        expect(call.line_items[0].price).toBe(priceId)
+        expect(call.metadata).toMatchObject({ plan, cycle })
+        expect(call.automatic_tax).toEqual({ enabled: true })
+        expect(call.mode).toBe('subscription')
+      })
+    }
+
+    it('cycle omitido -> "monthly" por omissão (compatibilidade total com o comportamento anterior)', async () => {
+      const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/default' })
+      mockStripe({ sessionsCreate })
+      mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter' }))
+      const json = await res.json()
+
+      expect(json.url).toBe('https://checkout.stripe.com/default')
+      expect(sessionsCreate.mock.calls[0][0].line_items[0].price).toBe(STARTER_PRICE_ID)
+      expect(sessionsCreate.mock.calls[0][0].metadata).toMatchObject({ plan: 'starter', cycle: 'monthly' })
+    })
+  })
+
+  it('recusa um ciclo inválido, sem chamar o Stripe', async () => {
+    const sessionsCreate = vi.fn()
+    mockStripe({ sessionsCreate })
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter', cycle: 'semestral' }))
+
+    expect(res.status).toBe(400)
+    expect(sessionsCreate).not.toHaveBeenCalled()
+  })
+
+  it('recusa um plano inválido, sem chamar o Stripe', async () => {
+    const sessionsCreate = vi.fn()
+    mockStripe({ sessionsCreate })
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'premium', cycle: 'monthly' }))
+
+    expect(res.status).toBe(400)
+    expect(sessionsCreate).not.toHaveBeenCalled()
+  })
+
+  it('ciclo anual pedido sem a variável de ambiente configurada: erro claro (501), nunca cai no mensal', async () => {
+    delete process.env.STRIPE_PRICE_STARTER_ANNUAL
+    const sessionsCreate = vi.fn()
     mockStripe({ sessionsCreate })
     mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
 
@@ -82,11 +157,26 @@ describe('POST /api/stripe/checkout', () => {
     const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter', cycle: 'annual' }))
     const json = await res.json()
 
-    expect(json.url).toBe('https://checkout.stripe.com/session-annual-attempt')
-    // Nunca rejeita nem trata cycle de forma especial — o campo é
-    // simplesmente ignorado, o Price ID usado continua o mensal fixo.
+    expect(res.status).toBe(501)
+    expect(json.error).toMatch(/Price ID/)
+    expect(sessionsCreate).not.toHaveBeenCalled()
+  })
+
+  it('nunca aceita um Price ID (ou qualquer outro valor) enviado no corpo do pedido — só plan+cycle decidem o preço', async () => {
+    process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
+    const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/safe' })
+    mockStripe({ sessionsCreate })
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({
+      professional_id: 'prof-1', plan: 'starter', cycle: 'monthly',
+      priceId: 'price_forjado_pelo_browser', price: 'price_forjado_pelo_browser', unit_amount: 1,
+    }))
+
+    // O único Price ID que pode ter ido para o Stripe é o resolvido no
+    // servidor a partir de plan+cycle — nunca o forjado.
     expect(sessionsCreate.mock.calls[0][0].line_items[0].price).toBe(STARTER_PRICE_ID)
-    expect(sessionsCreate.mock.calls[0][0].metadata).not.toHaveProperty('cycle')
   })
 
   it('reassinatura depois de um cancelamento (stripe_subscription_id limpo mas stripe_customer_id mantido): reutiliza o Customer existente, sem criar um duplicado', async () => {
@@ -111,18 +201,42 @@ describe('POST /api/stripe/checkout', () => {
     expect(sessionsCreate.mock.calls[0][0]).not.toHaveProperty('customer_email')
   })
 
-  it('já tem este plano ativo: recusa sem chamar o Stripe (evita subscrições/pedidos duplicados)', async () => {
-    const retrieve = vi.fn()
+  it('já tem este plano E este ciclo ativos (mesmo Price ID real na subscrição): recusa, nunca chama update/schedule', async () => {
+    const retrieve = vi.fn().mockResolvedValue({ items: { data: [{ id: 'si_1', price: { id: STARTER_PRICE_ID } }] }, schedule: null })
     const update = vi.fn()
     mockStripe({ retrieve, update })
     mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: 'starter', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' })
 
     const { POST } = await import('./route')
-    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter' }))
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter', cycle: 'monthly' }))
+    const json = await res.json()
 
     expect(res.status).toBe(400)
-    expect(retrieve).not.toHaveBeenCalled()
+    expect(json.error).toMatch(/plano e ciclo/i)
     expect(update).not.toHaveBeenCalled()
+  })
+
+  it('P5 (2026-09-19): mesmo tier, ciclo diferente (Starter mensal -> Starter anual) NÃO é bloqueado como "já tens este plano" — decide pelo Price ID real, não só pelo tier', async () => {
+    process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
+    // Subscrição real está no Starter MENSAL — o pedido é para Starter ANUAL.
+    const retrieve = vi.fn().mockResolvedValue({ items: { data: [{ id: 'si_1', price: { id: STARTER_PRICE_ID }, current_period_end: 1757980800 } ] }, schedule: null })
+    const scheduleCreate = vi.fn().mockResolvedValue({ id: 'sub_sched_1', phases: [{ start_date: 1755302400, items: [{ price: STARTER_PRICE_ID }] }] })
+    const scheduleUpdate = vi.fn().mockResolvedValue({ id: 'sub_sched_1' })
+    mockStripe({ retrieve, scheduleCreate, scheduleUpdate })
+    mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: 'starter', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' })
+
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ professional_id: 'prof-1', plan: 'starter', cycle: 'annual' }))
+    const json = await res.json()
+
+    // Mesmo tier -> não é "upgrade" -> segue o caminho de agendamento
+    // (mesma via seguro já usada para downgrades), nunca bloqueado.
+    expect(json).toEqual({ ok: true, deferred: true })
+    expect(scheduleUpdate).toHaveBeenCalledWith('sub_sched_1', expect.objectContaining({
+      phases: expect.arrayContaining([
+        expect.objectContaining({ items: [{ price: STARTER_ANNUAL_PRICE_ID }] }),
+      ]),
+    }))
   })
 
   it('upgrade Starter→Pro com subscrição existente: atualiza a MESMA subscrição com proration, nunca cria uma segunda', async () => {

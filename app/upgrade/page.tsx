@@ -11,6 +11,10 @@ export default function UpgradePage() {
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState<string | null>(null)
   const [openingPortal, setOpeningPortal] = useState(false)
+  // P5 (2026-09-19): seletor mensal/anual — só decide qual "cycle" vai no
+  // pedido a /api/stripe/checkout; o Price ID real é sempre resolvido no
+  // servidor (lib/stripe-plans.ts), nunca enviado a partir daqui.
+  const [cycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
 
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const success = searchParams?.get('success') === '1'
@@ -42,7 +46,7 @@ export default function UpgradePage() {
     const res = await fetch('/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ professional_id: professional.id, plan }),
+      body: JSON.stringify({ professional_id: professional.id, plan, cycle }),
     })
     const { url, ok, deferred, error } = await res.json()
     if (url) {
@@ -99,6 +103,30 @@ export default function UpgradePage() {
           </div>
         )}
 
+        {/* P5 (2026-09-19): seletor Mensal/Anual — só decide o "cycle" enviado
+            a /api/stripe/checkout quando se escolhe um plano; o Price ID real
+            é sempre resolvido no servidor. */}
+        <div className="flex items-center justify-center gap-1 mb-8 p-1 rounded-full mx-auto w-fit"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <button
+            onClick={() => setCycle('monthly')}
+            className="px-5 py-2 rounded-full text-sm font-bold transition-all"
+            style={cycle === 'monthly' ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' } : { color: '#9ca3af' }}
+          >
+            Mensal
+          </button>
+          <button
+            onClick={() => setCycle('annual')}
+            className="px-5 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2"
+            style={cycle === 'annual' ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' } : { color: '#9ca3af' }}
+          >
+            Anual
+            <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: cycle === 'annual' ? 'rgba(255,255,255,0.25)' : 'rgba(52,211,153,0.15)', color: cycle === 'annual' ? '#fff' : '#34d399' }}>
+              -15%
+            </span>
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
           {/* Starter */}
@@ -110,7 +138,10 @@ export default function UpgradePage() {
                 <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>ATIVO</span>
               )}
             </div>
-            <div className="text-3xl font-black text-white mb-1">€19<span className="text-base font-normal text-gray-400">/mês</span></div>
+            <div className="text-3xl font-black text-white mb-1">
+              {cycle === 'annual' ? '€193,80' : '€19'}
+              <span className="text-base font-normal text-gray-400">{cycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
+            </div>
             <p className="text-xs text-gray-500 mb-5">Ideal para começar</p>
             <ul className="space-y-3 mb-8 flex-1">
               {['Até 10 pedidos/mês via link pessoal', 'Link pessoal', 'Orçamentos automáticos', 'Dashboard kanban', 'Suporte por email'].map(f => (
@@ -149,7 +180,10 @@ export default function UpgradePage() {
                 <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(201,168,76,0.2)', color: '#c9a84c' }}>ATIVO</span>
               )}
             </div>
-            <div className="text-3xl font-black text-white mb-1">€39<span className="text-base font-normal text-gray-400">/mês</span></div>
+            <div className="text-3xl font-black text-white mb-1">
+              {cycle === 'annual' ? '€397,80' : '€39'}
+              <span className="text-base font-normal text-gray-400">{cycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
+            </div>
             <p className="text-xs text-gray-500 mb-5">Para quem quer crescer a sério</p>
             <ul className="space-y-3 mb-8 flex-1">
               {[

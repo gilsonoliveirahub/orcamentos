@@ -64,10 +64,18 @@ function mockDb({ professionalSelect, isDuplicateEvent = false }: { professional
   return { from, updatesByTable }
 }
 
+const STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
+const PRO_MONTHLY = 'price_1TPAOELFTn4mze6dDaYx6snk'
+const STARTER_ANNUAL = 'price_1UHAsXLFTn4mze6dU5uk5YkJ'
+const PRO_ANNUAL = 'price_1UHAuTLFTn4mze6d29nsPNiC'
+
 describe('POST /api/stripe/webhook', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, STRIPE_SECRET_KEY: 'sk_test_fake' }
+    process.env = {
+      ...ORIGINAL_ENV, STRIPE_SECRET_KEY: 'sk_test_fake',
+      STRIPE_PRICE_STARTER_ANNUAL: STARTER_ANNUAL, STRIPE_PRICE_PRO_ANNUAL: PRO_ANNUAL,
+    }
     delete process.env.STRIPE_WEBHOOK_SECRET // força o caminho sem verificação de assinatura nos testes
   })
   afterEach(() => {
@@ -275,6 +283,101 @@ describe('POST /api/stripe/webhook', () => {
       expect(db.updatesByTable.professionals).toContainEqual({ plan: 'inactive', stripe_subscription_id: null })
       // Nunca deve tocar em stripe_customer_id — nem sequer aparece no payload do update.
       expect(db.updatesByTable.professionals[0]).not.toHaveProperty('stripe_customer_id')
+    })
+  })
+
+  // P5 (2026-09-19): planos anuais — classifica pelos 4 preços reais
+  // (classifyPriceId), nunca confunde Starter com Pro nem mensal com anual.
+  describe('mapeamento dos 4 preços (mensal + anual) no webhook', () => {
+    const cases: Array<{ label: string; priceId: string; expectedPlan: string }> = [
+      { label: 'Starter mensal', priceId: STARTER_MONTHLY, expectedPlan: 'starter' },
+      { label: 'Pro mensal', priceId: PRO_MONTHLY, expectedPlan: 'pro' },
+      { label: 'Starter anual', priceId: STARTER_ANNUAL, expectedPlan: 'starter' },
+      { label: 'Pro anual', priceId: PRO_ANNUAL, expectedPlan: 'pro' },
+    ]
+
+    for (const { label, priceId, expectedPlan } of cases) {
+      it(`invoice.payment_succeeded classifica ${label} corretamente, mesmo com metadata.plan em falta`, async () => {
+        const retrieve = vi.fn().mockResolvedValue({
+          metadata: {}, // sem plan no metadata — tem de classificar só pelo Price ID
+          items: { data: [{ price: { id: priceId }, current_period_start: 1755302400, current_period_end: 1757980800 }] },
+        })
+        mockStripe({ retrieve })
+        const db = mockDb({ professionalSelect: { pending_plan: null } })
+        vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from } }))
+        vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn() }))
+
+        const { POST } = await import('./route')
+        await POST(fakeRequest({
+          id: `evt_${label}`,
+          type: 'invoice.payment_succeeded',
+          data: { object: { subscription: 'sub_1', billing_reason: 'subscription_cycle' } },
+        }))
+
+        expect(db.updatesByTable.professionals).toContainEqual(expect.objectContaining({ plan: expectedPlan }))
+      })
+
+      it(`customer.subscription.updated classifica ${label} corretamente, mesmo com metadata.plan em falta`, async () => {
+        const retrieve = vi.fn()
+        mockStripe({ retrieve })
+        const db = mockDb({})
+        vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from } }))
+        vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn() }))
+
+        const { POST } = await import('./route')
+        await POST(fakeRequest({
+          id: `evt_sub_updated_${label}`,
+          type: 'customer.subscription.updated',
+          data: { object: { id: 'sub_1', metadata: {}, items: { data: [{ price: { id: priceId }, current_period_start: 1755302400, current_period_end: 1757980800 }] } } },
+        }))
+
+        expect(db.updatesByTable.professionals).toContainEqual(expect.objectContaining({ plan: expectedPlan }))
+      })
+
+      it(`checkout.session.completed (nova subscrição) classifica ${label} pelo Price ID real da subscrição, não pelo metadata da sessão`, async () => {
+        const retrieve = vi.fn().mockResolvedValue({
+          metadata: {},
+          items: { data: [{ price: { id: priceId }, current_period_start: 1755302400, current_period_end: 1757980800 }] },
+        })
+        mockStripe({ retrieve })
+        const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com', marketplace_credits: 0 } })
+        vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from } }))
+        vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn().mockResolvedValue(undefined) }))
+
+        const { POST } = await import('./route')
+        await POST(fakeRequest({
+          id: `evt_checkout_${label}`,
+          type: 'checkout.session.completed',
+          // metadata.plan deliberadamente ERRADO — a classificação pelo
+          // Price ID real tem de ganhar sempre, provando que nunca há
+          // confusão Starter/Pro por confiar só no metadata.
+          data: { object: { metadata: { professional_id: 'prof-1', plan: expectedPlan === 'pro' ? 'starter' : 'pro' }, customer: 'cus_1', subscription: 'sub_1' } },
+        }))
+
+        expect(db.updatesByTable.professionals[0]).toMatchObject({ plan: expectedPlan })
+      })
+    }
+
+    it('nunca classifica um Price ID anual como Starter quando é Pro, nem vice-versa (ausência de classificação incorreta)', async () => {
+      const retrieve = vi.fn().mockResolvedValue({
+        metadata: {},
+        items: { data: [{ price: { id: PRO_ANNUAL }, current_period_start: 1755302400, current_period_end: 1787980800 }] },
+      })
+      mockStripe({ retrieve })
+      const db = mockDb({ professionalSelect: { pending_plan: null } })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from } }))
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn() }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({
+        id: 'evt_pro_annual_never_starter',
+        type: 'invoice.payment_succeeded',
+        data: { object: { subscription: 'sub_1', billing_reason: 'subscription_cycle' } },
+      }))
+
+      const update = db.updatesByTable.professionals[0]
+      expect(update.plan).toBe('pro')
+      expect(update.plan).not.toBe('starter')
     })
   })
 })

@@ -8,6 +8,10 @@ import { CREDIT_PACKS, formatEur } from '@/lib/marketplace-credits'
 
 export default function MarketingPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  // P5 (2026-09-19): seletor Mensal/Anual da secção de preços — só
+  // informativo nesta página pública (troca os valores mostrados); a
+  // escolha real acontece em /upgrade, depois do login.
+  const [pricingCycle, setPricingCycle] = useState<'monthly' | 'annual'>('monthly')
 
   useEffect(() => {
     track({ event_type: 'page_view', path: '/' })
@@ -264,9 +268,33 @@ export default function MarketingPage() {
       {/* PREÇOS */}
       <section id="precos" className="py-32 bg-white/2 border-t border-white/5">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">Preços simples</h2>
             <p className="text-white/50 text-lg">Sem surpresas. Cancelas quando quiseres.</p>
+          </div>
+
+          {/* P5 (2026-09-19): seletor Mensal/Anual — só informativo aqui
+              (troca os preços mostrados); a escolha real de plano+ciclo é
+              feita em /upgrade, depois do login, onde o checkout acontece. */}
+          <div className="flex items-center justify-center gap-1 mb-10 p-1 rounded-full mx-auto w-fit"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <button
+              onClick={() => setPricingCycle('monthly')}
+              className="px-5 py-2 rounded-full text-sm font-bold transition-all"
+              style={pricingCycle === 'monthly' ? { background: '#c9a84c', color: '#000' } : { color: 'rgba(255,255,255,0.6)' }}
+            >
+              Mensal
+            </button>
+            <button
+              onClick={() => setPricingCycle('annual')}
+              className="px-5 py-2 rounded-full text-sm font-bold transition-all flex items-center gap-2"
+              style={pricingCycle === 'annual' ? { background: '#c9a84c', color: '#000' } : { color: 'rgba(255,255,255,0.6)' }}
+            >
+              Anual
+              <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: pricingCycle === 'annual' ? 'rgba(0,0,0,0.2)' : 'rgba(52,211,153,0.15)', color: pricingCycle === 'annual' ? '#000' : '#34d399' }}>
+                -15%
+              </span>
+            </button>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -296,15 +324,10 @@ export default function MarketingPage() {
             {/* Starter */}
             <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
               <h3 className="text-2xl font-bold mb-2">Starter</h3>
-              <div className="text-4xl font-bold mb-1">€19<span className="text-lg font-normal text-white/40">/mês + IVA</span></div>
-              {/* P2 (2026-09-18): opção anual ditada e aprovada como
-                  informação — 15% de desconto (19×12×0.85). Só texto, sem
-                  seletor nem checkout: os 2 Price IDs anuais no Stripe
-                  ainda não existem, ver app/api/stripe/checkout/route.ts.
-                  "Em breve" (2026-09-19) para nunca dar a entender que já é
-                  possível comprar — nenhum botão/link associado a este
-                  texto. Lote separado quando os Price IDs existirem. */}
-              <p className="text-white/30 text-xs mb-1">ou €193,80/ano + IVA (-15%) · <span className="text-white/50 font-semibold">Em breve</span></p>
+              <div className="text-4xl font-bold mb-1">
+                {pricingCycle === 'annual' ? '€193,80' : '€19'}
+                <span className="text-lg font-normal text-white/40">{pricingCycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
+              </div>
               <p className="text-white/40 text-sm mb-8">Para começar</p>
               <ul className="space-y-3 mb-8">
                 {[
@@ -329,8 +352,10 @@ export default function MarketingPage() {
             <div className="bg-[#c9a84c]/5 border border-[#c9a84c]/30 rounded-3xl p-8 relative">
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <div className="text-4xl font-bold mb-1">€39<span className="text-lg font-normal text-white/40">/mês + IVA</span></div>
-              <p className="text-white/30 text-xs mb-1">ou €397,80/ano + IVA (-15%) · <span className="text-white/50 font-semibold">Em breve</span></p>
+              <div className="text-4xl font-bold mb-1">
+                {pricingCycle === 'annual' ? '€397,80' : '€39'}
+                <span className="text-lg font-normal text-white/40">{pricingCycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
+              </div>
               <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>
               <ul className="space-y-3 mb-8">
                 {[
