@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { resolvePriceId, classifyPriceId, isPlanTier, isBillingCycle, PLAN_RANK } from './stripe-plans'
+import { resolvePriceId, classifyPriceId, isPlanTier, isBillingCycle, PLAN_RANK, isActivePlanCycle, simplifySubscriptionStatus, resolveUnbilledStatus } from './stripe-plans'
 
 const ORIGINAL_ENV = { ...process.env }
 const STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
@@ -76,5 +76,102 @@ describe('isPlanTier / isBillingCycle — validação de entrada', () => {
 describe('PLAN_RANK', () => {
   it('Pro > Starter, independente de ciclo (o ciclo nunca entra nesta hierarquia)', () => {
     expect(PLAN_RANK.pro).toBeGreaterThan(PLAN_RANK.starter)
+  })
+})
+
+// Bug real corrigido em 2026-09-19 (achado pelo Gilson em produção): o
+// cartão "Plano atual" em app/upgrade decidia isto só pelo tier
+// (professionals.plan), ignorando o ciclo — Pro mensal aparecia "ATIVO"
+// mesmo com o seletor em Anual, impedindo abrir o checkout do Pro anual.
+// Estes 5 casos são exatamente os pedidos por Gilson para confirmar a
+// correção (rule 7 do pedido original).
+describe('isActivePlanCycle — "Plano atual" depende do Price ID/ciclo real, nunca só do tier (P5.1, 2026-09-19)', () => {
+  it('Pro mensal + seletor mensal → Plano atual (true)', () => {
+    expect(isActivePlanCycle({ plan: 'pro', cycle: 'monthly' }, 'pro', 'monthly')).toBe(true)
+  })
+
+  it('Pro mensal + seletor anual → NÃO é o plano atual (false, deve aparecer o botão Pro anual)', () => {
+    expect(isActivePlanCycle({ plan: 'pro', cycle: 'monthly' }, 'pro', 'annual')).toBe(false)
+  })
+
+  it('Pro anual + seletor anual → Plano atual (true)', () => {
+    expect(isActivePlanCycle({ plan: 'pro', cycle: 'annual' }, 'pro', 'annual')).toBe(true)
+  })
+
+  it('Pro anual + seletor mensal → NÃO é o plano atual (false, deve aparecer o botão Pro mensal)', () => {
+    expect(isActivePlanCycle({ plan: 'pro', cycle: 'annual' }, 'pro', 'monthly')).toBe(false)
+  })
+
+  it('plano na BD sem subscrição Stripe ativa (cycle null) → sempre false, nunca bloqueia nenhum ciclo', () => {
+    expect(isActivePlanCycle({ plan: 'pro', cycle: null }, 'pro', 'monthly')).toBe(false)
+    expect(isActivePlanCycle({ plan: 'pro', cycle: null }, 'pro', 'annual')).toBe(false)
+  })
+
+  it('status null/undefined (ainda a carregar) → sempre false, nunca bloqueia', () => {
+    expect(isActivePlanCycle(null, 'pro', 'monthly')).toBe(false)
+    expect(isActivePlanCycle(undefined, 'starter', 'annual')).toBe(false)
+  })
+
+  it('Starter segue exatamente a mesma lógica (regra 4 do pedido)', () => {
+    expect(isActivePlanCycle({ plan: 'starter', cycle: 'monthly' }, 'starter', 'monthly')).toBe(true)
+    expect(isActivePlanCycle({ plan: 'starter', cycle: 'monthly' }, 'starter', 'annual')).toBe(false)
+    expect(isActivePlanCycle({ plan: 'starter', cycle: 'annual' }, 'starter', 'annual')).toBe(true)
+    expect(isActivePlanCycle({ plan: 'starter', cycle: 'annual' }, 'starter', 'monthly')).toBe(false)
+    expect(isActivePlanCycle({ plan: 'starter', cycle: null }, 'starter', 'monthly')).toBe(false)
+  })
+
+  it('nunca confunde Starter ativo com o cartão Pro, mesmo com o mesmo ciclo', () => {
+    expect(isActivePlanCycle({ plan: 'starter', cycle: 'monthly' }, 'pro', 'monthly')).toBe(false)
+    expect(isActivePlanCycle({ plan: 'pro', cycle: 'annual' }, 'starter', 'annual')).toBe(false)
+  })
+})
+
+describe('simplifySubscriptionStatus — estado do Stripe reduzido para a interface', () => {
+  it('active/trialing → active', () => {
+    expect(simplifySubscriptionStatus('active')).toBe('active')
+    expect(simplifySubscriptionStatus('trialing')).toBe('active')
+  })
+
+  it('past_due/unpaid → past_due', () => {
+    expect(simplifySubscriptionStatus('past_due')).toBe('past_due')
+    expect(simplifySubscriptionStatus('unpaid')).toBe('past_due')
+  })
+
+  it('canceled/incomplete_expired → canceled', () => {
+    expect(simplifySubscriptionStatus('canceled')).toBe('canceled')
+    expect(simplifySubscriptionStatus('incomplete_expired')).toBe('canceled')
+  })
+
+  it('null/undefined (sem stripe_subscription_id) → no_subscription, nunca "canceled"', () => {
+    expect(simplifySubscriptionStatus(null)).toBe('no_subscription')
+    expect(simplifySubscriptionStatus(undefined)).toBe('no_subscription')
+  })
+
+  it('valor Stripe não mapeado → unknown, nunca assume "active"', () => {
+    expect(simplifySubscriptionStatus('incomplete')).toBe('unknown')
+    expect(simplifySubscriptionStatus('paused')).toBe('unknown')
+  })
+})
+
+// Acesso administrativo (2026-09-19): confirmado por leitura em produção
+// que a única conta com um tier pago sem subscrição Stripe é a do Gilson,
+// e que o seu user_id está na tabela `admins` — nunca inventa isto para
+// nenhum profissional normal na mesma situação (fica 'no_subscription',
+// tratado como estado inconsistente).
+describe('resolveUnbilledStatus — distingue acesso administrativo de conta paga sem subscrição real', () => {
+  it('admin com tier pago (Pro ou Starter) e sem subscrição → admin_access', () => {
+    expect(resolveUnbilledStatus(true, 'pro')).toBe('admin_access')
+    expect(resolveUnbilledStatus(true, 'starter')).toBe('admin_access')
+  })
+
+  it('profissional normal (não admin) com tier pago e sem subscrição → no_subscription, tratado como estado inconsistente', () => {
+    expect(resolveUnbilledStatus(false, 'pro')).toBe('no_subscription')
+    expect(resolveUnbilledStatus(false, 'starter')).toBe('no_subscription')
+  })
+
+  it('admin sem nenhum tier pago (null/inactive) → no_subscription, nunca inventa acesso administrativo sem um plano para o justificar', () => {
+    expect(resolveUnbilledStatus(true, null)).toBe('no_subscription')
+    expect(resolveUnbilledStatus(true, 'inactive')).toBe('no_subscription')
+    expect(resolveUnbilledStatus(true, undefined)).toBe('no_subscription')
   })
 })

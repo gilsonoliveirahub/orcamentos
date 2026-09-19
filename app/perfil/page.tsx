@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import { computeProfileCompleteness } from '@/lib/profile-completeness'
+import type { ActiveSubscriptionStatus, SimplifiedSubscriptionStatus } from '@/lib/stripe-plans'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
 
@@ -17,6 +18,10 @@ export default function PerfilPage() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
+  // "O meu plano" (2026-09-19) — nunca deriva ciclo/estado só do tier
+  // guardado em professionals.plan; vem sempre desta leitura real ao
+  // Stripe (mesma rota usada por app/upgrade e app/dashboard).
+  const [subStatus, setSubStatus] = useState<(ActiveSubscriptionStatus & { status: SimplifiedSubscriptionStatus; current_period_end: string | null }) | null>(null)
   const [form, setForm] = useState({ name: '', phone: '', zone: '', description: '' })
   const [specialties, setSpecialties] = useState<string[]>(['Pintura'])
   const [portfolio, setPortfolio] = useState<any[]>([])
@@ -58,6 +63,11 @@ export default function PerfilPage() {
       ])
       setPortfolio(portfolioData || [])
       setReviews(reviewsData || [])
+      // GET sem parâmetros de propósito — o servidor resolve o profissional
+      // só pela sessão autenticada, nunca por um id enviado a partir daqui.
+      const statusRes = await fetch('/api/stripe/subscription-status')
+      const statusJson = await statusRes.json().catch(() => null)
+      if (statusJson && !statusJson.error) setSubStatus(statusJson)
       setLoading(false)
     })
   }, [router])
@@ -547,6 +557,91 @@ export default function PerfilPage() {
             </div>
           </div>
         )}
+
+        {/* O meu plano (2026-09-19) — nome do plano, ciclo, estado e preço
+            vêm sempre de subStatus (leitura real ao Stripe), nunca de uma
+            suposição a partir do tier guardado na BD. */}
+        <div className="rounded-2xl p-5 space-y-4" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 className="font-black text-white text-sm">O meu plano</h2>
+          {(() => {
+            const planTier = subStatus?.plan
+            const planLabel = planTier === 'pro' ? 'Pro' : planTier === 'starter' ? 'Starter' : 'Sem plano'
+            const cycleLabel = subStatus?.cycle === 'annual' ? 'Anual' : subStatus?.cycle === 'monthly' ? 'Mensal' : null
+            const priceLabel = planTier === 'pro'
+              ? (subStatus?.cycle === 'annual' ? '€397,80/ano + IVA' : subStatus?.cycle === 'monthly' ? '€39/mês + IVA' : null)
+              : planTier === 'starter'
+                ? (subStatus?.cycle === 'annual' ? '€193,80/ano + IVA' : subStatus?.cycle === 'monthly' ? '€19/mês + IVA' : null)
+                : null
+            const isAdminAccess = subStatus?.status === 'admin_access'
+            const statusMeta: Record<SimplifiedSubscriptionStatus, { label: string; color: string; bg: string; icon: React.ReactElement }> = {
+              active:          { label: 'Ativo',                              color: '#34d399', bg: 'rgba(52,211,153,0.12)', icon: <CheckCircle size={14} /> },
+              past_due:        { label: 'Pagamento em atraso',                color: '#fbbf24', bg: 'rgba(251,191,36,0.12)', icon: <AlertTriangle size={14} /> },
+              canceled:        { label: 'Cancelado',                          color: '#f87171', bg: 'rgba(248,113,113,0.12)', icon: <Zap size={14} /> },
+              no_subscription: { label: 'Sem subscrição Stripe associada',    color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', icon: <Info size={14} /> },
+              // Acesso administrativo (2026-09-19) — nunca "erro de
+              // cobrança": é um acesso concedido de propósito, ligado a esta
+              // conta estar na tabela `admins` (ver
+              // app/api/stripe/subscription-status/route.ts).
+              admin_access:    { label: 'Acesso administrativo (sem cobrança)', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', icon: <ShieldCheck size={14} /> },
+              unknown:         { label: 'Estado desconhecido',                color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', icon: <Info size={14} /> },
+            }
+            const meta = subStatus ? statusMeta[subStatus.status] : null
+            return (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: isAdminAccess ? 'rgba(167,139,250,0.15)' : planTier === 'pro' ? 'rgba(201,168,76,0.15)' : 'rgba(99,102,241,0.15)' }}>
+                    {isAdminAccess
+                      ? <ShieldCheck size={18} style={{ color: '#a78bfa' }} />
+                      : <Crown size={18} style={{ color: planTier === 'pro' ? '#c9a84c' : '#818cf8' }} />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-black text-white">
+                      {isAdminAccess ? `Acesso administrativo · funcionalidades ${planLabel}` : `${planLabel}${cycleLabel ? ` · ${cycleLabel}` : ''}`}
+                    </div>
+                    {priceLabel && !isAdminAccess && <div className="text-xs text-gray-500">{priceLabel}</div>}
+                  </div>
+                </div>
+
+                {meta && (
+                  <div className="flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl w-fit"
+                    style={{ background: meta.bg, color: meta.color }}>
+                    {meta.icon} {meta.label}
+                  </div>
+                )}
+
+                {/* Regra 5 (profissional normal): plano marcado na BD mas sem
+                    subscrição Stripe real por trás — nunca inventa
+                    "Mensal"/"Anual", explica a situação claramente. Nunca
+                    aparece para admin_access (é um estado distinto, tratado
+                    acima). */}
+                {subStatus?.status === 'no_subscription' && (planTier === 'starter' || planTier === 'pro') && (
+                  <p className="text-xs text-gray-500">
+                    A tua conta está marcada como {planLabel} mas não encontrámos uma subscrição Stripe ativa — escolhe um ciclo para a ativar.
+                  </p>
+                )}
+
+                {isAdminAccess && (
+                  <p className="text-xs text-gray-500">
+                    Acesso {planLabel} atribuído por administração da plataforma — sem subscrição, ciclo nem cobrança associados.
+                  </p>
+                )}
+
+                {subStatus?.current_period_end && subStatus.status === 'active' && (
+                  <div className="text-xs text-gray-500">
+                    Próxima renovação: {new Date(subStatus.current_period_end).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </div>
+                )}
+
+                <Link href="/upgrade"
+                  className="flex items-center justify-center gap-2 text-sm font-bold px-4 py-3 rounded-xl transition-all"
+                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}>
+                  Ver ou alterar plano
+                </Link>
+              </>
+            )
+          })()}
+        </div>
 
         {/* Info conta */}
         <div className="rounded-2xl p-5 space-y-3" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>

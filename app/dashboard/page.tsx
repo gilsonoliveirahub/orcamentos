@@ -433,6 +433,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
+  const [subStatus, setSubStatus] = useState<{ plan: string | null; cycle: 'monthly' | 'annual' | null; status: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [closingLeadId, setClosingLeadId] = useState<string | null>(null)
@@ -469,12 +470,20 @@ export default function Dashboard() {
     const [{ data: leadsData }, { data: quotesData }, { data: profData }] = await Promise.all([
       supabase.rpc('dashboard_leads'),
       supabase.from('quotes').select('*').order('created_at', { ascending: false }),
-      user ? supabase.from('professionals').select('slug, name, marketplace_credits, plan, trial_ends_at, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
+      user ? supabase.from('professionals').select('id, slug, name, marketplace_credits, plan, trial_ends_at, current_period_start, current_period_end').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     const sortedLeads = [...(leadsData || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     setLeads(sortedLeads)
     setQuotes(quotesData || [])
     setProfessional(profData)
+    // Indicação compacta do plano (2026-09-19) — ciclo/estado vêm sempre
+    // desta leitura real ao Stripe, nunca de professionals.plan sozinho
+    // (mesma rota usada por app/upgrade e app/perfil). GET sem parâmetros
+    // de propósito — o servidor resolve o profissional só pela sessão.
+    if (profData) {
+      fetch('/api/stripe/subscription-status')
+        .then(res => res.json()).then(json => { if (json && !json.error) setSubStatus(json) }).catch(() => {})
+    }
     setLoading(false)
   }
 
@@ -791,6 +800,29 @@ export default function Dashboard() {
           </div>
         )
       })()}
+
+      {/* Indicação compacta do plano (2026-09-19) — plan+cycle+status vêm de
+          subStatus (leitura real ao Stripe), nunca de professional.plan
+          sozinho. cycle null (sem subscrição identificável) mostra só o
+          tier, sem inventar "Mensal"/"Anual". admin_access (acesso
+          concedido de propósito, sem cobrança) tem o seu próprio texto —
+          nunca aparece como "sem subscrição associada". */}
+      {subStatus?.plan && (subStatus.plan === 'starter' || subStatus.plan === 'pro') && (
+        <div className="mx-3 md:mx-6 mt-3">
+          <a href="/upgrade" className="inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
+            style={subStatus.status === 'admin_access'
+              ? { background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }
+              : {
+                background: subStatus.plan === 'pro' ? 'rgba(201,168,76,0.12)' : 'rgba(99,102,241,0.12)',
+                color: subStatus.plan === 'pro' ? '#c9a84c' : '#818cf8',
+                border: `1px solid ${subStatus.plan === 'pro' ? 'rgba(201,168,76,0.25)' : 'rgba(99,102,241,0.25)'}`,
+              }}>
+            {subStatus.status === 'admin_access'
+              ? `Acesso administrativo · funcionalidades ${subStatus.plan === 'pro' ? 'Pro' : 'Starter'}`
+              : `Plano ${subStatus.plan === 'pro' ? 'Pro' : 'Starter'}${subStatus.cycle ? ` · ${subStatus.cycle === 'annual' ? 'Anual' : 'Mensal'}` : ' · sem subscrição associada'}`}
+          </a>
+        </div>
+      )}
 
       {/* Banner créditos marketplace */}
       {professional && (

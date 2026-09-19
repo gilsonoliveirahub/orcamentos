@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, ArrowLeft, Crown, Zap } from 'lucide-react'
+import { CheckCircle, ArrowLeft, Crown, Zap, Info, ShieldCheck } from 'lucide-react'
+import { isActivePlanCycle, type ActiveSubscriptionStatus, type SimplifiedSubscriptionStatus } from '@/lib/stripe-plans'
 
 export default function UpgradePage() {
   const router = useRouter()
   const [professional, setProfessional] = useState<any>(null)
+  const [subStatus, setSubStatus] = useState<ActiveSubscriptionStatus & { status?: SimplifiedSubscriptionStatus } | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState<string | null>(null)
   const [openingPortal, setOpeningPortal] = useState(false)
@@ -19,12 +21,27 @@ export default function UpgradePage() {
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const success = searchParams?.get('success') === '1'
 
+  async function loadSubscriptionStatus() {
+    // GET sem parâmetros de propósito — o servidor resolve o profissional só
+    // pela sessão autenticada (ver app/api/stripe/subscription-status),
+    // nunca a partir de um id enviado a partir daqui.
+    const res = await fetch('/api/stripe/subscription-status')
+    const json = await res.json().catch(() => null)
+    if (json && !json.error) setSubStatus(json)
+  }
+
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push('/login'); return }
       const { data } = await supabase.from('professionals').select('*').eq('user_id', user.id).maybeSingle()
       if (!data) { router.push('/login'); return }
       setProfessional(data)
+      // Bug corrigido em 2026-09-19: o cartão "Plano atual" decidia isto só
+      // pelo tier (professional.plan) — nunca distinguia mensal de anual.
+      // Aguarda esta leitura ao Stripe antes de tirar o loading, para nunca
+      // desenhar a página uma vez com o estado errado e "saltar" logo a
+      // seguir.
+      await loadSubscriptionStatus()
       setLoading(false)
     })
   }, [router])
@@ -42,6 +59,16 @@ export default function UpgradePage() {
   }
 
   const handleCheckout = async (plan: 'starter' | 'pro') => {
+    // Acesso administrativo (2026-09-19) — esta conta tem funcionalidades
+    // Pro/Starter concedidas sem cobrança (ver "O meu plano" em /perfil).
+    // Continuar aqui cria uma subscrição Stripe REAL, cobrada ao email
+    // desta conta — nunca deixar isso acontecer por um clique acidental.
+    if (subStatus?.status === 'admin_access') {
+      const confirmed = window.confirm(
+        'Esta conta tem acesso administrativo (sem subscrição real). Continuar vai criar uma subscrição Stripe REAL e cobrar esta conta. Continuar?'
+      )
+      if (!confirmed) return
+    }
     setPaying(plan)
     const res = await fetch('/api/stripe/checkout', {
       method: 'POST',
@@ -65,7 +92,10 @@ export default function UpgradePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data } = await supabase.from('professionals').select('*').eq('user_id', user.id).maybeSingle()
-        if (data) setProfessional(data)
+        if (data) {
+          setProfessional(data)
+          await loadSubscriptionStatus()
+        }
       }
       setPaying(null)
       return
@@ -80,7 +110,23 @@ export default function UpgradePage() {
     </div>
   )
 
-  const currentPlan = professional?.plan
+  // Regras corrigidas em 2026-09-19: "ativo" depende do Price ID/ciclo REAL
+  // da subscrição (subStatus, lido do Stripe), nunca só do tier guardado em
+  // professionals.plan — ver isActivePlanCycle em lib/stripe-plans.ts.
+  // Quando subStatus.cycle é null (sem subscrição Stripe identificável, ex:
+  // conta marcada "pro" manualmente) isto é sempre false para os dois
+  // planos, nunca bloqueando o botão de nenhum ciclo.
+  const isStarterActive = isActivePlanCycle(subStatus, 'starter', cycle)
+  const isProActive = isActivePlanCycle(subStatus, 'pro', cycle)
+  // "Tem plano na BD mas sem ciclo identificável" — a conta está marcada
+  // como paga (starter/pro) mas subStatus.cycle é null: nem trial, nem
+  // inactive, só sem uma subscrição Stripe real por trás do tier. Exclui
+  // admin_access de propósito (2026-09-19) — é um estado explicado à parte
+  // abaixo, nunca tratado como a mesma inconsistência de uma conta normal.
+  const hasUnidentifiedCycle = !!subStatus && subStatus.cycle === null
+    && (subStatus.plan === 'starter' || subStatus.plan === 'pro')
+    && subStatus.status !== 'admin_access'
+  const isAdminAccess = subStatus?.status === 'admin_access'
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -100,6 +146,22 @@ export default function UpgradePage() {
             style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
             <CheckCircle size={18} className="text-emerald-400 flex-shrink-0" />
             <p className="text-sm font-bold text-white">Pagamento confirmado! O teu plano está ativo.</p>
+          </div>
+        )}
+
+        {/* Acesso administrativo (2026-09-19) — nunca deve parecer um erro de
+            cobrança nem convidar a "ativar o pagamento" (ver
+            hasUnidentifiedCycle acima, que exclui este caso). Qualquer
+            escolha nas cartas abaixo continua a criar uma subscrição real
+            (handleCheckout já pede confirmação explícita nesse caso). */}
+        {isAdminAccess && (
+          <div className="mb-6 p-4 rounded-2xl flex items-center gap-3"
+            style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)' }}>
+            <ShieldCheck size={18} className="flex-shrink-0" style={{ color: '#a78bfa' }} />
+            <p className="text-sm text-gray-300">
+              Esta conta tem <strong className="text-white">acesso administrativo</strong> às funcionalidades {subStatus?.plan === 'pro' ? 'Pro' : 'Starter'}, sem subscrição nem cobrança associada.
+              Escolher um plano abaixo cria uma <strong className="text-white">subscrição Stripe real</strong>, cobrada a esta conta.
+            </p>
           </div>
         )}
 
@@ -131,10 +193,10 @@ export default function UpgradePage() {
 
           {/* Starter */}
           <div className="rounded-2xl p-6 flex flex-col"
-            style={{ background: 'rgba(255,255,255,0.03)', border: currentPlan === 'starter' ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ background: 'rgba(255,255,255,0.03)', border: isStarterActive ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-white text-lg">Starter</h3>
-              {currentPlan === 'starter' && (
+              {isStarterActive && (
                 <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>ATIVO</span>
               )}
             </div>
@@ -150,7 +212,7 @@ export default function UpgradePage() {
                 </li>
               ))}
             </ul>
-            {currentPlan === 'starter' ? (
+            {isStarterActive ? (
               <div className="w-full py-3 rounded-xl text-center text-sm font-bold text-indigo-400"
                 style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
                 Plano atual
@@ -162,21 +224,23 @@ export default function UpgradePage() {
                 disabled={paying !== null}
                 onClick={() => handleCheckout('starter')}
               >
-                {paying === 'starter' ? 'A redirecionar...' : 'Escolher Starter'}
+                {paying === 'starter' ? 'A redirecionar...' : subStatus?.plan === 'starter'
+                  ? `Mudar para Starter ${cycle === 'annual' ? 'anual' : 'mensal'}`
+                  : 'Escolher Starter'}
               </button>
             )}
           </div>
 
           {/* Pro */}
           <div className="rounded-2xl p-6 flex flex-col relative"
-            style={{ background: 'rgba(201,168,76,0.06)', border: currentPlan === 'pro' ? '2px solid #c9a84c' : '1px solid rgba(201,168,76,0.25)' }}>
+            style={{ background: 'rgba(201,168,76,0.06)', border: isProActive ? '2px solid #c9a84c' : '1px solid rgba(201,168,76,0.25)' }}>
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-black px-3 py-0.5 rounded-full"
               style={{ background: '#c9a84c', color: '#000' }}>
               MAIS POPULAR
             </span>
             <div className="flex items-center justify-between mb-1">
               <h3 className="font-bold text-white text-lg">Pro</h3>
-              {currentPlan === 'pro' && (
+              {isProActive && (
                 <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(201,168,76,0.2)', color: '#c9a84c' }}>ATIVO</span>
               )}
             </div>
@@ -201,7 +265,7 @@ export default function UpgradePage() {
                 </li>
               ))}
             </ul>
-            {currentPlan === 'pro' ? (
+            {isProActive ? (
               <div className="w-full py-3 rounded-xl text-center text-sm font-bold"
                 style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c' }}>
                 <Crown size={14} className="inline mr-1" /> Plano atual
@@ -213,12 +277,29 @@ export default function UpgradePage() {
                 disabled={paying !== null}
                 onClick={() => handleCheckout('pro')}
               >
-                {paying === 'pro' ? 'A redirecionar...' : 'Escolher Pro'}
+                {paying === 'pro' ? 'A redirecionar...' : subStatus?.plan === 'pro'
+                  ? `Mudar para Pro ${cycle === 'annual' ? 'anual' : 'mensal'}`
+                  : 'Escolher Pro'}
               </button>
             )}
           </div>
 
         </div>
+
+        {/* Regra 5 (2026-09-19): a conta tem um tier pago na BD mas sem
+            Price ID/subscrição Stripe identificável — nunca inventa o ciclo
+            (por isso nenhum dos dois cartões acima aparece como "ATIVO"),
+            só explica a situação e deixa os botões de Mensal/Anual livres. */}
+        {hasUnidentifiedCycle && (
+          <div className="mt-6 p-4 rounded-2xl flex items-center gap-3"
+            style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+            <Info size={18} className="text-blue-400 flex-shrink-0" />
+            <p className="text-sm text-gray-300">
+              A tua conta está marcada como <strong className="text-white">{subStatus?.plan === 'pro' ? 'Pro' : 'Starter'}</strong>,
+              mas não encontrámos uma subscrição Stripe ativa associada. Escolhe Mensal ou Anual acima para ativar o pagamento.
+            </p>
+          </div>
+        )}
 
         <p className="text-center text-xs text-gray-600 mt-6">
           Sem contrato · Cancela a qualquer momento · Pagamento seguro via Stripe
@@ -237,7 +318,7 @@ export default function UpgradePage() {
           </div>
         )}
 
-        {currentPlan === 'inactive' && (
+        {professional?.plan === 'inactive' && (
           <div className="mt-6 p-4 rounded-2xl flex items-center gap-3"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <Zap size={18} className="text-red-400 flex-shrink-0" />
