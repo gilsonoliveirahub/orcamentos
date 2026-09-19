@@ -127,3 +127,18 @@ export function resolveUnbilledStatus(isAdmin: boolean, plan: string | null | un
   if (isAdmin && (plan === 'starter' || plan === 'pro')) return 'admin_access'
   return 'no_subscription'
 }
+
+// Proteção contra dupla subscrição (2026-09-19, decisão de negócio do
+// Gilson): a reconciliação em app/api/stripe/checkout NUNCA pode verificar
+// só `status: 'active'` — uma subscrição trialing/past_due/unpaid/incomplete
+// já é uma subscrição real no Stripe (já existe, já pode gerar cobrança) e
+// tem de ser encontrada antes de criar uma segunda. Só 'canceled' e
+// 'incomplete_expired' contam como verdadeiramente terminadas — tudo o
+// resto conta para efeitos de "já existe uma subscrição para este cliente".
+const NON_TERMINAL_SUBSCRIPTION_STATUSES = new Set([
+  'trialing', 'active', 'past_due', 'unpaid', 'incomplete', 'paused',
+])
+
+export function isNonTerminalSubscriptionStatus(status: string | null | undefined): boolean {
+  return !!status && NON_TERMINAL_SUBSCRIPTION_STATUSES.has(status)
+}

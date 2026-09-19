@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { resolvePriceId, classifyPriceId, isPlanTier, isBillingCycle, PLAN_RANK, isActivePlanCycle, simplifySubscriptionStatus, resolveUnbilledStatus } from './stripe-plans'
+import { resolvePriceId, classifyPriceId, isPlanTier, isBillingCycle, PLAN_RANK, isActivePlanCycle, simplifySubscriptionStatus, resolveUnbilledStatus, isNonTerminalSubscriptionStatus } from './stripe-plans'
 
 const ORIGINAL_ENV = { ...process.env }
 const STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
@@ -173,5 +173,31 @@ describe('resolveUnbilledStatus — distingue acesso administrativo de conta pag
     expect(resolveUnbilledStatus(true, null)).toBe('no_subscription')
     expect(resolveUnbilledStatus(true, 'inactive')).toBe('no_subscription')
     expect(resolveUnbilledStatus(true, undefined)).toBe('no_subscription')
+  })
+})
+
+// Proteção contra dupla subscrição (2026-09-19, decisão de negócio): a
+// reconciliação em app/api/stripe/checkout nunca pode verificar só
+// `status: 'active'` — uma subscrição trialing/past_due/unpaid/incomplete
+// já é real e já tem de contar como "existe uma subscrição para este
+// cliente". Só canceled/incomplete_expired são verdadeiramente terminadas.
+describe('isNonTerminalSubscriptionStatus', () => {
+  it('trialing, active, past_due, unpaid, incomplete, paused → contam como não terminadas', () => {
+    expect(isNonTerminalSubscriptionStatus('trialing')).toBe(true)
+    expect(isNonTerminalSubscriptionStatus('active')).toBe(true)
+    expect(isNonTerminalSubscriptionStatus('past_due')).toBe(true)
+    expect(isNonTerminalSubscriptionStatus('unpaid')).toBe(true)
+    expect(isNonTerminalSubscriptionStatus('incomplete')).toBe(true)
+    expect(isNonTerminalSubscriptionStatus('paused')).toBe(true)
+  })
+
+  it('canceled e incomplete_expired → terminadas, nunca contam', () => {
+    expect(isNonTerminalSubscriptionStatus('canceled')).toBe(false)
+    expect(isNonTerminalSubscriptionStatus('incomplete_expired')).toBe(false)
+  })
+
+  it('null/undefined → nunca conta como subscrição existente', () => {
+    expect(isNonTerminalSubscriptionStatus(null)).toBe(false)
+    expect(isNonTerminalSubscriptionStatus(undefined)).toBe(false)
   })
 })
