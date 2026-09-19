@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createClient } from '@/lib/supabase-server'
 import { resolvePriceId, isPlanTier, isBillingCycle, PLAN_RANK, classifyPriceId, isNonTerminalSubscriptionStatus, type PlanTier, type BillingCycle } from '@/lib/stripe-plans'
 import { acquireCheckoutLock, attachCheckoutSession, releaseCheckoutLock, isLockStale, resumeStaleLock, replaceExpiredLock } from '@/lib/checkout-lock'
 import { flagSubscriptionConflict } from '@/lib/subscription-conflicts'
@@ -118,10 +119,22 @@ async function listNonTerminalSubscriptions(customerId: string): Promise<Stripe.
 
 export async function POST(req: NextRequest) {
   try {
-    const { professional_id, plan: requestedPlan = 'starter', cycle: requestedCycle = 'monthly' } = await req.json()
+    // Autenticação por sessão (2026-09-19) — nunca aceita professional_id
+    // do corpo do pedido; o profissional é sempre resolvido a partir do
+    // user_id da sessão, mesmo padrão já usado em
+    // app/api/stripe/subscription-status e app/api/leads/status. Isto
+    // garante que um utilizador nunca consegue criar um checkout, adquirir
+    // a reserva, nem consultar/alterar a subscrição de outro profissional.
+    const userClient = await createClient()
+    const { data: { user } } = await userClient.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-    // Lista fechada (lib/stripe-plans.ts) — o pedido só manda plano e ciclo,
-    // nunca um Price ID nem um valor.
+    // Só plan/cycle são aceites do corpo — lista fechada
+    // (isPlanTier/isBillingCycle), nunca um Price ID, nunca um valor, e
+    // agora nunca também um professional_id (ignorado mesmo que seja
+    // enviado, ver requisito 2).
+    const { plan: requestedPlan = 'starter', cycle: requestedCycle = 'monthly' } = await req.json()
+
     if (!isPlanTier(requestedPlan)) {
       return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
     }
@@ -137,7 +150,7 @@ export async function POST(req: NextRequest) {
     const { data: prof } = await supabaseAdmin
       .from('professionals')
       .select('id, name, email, slug, plan, stripe_customer_id, stripe_subscription_id')
-      .eq('id', professional_id)
+      .eq('user_id', user.id)
       .single()
 
     if (!prof) return NextResponse.json({ error: 'Profissional não encontrado' }, { status: 404 })
@@ -223,7 +236,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: err.message || 'Falha ao agendar a alteração' }, { status: 500 })
           }
 
-          await supabaseAdmin.from('professionals').update({ pending_plan: plan }).eq('id', professional_id)
+          await supabaseAdmin.from('professionals').update({ pending_plan: plan }).eq('id', prof.id)
           return finalize(NextResponse.json({ ok: true, deferred: true }))
         }
 
@@ -246,7 +259,7 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin
           .from('professionals')
           .update({ plan, pending_plan: null, ...period })
-          .eq('id', professional_id)
+          .eq('id', prof.id)
 
         return finalize(NextResponse.json({ ok: true }))
       } finally {

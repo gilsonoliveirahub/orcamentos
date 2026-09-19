@@ -70,10 +70,12 @@ export default function UpgradePage() {
       if (!confirmed) return
     }
     setPaying(plan)
+    // 2026-09-19: já não envia professional_id — a rota resolve sempre o
+    // profissional pela sessão autenticada, nunca por um id vindo daqui.
     const res = await fetch('/api/stripe/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ professional_id: professional.id, plan, cycle }),
+      body: JSON.stringify({ plan, cycle }),
     })
     const { url, ok, deferred, error } = await res.json()
     if (url) {

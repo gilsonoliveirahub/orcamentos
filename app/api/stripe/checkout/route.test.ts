@@ -38,17 +38,38 @@ function mockStripe({
   }))
 }
 
+// Capturado à parte (nunca anexado ao array de updates devolvido — isso
+// faria toEqual([...]) falhar nos testes já existentes, que comparam esse
+// array diretamente contra um literal simples). Usado só pelos testes de
+// isolamento (2026-09-19) para confirmar QUE coluna/valor identificou o
+// profissional — tem de ser sempre user_id da sessão, nunca um id vindo do
+// corpo do pedido.
+let lastProfessionalEqCalls: unknown[][] = []
+
 function mockProfessional(prof: unknown) {
   const updatePayloads: Record<string, unknown>[] = []
+  lastProfessionalEqCalls = []
   const from = vi.fn((table: string) => {
     if (table !== 'professionals') throw new Error(`tabela inesperada: ${table}`)
     return {
-      select: () => ({ eq: () => ({ single: async () => ({ data: prof }) }) }),
+      select: () => ({ eq: (...args: unknown[]) => { lastProfessionalEqCalls.push(args); return { single: async () => ({ data: prof }) } } }),
       update: (payload: Record<string, unknown>) => { updatePayloads.push(payload); return { eq: () => Promise.resolve({}) } },
     }
   })
   vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
   return updatePayloads
+}
+
+// Sessão autenticada (2026-09-19) — /api/stripe/checkout deixou de aceitar
+// professional_id no corpo; o profissional é sempre resolvido pelo user_id
+// da sessão, mesmo padrão já usado em app/api/leads/status e
+// app/api/stripe/subscription-status.
+function mockAuth(userId: string | null) {
+  vi.doMock('@/lib/supabase-server', () => ({
+    createClient: async () => ({
+      auth: { getUser: async () => ({ data: { user: userId ? { id: userId } : null } }) },
+    }),
+  }))
 }
 
 // Reserva atómica (lib/checkout-lock.ts) e registo de conflitos
@@ -110,14 +131,78 @@ describe('POST /api/stripe/checkout', () => {
     process.env = { ...ORIGINAL_ENV, STRIPE_SECRET_KEY: 'sk_test_fake' }
     mockCheckoutLock()
     mockConflicts()
+    // Por omissão, uma sessão autenticada válida — os testes de
+    // autenticação/isolamento chamam mockAuth de novo com outro valor.
+    mockAuth('user-1')
   })
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
     vi.restoreAllMocks()
     vi.doUnmock('@/lib/supabase-admin')
+    vi.doUnmock('@/lib/supabase-server')
     vi.doUnmock('@/lib/checkout-lock')
     vi.doUnmock('@/lib/subscription-conflicts')
     vi.doUnmock('stripe')
+  })
+
+  // Autenticação por sessão (2026-09-19) — /api/stripe/checkout deixou de
+  // confiar num professional_id enviado pelo browser.
+  describe('autenticação e isolamento entre utilizadores', () => {
+    it('sem sessão autenticada: 401, nunca chega a tocar na base de dados nem no Stripe', async () => {
+      mockAuth(null)
+      const from = vi.fn()
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+      const sessionsCreate = vi.fn()
+      mockStripe({ sessionsCreate })
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ plan: 'starter' }))
+
+      expect(res.status).toBe(401)
+      expect(from).not.toHaveBeenCalled()
+      expect(sessionsCreate).not.toHaveBeenCalled()
+    })
+
+    it('ignora professional_id enviado no corpo do pedido — resolve sempre pelo user_id da sessão, nunca pelo id enviado', async () => {
+      mockAuth('user-1')
+      const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session-1' })
+      mockStripe({ sessionsCreate })
+      const updatePayloads = mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+      const { POST } = await import('./route')
+      // Corpo tenta forjar um professional_id de outra conta — tem de ser
+      // completamente ignorado.
+      const res = await POST(fakeRequest({ professional_id: 'prof-de-outra-conta', plan: 'starter' }))
+      const json = await res.json()
+
+      expect(json.url).toBe('https://checkout.stripe.com/session-1')
+      // A única consulta a professionals foi filtrada por user_id da
+      // sessão — nunca por 'id' com o valor forjado no corpo.
+      expect(lastProfessionalEqCalls).toContainEqual(['user_id', 'user-1'])
+      expect(lastProfessionalEqCalls.some(call => call[0] === 'id' && call[1] === 'prof-de-outra-conta')).toBe(false)
+      // A sessão criada no Stripe também nunca reflete o id forjado.
+      expect(sessionsCreate.mock.calls[0][0].metadata.professional_id).toBe('prof-1')
+    })
+
+    it('utilizador A autenticado nunca consegue adquirir/consultar a reserva ou subscrição do utilizador B, mesmo pedindo isso explicitamente no corpo', async () => {
+      mockAuth('user-a')
+      const acquire = vi.fn().mockResolvedValue({ ok: true, idempotencyKey: 'idem-a' })
+      mockCheckoutLock({ acquire })
+      const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session-a' })
+      mockStripe({ sessionsCreate })
+      // A ficha devolvida pela BD é sempre a de quem está autenticado
+      // (user-a -> prof-a) — o mock simula isto devolvendo sempre a mesma
+      // ficha, exatamente como a BD real faria ao filtrar por user_id.
+      mockProfessional({ id: 'prof-a', email: 'a@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
+
+      const { POST } = await import('./route')
+      const res = await POST(fakeRequest({ professional_id: 'prof-b', plan: 'starter' }))
+      await res.json()
+
+      // A reserva foi sempre adquirida para prof-a (o autenticado), nunca
+      // para prof-b (o id forjado no corpo).
+      expect(acquire).toHaveBeenCalledWith('prof-a', 'starter', 'monthly')
+    })
   })
 
   it('sem subscrição existente: cria uma sessão de Checkout normal (primeira assinatura)', async () => {
