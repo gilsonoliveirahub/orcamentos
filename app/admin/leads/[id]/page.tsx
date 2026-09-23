@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { LogOut, Loader2, ArrowLeft, User, Briefcase, FileText, Image as ImageIcon, Euro } from 'lucide-react'
+import { LogOut, Loader2, ArrowLeft, User, Briefcase, FileText, Image as ImageIcon, Euro, CheckCircle2, Star, Clock } from 'lucide-react'
 import { Section, Field, fmtDateTime } from '@/components/admin/AdminFicha'
 import { ADMIN_LEAD_ACCESS_STATE_LABELS, type AdminLeadAccessState } from '@/lib/admin-lead-access-state'
 
@@ -13,6 +13,7 @@ type LeadDetail = {
     status: string | null; source: string | null; specialty: string | null; zone_requested: string | null
     professional_id: string | null; created_at: string; updated_at: string; opened_at: string | null
     locked: boolean | null; valor_fechado: number | null; metadata: Record<string, unknown>
+    concluido_at: string | null; concluido_by: string | null
     q1_tipo_trabalho: string | null; q2_divisoes: string | null; q3_area_m2: number | null
     q4_cor_escura: boolean | null; q5_fissuras: boolean | null; q6_mobilias: boolean | null
     q7_primer: boolean | null; q8_teto: boolean | null; q9_prazo: string | null
@@ -22,6 +23,7 @@ type LeadDetail = {
   access_state: AdminLeadAccessState
   quotes: Array<{ id: string; valor_min: number | null; valor_max: number | null; valor_final: number | null; proposal_text: string | null; status: string; created_at: string }>
   client: { id: string; name: string; email: string | null } | null
+  review: { id: string; rating: number; comment: string | null; client_name: string; created_at: string } | null
 }
 
 const ACCESS_COLOR: Record<AdminLeadAccessState, string> = { aberto: '#34d399', bloqueado: '#f87171', disponivel: '#60a5fa', adquirido: '#c084fc', desconhecido: '#64748b' }
@@ -93,7 +95,7 @@ export default function AdminLeadDetailPage() {
     )
   }
 
-  const { lead, access_state, quotes, client } = data
+  const { lead, access_state, quotes, client, review } = data
   const fotos = (lead.q11_fotos_url || []).filter(Boolean)
 
   return (
@@ -123,6 +125,37 @@ export default function AdminLeadDetailPage() {
             <span className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>Valor fechado: €{lead.valor_fechado}</span>
           )}
         </div>
+
+        {/* Conclusão do trabalho + opinião do cliente — dois factos SEPARADOS
+            de propósito: "concluído pelo profissional" nunca é apresentado
+            como se fosse a resposta do cliente, que pode ainda não ter
+            chegado (ou nunca chegar). */}
+        {lead.status === 'concluido' && (
+          <Section title="Conclusão e opinião" icon={<CheckCircle2 size={16} />}>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-2 text-sm" style={{ color: '#34d399' }}>
+                <CheckCircle2 size={15} />
+                <span>Concluído pelo profissional ({lead.professionals?.name || '—'}) em {fmtDateTime(lead.concluido_at)}</span>
+              </div>
+              {review ? (
+                <div>
+                  <div className="flex items-center gap-1 mb-1">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <Star key={n} size={13} fill={review.rating >= n ? '#fbbf24' : 'none'} className={review.rating >= n ? 'text-amber-400' : 'text-gray-700'} />
+                    ))}
+                    <span className="text-xs text-gray-500 ml-1">Opinião recebida em {fmtDateTime(review.created_at)}</span>
+                  </div>
+                  {review.comment && <p className="text-sm text-gray-300 italic">&quot;{review.comment}&quot;</p>}
+                  <p className="text-xs text-gray-600 mt-1">— {review.client_name}</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Clock size={14} /> Ainda sem opinião do cliente
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           <Section title="Cliente" icon={<User size={16} />}>

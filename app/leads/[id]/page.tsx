@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
+import { ArrowLeft, Phone, MessageCircle, Copy, Check, Euro, RefreshCw, FileDown, X, ChevronLeft, ChevronRight, ImageIcon, CheckCircle2, Star, Clock, AlertTriangle } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { PROFESSIONS, getProfessionPricingType, getLeadSpecialty } from '@/lib/professions'
 import ClosedValueModal from '@/components/ClosedValueModal'
+import CompleteJobModal from '@/components/CompleteJobModal'
 import { computeLeadCompleteness } from '@/lib/lead-completeness'
 import { summarizeMedia } from '@/lib/media-summary'
 
@@ -37,11 +38,15 @@ export default function LeadDetail() {
   const router = useRouter()
   const [lead, setLead] = useState<any>(null)
   const [quote, setQuote] = useState<any>(null)
+  const [review, setReview] = useState<any>(null)
+  const [reviewEmailStatus, setReviewEmailStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [quotaBlocked, setQuotaBlocked] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [completing, setCompleting] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [actionError, setActionError] = useState('')
   const [horasInput, setHorasInput] = useState('')
@@ -80,9 +85,11 @@ export default function LeadDetail() {
       return
     }
 
-    const { lead: leadData, quote: quoteData } = await res.json()
+    const { lead: leadData, quote: quoteData, review: reviewData, reviewEmailStatus: reviewEmailStatusData } = await res.json()
     setLead(leadData)
     setQuote(quoteData)
+    setReview(reviewData)
+    setReviewEmailStatus(reviewEmailStatusData)
     setLoading(false)
   }
 
@@ -196,6 +203,26 @@ export default function LeadDetail() {
     }
   }
 
+  // Conclusão do trabalho — sempre atrás da confirmação explícita do modal
+  // (nunca disparada por um clique só, ao contrário dos outros estados).
+  // Serve tanto para a 1ª conclusão como para "Reenviar pedido de opinião"
+  // (mesmo endpoint, mesma proteção contra duplicados em lib/complete-lead.ts).
+  async function handleConfirmComplete() {
+    setCompleting(true)
+    setActionError('')
+    const res = await fetch('/api/leads/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: id, status: 'concluido' }),
+    })
+    if (!res.ok) {
+      setActionError('Não foi possível marcar como concluído. Tente novamente.')
+    }
+    setShowCompleteModal(false)
+    setCompleting(false)
+    await loadData()
+  }
+
   function copyProposal() {
     if (quote?.proposal_text) {
       navigator.clipboard.writeText(quote.proposal_text)
@@ -298,6 +325,14 @@ export default function LeadDetail() {
       {showCloseModal && (
         <ClosedValueModal onConfirm={handleConfirmClose} onCancel={() => setShowCloseModal(false)} />
       )}
+      {showCompleteModal && (
+        <CompleteJobModal
+          onConfirm={handleConfirmComplete}
+          onCancel={() => setShowCompleteModal(false)}
+          submitting={completing}
+          mode={lead?.status === 'concluido' ? 'resend' : 'complete'}
+        />
+      )}
       {lightboxIndex !== null && mediaUrls[lightboxIndex] && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.9)' }}
@@ -382,6 +417,69 @@ export default function LeadDetail() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Conclusão do trabalho + opinião do cliente — dois factos sempre
+            mostrados separados: "concluído pelo profissional" nunca é
+            apresentado como se fosse a confirmação/resposta do cliente. */}
+        <div className="rounded-2xl p-5" style={cardStyle}>
+          <h2 className="text-sm font-bold text-gray-400 mb-3">Conclusão do trabalho</h2>
+          {lead.status !== 'concluido' ? (
+            <button
+              onClick={() => setShowCompleteModal(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm text-white transition-all"
+              style={{ background: 'linear-gradient(135deg, #34d399, #059669)' }}
+            >
+              <CheckCircle2 size={16} /> Marcar como concluído
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm" style={{ color: '#34d399' }}>
+                <CheckCircle2 size={15} />
+                <span>Concluído por ti em {lead.concluido_at ? new Date(lead.concluido_at).toLocaleString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+              </div>
+
+              {/* Opinião do cliente — estado independente da conclusão acima */}
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                {review ? (
+                  <div>
+                    <div className="flex items-center gap-1 mb-1.5">
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <Star key={n} size={14} fill={review.rating >= n ? '#fbbf24' : 'none'} className={review.rating >= n ? 'text-amber-400' : 'text-gray-700'} />
+                      ))}
+                      <span className="text-xs text-gray-500 ml-1">Opinião recebida · {new Date(review.created_at).toLocaleDateString('pt-PT')}</span>
+                    </div>
+                    {review.comment && <p className="text-sm text-gray-300 italic">&quot;{review.comment}&quot;</p>}
+                    <p className="text-xs text-gray-600 mt-1">— {review.client_name}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <Clock size={14} />
+                      <span>Ainda sem opinião do cliente</span>
+                    </div>
+                    {reviewEmailStatus?.status === 'failed' && (
+                      <span className="flex items-center gap-1 text-xs" style={{ color: '#f87171' }}>
+                        <AlertTriangle size={12} /> Falha ao enviar o pedido
+                      </span>
+                    )}
+                    {reviewEmailStatus?.status === 'skipped' && reviewEmailStatus?.reason === 'no_email' && (
+                      <span className="flex items-center gap-1 text-xs" style={{ color: '#f59e0b' }}>
+                        <AlertTriangle size={12} /> Cliente sem email — não foi possível enviar
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setShowCompleteModal(true)}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                      style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}
+                    >
+                      Reenviar pedido de opinião
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Completude do pedido — só aparece quando falta algo, nunca bloqueia nada */}

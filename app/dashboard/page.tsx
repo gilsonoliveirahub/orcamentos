@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, Briefcase, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart, GripVertical } from 'lucide-react'
+import { Phone, MessageCircle, Euro, User, LogOut, Plus, X, BarChart2, TrendingUp, CheckCircle, ChevronRight, Link2, Lock, Unlock, Menu, ShoppingCart, GripVertical, Star, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getCycleWindow, PERSONAL_LINK_PLAN_LIMITS } from '@/lib/personal-link-limits-shared'
 import { getEffectivePlan, isPaidEffective } from '@/lib/effective-plan'
@@ -24,13 +24,24 @@ import { getLeadSpecialty } from '@/lib/professions'
 const STALE_REMINDER_DISMISSED_KEY = 'facoporti_stale_leads_reminder_dismissed_at'
 
 const COLUMNS = [
-  { id: 'novo',        label: 'Novo',       color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
-  { id: 'qualificado', label: 'Qualificado', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)'  },
-  { id: 'visita',      label: 'Visita',      color: '#60a5fa', bg: 'rgba(96,165,250,0.12)'  },
-  { id: 'proposta',    label: 'Proposta',    color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
-  { id: 'fechado',     label: 'Fechado',     color: '#34d399', bg: 'rgba(52,211,153,0.12)'  },
-  { id: 'perdido',     label: 'Perdido',     color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  { id: 'novo',        label: 'Novo',        desc: 'Pedidos novos, ainda por avaliar.',        color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
+  { id: 'qualificado', label: 'Qualificado', desc: 'Pedidos válidos, prontos para avançar.',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)'  },
+  { id: 'visita',      label: 'Visita',      desc: 'Visita ou avaliação agendada.',             color: '#60a5fa', bg: 'rgba(96,165,250,0.12)'  },
+  { id: 'proposta',    label: 'Proposta',    desc: 'Orçamento enviado, a aguardar decisão.',    color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
+  { id: 'fechado',     label: 'Fechado',     desc: 'Valor do orçamento fechado.',                color: '#34d399', bg: 'rgba(52,211,153,0.12)'  },
+  { id: 'perdido',     label: 'Perdido',     desc: 'Pedidos que não avançaram.',                 color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
 ]
+
+// Ordem "linha a linha" dos 6 estados na grelha 3 colunas × 2 linhas: 1ª
+// linha Novo/Visita/Fechado, 2ª linha Qualificado/Proposta/Perdido — colocada
+// assim (em vez de "3 colunas, cada uma com os 2 estados empilhados") para
+// que a grelha CSS alinhe a MESMA altura dentro de cada linha (comportamento
+// nativo do grid: cada item estica até à altura do mais alto da sua linha).
+// "concluido" fica de fora de propósito: não é um estado do pipeline em que
+// se arrasta o cartão, só se chega lá pela confirmação explícita em
+// /leads/[id] (ver CompleteJobModal) — por isso tem a sua própria secção de
+// largura total mais abaixo, sempre depois das 2 linhas, nunca misturada.
+const BOARD_ORDER = ['novo', 'visita', 'fechado', 'qualificado', 'proposta', 'perdido']
 
 function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, personalQuotaExhausted }: { lead: any; quote: any; onClick: () => void; onUnlock: () => void; onStatusChange: (leadId: string, status: string) => void; isPaid: boolean; personalQuotaExhausted?: boolean }) {
   const router = useRouter()
@@ -55,9 +66,9 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
       ref={setNodeRef}
       style={{
         ...style,
-        background: isLocked ? 'linear-gradient(135deg, #1a1a2e 0%, #16162a 100%)' : 'linear-gradient(135deg, #1e2035 0%, #191b2e 100%)',
-        border: isLocked ? '1px solid rgba(248,113,113,0.2)' : '1px solid rgba(255,255,255,0.07)',
-        boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+        background: isLocked ? '#f4f4f6' : '#ffffff',
+        border: isLocked ? '1px solid rgba(220,38,38,0.25)' : '1px solid rgba(15,23,42,0.08)',
+        boxShadow: isDragging ? '0 25px 50px rgba(0,0,0,0.35)' : '0 1px 3px rgba(15,23,42,0.12)',
       }}
       onClick={isLocked ? undefined : onClick}
       className={`group relative rounded-2xl p-4 transition-all select-none ${
@@ -68,7 +79,7 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
       {lead.source === 'marketplace' && (
         <div className="flex items-center gap-1 mb-2">
           <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
-            style={{ background: isLocked ? 'rgba(248,113,113,0.15)' : 'rgba(201,168,76,0.15)', color: isLocked ? '#f87171' : '#c9a84c' }}>
+            style={{ background: isLocked ? 'rgba(220,38,38,0.1)' : 'rgba(201,168,76,0.15)', color: isLocked ? '#dc2626' : '#92730f' }}>
             {isLocked ? <Lock size={9} /> : <Unlock size={9} />}
             {isLocked ? 'Bloqueado' : 'Marketplace'}
           </span>
@@ -79,16 +90,16 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black"
-            style={{ background: isLocked ? 'rgba(100,100,120,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0"
+            style={{ background: isLocked ? '#9ca3af' : 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
           >
-            {isLocked ? <Lock size={14} className="text-gray-500" /> : (lead.name || '?')[0].toUpperCase()}
+            {isLocked ? <Lock size={14} /> : (lead.name || '?')[0].toUpperCase()}
           </div>
           <div>
-            <div className="font-bold text-sm text-white leading-tight">
+            <div className="font-bold text-sm leading-tight" style={{ color: '#0f172a' }}>
               {isLocked ? '••••••••' : (lead.name || 'Sem nome')}
             </div>
-            <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+            <div className="text-xs flex items-center gap-1 mt-0.5" style={{ color: '#64748b' }}>
               <Phone size={9} /> {isLocked ? '•••••••••' : lead.phone}
             </div>
           </div>
@@ -105,12 +116,13 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
               {...listeners}
               onClick={e => e.stopPropagation()}
               aria-label="Arrastar para mudar estado"
-              className="hidden md:flex items-center justify-center w-6 h-6 rounded-lg text-gray-600 hover:text-gray-300 transition-colors cursor-grab active:cursor-grabbing"
+              className="hidden md:flex items-center justify-center w-6 h-6 rounded-lg transition-colors cursor-grab active:cursor-grabbing"
+              style={{ color: '#94a3b8' }}
             >
               <GripVertical size={14} />
             </button>
           )}
-          {!isLocked && <ChevronRight size={14} className="text-gray-600 group-hover:text-gray-400 transition-colors" />}
+          {!isLocked && <ChevronRight size={14} className="transition-colors" style={{ color: '#94a3b8' }} />}
         </div>
       </div>
 
@@ -119,19 +131,19 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
         <div className="flex flex-wrap gap-1.5 mb-3">
           {lead.metadata?._service_specialty && (
             <span className="text-xs px-2 py-0.5 rounded-lg font-medium"
-              style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+              style={{ background: 'rgba(139,92,246,0.12)', color: '#6d28d9' }}>
               {lead.metadata._service_specialty}
             </span>
           )}
           {lead.q1_tipo_trabalho && (
             <span className="text-xs px-2 py-0.5 rounded-lg font-medium capitalize"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+              style={{ background: 'rgba(99,102,241,0.12)', color: '#4338ca' }}>
               {lead.q1_tipo_trabalho}
             </span>
           )}
           {lead.q3_area_m2 && (
             <span className="text-xs px-2 py-0.5 rounded-lg font-medium"
-              style={{ background: 'rgba(96,165,250,0.2)', color: '#60a5fa' }}>
+              style={{ background: 'rgba(96,165,250,0.15)', color: '#1d4ed8' }}>
               {lead.q3_area_m2} m²
             </span>
           )}
@@ -139,19 +151,19 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(15,23,42,0.08)' }}>
         {isLocked ? (
           isPlanLocked ? (
             <button
               onClick={e => { e.stopPropagation(); router.push('/upgrade') }}
               className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl transition-colors"
-              style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
+              style={{ background: 'rgba(99,102,241,0.1)', color: '#4338ca', border: '1px solid rgba(99,102,241,0.25)' }}
             >
               <Lock size={11} /> Ativar plano para ver
             </button>
           ) : isQuotaLocked ? (
             <div className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl"
-              style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: '1px solid rgba(148,163,184,0.2)' }}
+              style={{ background: 'rgba(100,116,139,0.1)', color: '#475569', border: '1px solid rgba(100,116,139,0.25)' }}
             >
               <Lock size={11} /> Limite do ciclo atingido
             </div>
@@ -159,15 +171,15 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
           <button
             onClick={e => { e.stopPropagation(); onUnlock() }}
             className="w-full flex items-center justify-center gap-1.5 text-xs font-black py-2 rounded-xl transition-colors"
-            style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
+            style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.25)' }}
           >
             <Unlock size={11} /> Desbloquear (1 crédito)
           </button>
           )
         ) : quote ? (
           <>
-            <span className="text-xs text-gray-500">Orçamento</span>
-            <span className="text-sm font-black" style={{ color: '#34d399' }}>
+            <span className="text-xs" style={{ color: '#64748b' }}>Orçamento</span>
+            <span className="text-sm font-black" style={{ color: '#059669' }}>
               €{quote.valor_min}–{quote.valor_max}
             </span>
           </>
@@ -179,7 +191,7 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
               rel="noopener noreferrer"
               onClick={e => e.stopPropagation()}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(37,211,102,0.15)', color: '#25d366' }}
+              style={{ background: 'rgba(37,211,102,0.12)', color: '#16803c' }}
             >
               <MessageCircle size={11} /> WhatsApp
             </a>
@@ -202,11 +214,11 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
                 window.location.reload()
               }}
               className="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}
+              style={{ background: 'rgba(99,102,241,0.12)', color: '#4338ca' }}
             >
               + Orçamento
             </button>
-            <span className="text-xs text-gray-600">
+            <span className="text-xs" style={{ color: '#94a3b8' }}>
               {new Date(lead.created_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}
             </span>
           </>
@@ -222,10 +234,10 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
           onClick={e => e.stopPropagation()}
           onChange={e => { e.stopPropagation(); onStatusChange(lead.id, e.target.value) }}
           className="md:hidden w-full mt-3 text-xs font-semibold rounded-xl px-3 py-2"
-          style={{ background: 'rgba(255,255,255,0.05)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.1)' }}
+          style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid rgba(15,23,42,0.1)' }}
         >
           {COLUMNS.map(c => (
-            <option key={c.id} value={c.id} style={{ background: '#13152a' }}>{c.label}</option>
+            <option key={c.id} value={c.id}>{c.label}</option>
           ))}
         </select>
       )}
@@ -233,35 +245,51 @@ function LeadCard({ lead, quote, onClick, onUnlock, onStatusChange, isPaid, pers
   )
 }
 
-function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, onStatusChange, isPaid, personalQuotaExhausted }: any) {
+// Máximo de cartões visíveis por estado antes de precisar de "Ver todos" —
+// sem isto, um estado com muitos pedidos esticava a caixa inteira (e, por
+// estarem todas na mesma linha da grelha, arrastava consigo as outras duas
+// caixas da linha, com muito espaço vazio lá dentro). 2 (não 4): mesmo 4
+// cartões já deixava as caixas mais curtas da mesma linha com uma área
+// escura vazia grande a mais — 2 mantém a linha compacta em qualquer
+// combinação. Lista completa só quando pedido explicitamente.
+const MAX_VISIBLE_CARDS = 2
+
+// Uma caixa por estado: contorno e brilho na cor do estado, título em texto
+// claro (bem legível sobre o fundo escuro), descrição curta em mostarda —
+// dentro, a lista de pedidos em cartões brancos com texto escuro (LeadCard).
+// O estado vazio é deliberadamente compacto (uma linha), nunca uma caixa
+// alta e vazia. As 3 caixas de cada linha da grelha (ver render em
+// Dashboard) ficam com a MESMA altura por definição do CSS Grid (stretch é o
+// comportamento por omissão) — nunca precisa de cálculo manual.
+function Column({ id, label, desc, color, bg, leads, quotes, onCardClick, onUnlock, onStatusChange, isPaid, personalQuotaExhausted }: any) {
   const { setNodeRef, isOver } = useDroppable({ id })
   const colLeads = leads.filter((l: any) => l.status === id)
+  const [expanded, setExpanded] = useState(false)
+  const hasMore = colLeads.length > MAX_VISIBLE_CARDS
+  const visibleLeads = expanded ? colLeads : colLeads.slice(0, MAX_VISIBLE_CARDS)
 
   return (
-    <div className="flex-1 min-w-[240px] max-w-[290px] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <div className="w-2 h-2 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
-        <span className="font-bold text-sm" style={{ color: '#e2e8f0' }}>{label}</span>
-        <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-lg"
+    <div
+      ref={setNodeRef}
+      className="w-full h-full flex flex-col rounded-2xl p-3.5 transition-all"
+      style={{
+        background: '#12141f',
+        border: `2px solid ${color}`,
+        boxShadow: isOver ? `0 0 0 3px ${color}40` : 'none',
+      }}
+    >
+      <div className="flex items-center gap-2 mb-0.5">
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
+        <span className="font-bold text-sm" style={{ color: '#f1f5f9' }}>{label}</span>
+        <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
           style={{ background: bg, color }}>
           {colLeads.length}
         </span>
       </div>
+      {desc && <p className="text-xs mb-3 pl-4" style={{ color: '#c9a84c' }}>{desc}</p>}
 
-      {/* Drop zone */}
-      <div
-        ref={setNodeRef}
-        className="flex flex-col gap-3 flex-1 rounded-xl p-3 min-h-[200px] transition-all"
-        style={{
-          background: '#ffffff',
-          border: `3px solid ${color}`,
-          outline: `3px solid ${color}40`,
-          outlineOffset: '3px',
-          borderRadius: '14px',
-        }}
-      >
-        {colLeads.map((lead: any) => (
+      <div className="flex flex-col gap-2.5">
+        {visibleLeads.map((lead: any) => (
           <LeadCard
             key={lead.id}
             lead={lead}
@@ -274,12 +302,73 @@ function Column({ id, label, color, bg, leads, quotes, onCardClick, onUnlock, on
           />
         ))}
         {colLeads.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-1"
-              style={{ background: `${color}20`, border: `2px dashed ${color}60` }}>
-              <Plus size={16} style={{ color }} />
-            </div>
-            <span className="text-sm font-bold" style={{ color: '#9b1c1c' }}>Arrasta aqui</span>
+          <div className="rounded-xl py-3 text-center text-xs font-semibold"
+            style={{ background: 'rgba(255,255,255,0.03)', border: `1px dashed ${color}50`, color: '#64748b' }}>
+            Sem pedidos neste estado
+          </div>
+        )}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="text-xs font-bold py-2 rounded-xl transition-colors"
+            style={{ background: `${color}15`, color }}
+          >
+            {expanded ? 'Ver menos' : `Ver todos (${colLeads.length})`}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Cartão da secção "Concluído" — deliberadamente não arrastável (ao
+// contrário de LeadCard): reabrir um trabalho concluído não passa por
+// drag-and-drop, só pela ação explícita em /leads/[id]. Mostra sempre os
+// dois factos separados: quando foi concluído pelo profissional e se já há
+// opinião do cliente — nunca apresenta um como se fosse o outro.
+function ConcludedLeadCard({ lead, review, onClick }: { lead: any; review: any; onClick: () => void }) {
+  // Primeira foto real enviada pelo cliente (se houver) — nunca um
+  // placeholder genérico. metadata.media_urls é o campo novo; q11_fotos_url
+  // é o legacy, ainda usado nalguns leads antigos.
+  const photos: string[] = Array.isArray(lead.metadata?.media_urls) ? lead.metadata.media_urls : (lead.q11_fotos_url || [])
+  const isVideoUrl = (url: string) => /\.(mp4|mov|webm)$/i.test(url)
+  const thumb = photos.find(u => u && !isVideoUrl(u))
+
+  return (
+    <div
+      onClick={onClick}
+      className="rounded-2xl p-3.5 cursor-pointer transition-all hover:translate-y-[-2px] hover:shadow-lg select-none flex items-center gap-3"
+      style={{ background: '#ffffff', border: '1px solid rgba(52,211,153,0.3)' }}
+    >
+      {thumb ? (
+        <img src={thumb} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" style={{ border: '1px solid rgba(15,23,42,0.08)' }} />
+      ) : (
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #34d399, #059669)' }}>
+          {(lead.name || '?')[0].toUpperCase()}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <div className="font-bold text-sm leading-tight truncate" style={{ color: '#0f172a' }}>{lead.name || 'Sem nome'}</div>
+          <CheckCircle size={13} style={{ color: '#059669' }} className="flex-shrink-0" />
+        </div>
+        <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>
+          {lead.concluido_at ? `Concluído ${new Date(lead.concluido_at).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}` : 'Concluído'}
+        </div>
+
+        {review ? (
+          <div className="flex items-center gap-0.5 mt-1.5">
+            {[1, 2, 3, 4, 5].map(n => (
+              <Star key={n} size={11} fill={review.rating >= n ? '#f59e0b' : 'none'} style={{ color: review.rating >= n ? '#f59e0b' : '#d1d5db' }} />
+            ))}
+            <span className="text-xs ml-1" style={{ color: '#059669' }}>Opinião recebida</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 mt-1.5 text-xs" style={{ color: '#94a3b8' }}>
+            <Clock size={11} /> A aguardar opinião
           </div>
         )}
       </div>
@@ -430,6 +519,7 @@ function NovoLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 export default function Dashboard() {
   const [leads, setLeads] = useState<any[]>([])
   const [quotes, setQuotes] = useState<any[]>([])
+  const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [professional, setProfessional] = useState<any>(null)
@@ -483,6 +573,11 @@ export default function Dashboard() {
     if (profData) {
       fetch('/api/stripe/subscription-status')
         .then(res => res.json()).then(json => { if (json && !json.error) setSubStatus(json) }).catch(() => {})
+      // Opiniões dos clientes (para a secção "Concluído") — reviews tem
+      // policy de leitura pública (reviews_select_all), por isso o cliente
+      // Supabase do browser já consegue ler diretamente, sem rota própria.
+      supabase.from('reviews').select('lead_id, rating, comment, client_name, created_at').eq('professional_id', profData.id)
+        .then(({ data, error }) => { if (!error) setReviews(data || []) })
     }
     setLoading(false)
   }
@@ -568,6 +663,12 @@ export default function Dashboard() {
     }
   }
 
+  // Secção "Concluído" — trabalhos marcados como concluídos pelo
+  // profissional (ver app/leads/[id]/page.tsx), com a opinião do cliente
+  // associada quando já existir (reviews_select_all é pública, ver loadData).
+  const concludedLeads = leads.filter(l => l.status === 'concluido')
+  const reviewsByLead = Object.fromEntries(reviews.map((r: any) => [r.lead_id, r]))
+
   const totalFechado = leads.filter(l => l.status === 'fechado').length
   const totalLeads = leads.length
   const totalOrcamentos = quotes.length
@@ -610,102 +711,106 @@ export default function Dashboard() {
         <ClosedValueModal onConfirm={handleConfirmClose} onCancel={() => setClosingLeadId(null)} />
       )}
 
-      {/* Header */}
-      <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Header — faixa branca de propósito (separação/luminosidade), ao
+          contrário do resto do painel que fica escuro. Logo: símbolo da
+          marca (public/icon-512.png), nunca substituído por um ícone
+          genérico. */}
+      <div style={{ background: '#ffffff', borderBottom: '1px solid rgba(15,23,42,0.08)' }}>
 
         {/* Desktop header */}
-        <div className="hidden md:flex px-6 py-4 items-center justify-between">
+        <div className="hidden md:flex px-6 py-3.5 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
-              <Briefcase size={18} className="text-white" />
-            </div>
+            <img src="/icon-512.png" alt="FaçoPorTi"
+              className="w-12 h-12 rounded-2xl object-contain flex-shrink-0"
+              style={{ border: '1px solid rgba(15,23,42,0.1)', boxShadow: '0 1px 4px rgba(15,23,42,0.12)' }} />
             <div>
-              <h1 className="text-lg font-black text-white">Faço<span style={{ color: '#818cf8' }}>Por</span>Ti</h1>
-              <p className="text-xs text-gray-600">Gestão de Orçamentos</p>
+              <h1 className="text-lg font-black" style={{ color: '#0f172a' }}>Faço<span style={{ color: '#ea580c' }}>Por</span>Ti</h1>
+              <p className="text-xs" style={{ color: '#64748b' }}>Gestão de Orçamentos</p>
             </div>
           </div>
 
-          {/* KPIs */}
+          {/* KPIs — fundo em tons de azul sólidos (não só a faixa fica
+              branca), texto branco para contraste alto. */}
           <div className="flex items-center gap-2">
             {[
-              { icon: <User size={13} />, value: totalLeads, label: 'Leads', color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
-              { icon: <TrendingUp size={13} />, value: totalOrcamentos, label: 'Orçamentos', color: '#c084fc', bg: 'rgba(192,132,252,0.1)' },
-              { icon: <CheckCircle size={13} />, value: totalFechado, label: 'Fechados', color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
-              ...(faturacao > 0 ? [{ icon: <Euro size={13} />, value: `€${Math.round(faturacao)}`, label: 'Faturado', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' }] : []),
+              { icon: <User size={13} />, value: totalLeads, label: 'Leads', bg: '#4f46e5' },
+              { icon: <TrendingUp size={13} />, value: totalOrcamentos, label: 'Orçamentos', bg: '#2563eb' },
+              { icon: <CheckCircle size={13} />, value: totalFechado, label: 'Fechados', bg: '#0284c7' },
+              ...(faturacao > 0 ? [{ icon: <Euro size={13} />, value: `€${Math.round(faturacao)}`, label: 'Faturado', bg: '#0369a1' }] : []),
             ].map((kpi, i) => (
               <div key={i} className="flex items-center gap-2.5 px-4 py-2 rounded-xl"
-                style={{ background: kpi.bg, border: `1px solid ${kpi.color}20` }}>
-                <span style={{ color: kpi.color }}>{kpi.icon}</span>
+                style={{ background: kpi.bg }}>
+                <span className="text-white">{kpi.icon}</span>
                 <div>
-                  <div className="text-base font-black text-white leading-tight">{kpi.value}</div>
-                  <div className="text-xs leading-tight" style={{ color: kpi.color + 'aa' }}>{kpi.label}</div>
+                  <div className="text-base font-black leading-tight text-white">{kpi.value}</div>
+                  <div className="text-xs leading-tight text-white/80">{kpi.label}</div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Actions */}
+          {/* Actions — mesmos tons de azul sólidos que os KPIs, para se
+              distinguirem claramente da faixa branca; "Novo Lead" continua o
+              botão mais destacado (gradiente + sombra, único não-flat). */}
           <div className="flex items-center gap-2">
             {professional?.slug && (
               <button onClick={copyLink}
-                className="flex items-center gap-1.5 text-sm font-bold px-3 py-2.5 rounded-xl transition-all"
-                style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818cf8', border: `1px solid ${copied ? '#34d39930' : '#6366f130'}` }}>
+                className="flex items-center gap-1.5 text-sm font-bold px-3 py-2.5 rounded-xl transition-all text-white"
+                style={{ background: copied ? '#059669' : '#2563eb' }}>
                 <Link2 size={14} /> {copied ? 'Copiado!' : 'Meu Link'}
               </button>
             )}
             <button onClick={() => setShowModal(true)}
               className="flex items-center gap-2 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.35)' }}>
+              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
               <Plus size={15} /> Novo Lead
             </button>
             <a href="/marketplace"
-              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               <ShoppingCart size={14} /> Marketplace
             </a>
             <a href="/acordos"
-              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               📋 Acordos
             </a>
             <a href="/stats"
-              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               <BarChart2 size={14} /> Stats
             </a>
             <a href="/config"
-              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               ⚙️ Preços
             </a>
             <button onClick={loadData}
-              className="text-sm px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="text-sm px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               ↻
             </button>
             <a href="/perfil"
-              className="px-3 py-2.5 rounded-xl transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="px-3 py-2.5 rounded-xl transition-colors text-white"
+              style={{ background: '#2563eb' }}>
               👤
             </a>
             <button onClick={handleLogout}
               className="px-3 py-2.5 rounded-xl transition-colors"
-              style={{ color: '#475569' }}>
+              style={{ color: '#64748b' }}>
               <LogOut size={15} />
             </button>
           </div>
         </div>
 
         {/* Mobile header */}
-        <div className="flex md:hidden px-4 py-3 items-center justify-between">
+        <div className="flex md:hidden px-4 py-2.5 items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-              <Briefcase size={16} className="text-white" />
-            </div>
-            <h1 className="text-base font-black text-white">Faço<span style={{ color: '#818cf8' }}>Por</span>Ti</h1>
+            <img src="/icon-512.png" alt="FaçoPorTi"
+              className="w-10 h-10 rounded-xl object-contain flex-shrink-0"
+              style={{ border: '1px solid rgba(15,23,42,0.1)', boxShadow: '0 1px 3px rgba(15,23,42,0.12)' }} />
+            <h1 className="text-base font-black" style={{ color: '#0f172a' }}>Faço<span style={{ color: '#ea580c' }}>Por</span>Ti</h1>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowModal(true)}
@@ -714,8 +819,8 @@ export default function Dashboard() {
               <Plus size={13} /> Novo Lead
             </button>
             <button onClick={() => setMobileMenuOpen(o => !o)}
-              className="p-2 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="p-2 rounded-xl text-white"
+              style={{ background: '#2563eb' }}>
               {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
@@ -723,21 +828,21 @@ export default function Dashboard() {
 
         {/* Mobile menu dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden px-4 pb-4 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {/* KPIs */}
+          <div className="md:hidden px-4 pb-4 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(15,23,42,0.08)' }}>
+            {/* KPIs — mesmo tratamento azul sólido/texto branco do desktop */}
             <div className="flex items-center gap-2 py-3 overflow-x-auto">
               {[
-                { icon: <User size={12} />, value: totalLeads, label: 'Leads', color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
-                { icon: <TrendingUp size={12} />, value: totalOrcamentos, label: 'Orçamentos', color: '#c084fc', bg: 'rgba(192,132,252,0.1)' },
-                { icon: <CheckCircle size={12} />, value: totalFechado, label: 'Fechados', color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
-                ...(faturacao > 0 ? [{ icon: <Euro size={12} />, value: `€${Math.round(faturacao)}`, label: 'Faturado', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)' }] : []),
+                { icon: <User size={12} />, value: totalLeads, label: 'Leads', bg: '#4f46e5' },
+                { icon: <TrendingUp size={12} />, value: totalOrcamentos, label: 'Orçamentos', bg: '#2563eb' },
+                { icon: <CheckCircle size={12} />, value: totalFechado, label: 'Fechados', bg: '#0284c7' },
+                ...(faturacao > 0 ? [{ icon: <Euro size={12} />, value: `€${Math.round(faturacao)}`, label: 'Faturado', bg: '#0369a1' }] : []),
               ].map((kpi, i) => (
                 <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl flex-shrink-0"
-                  style={{ background: kpi.bg, border: `1px solid ${kpi.color}20` }}>
-                  <span style={{ color: kpi.color }}>{kpi.icon}</span>
+                  style={{ background: kpi.bg }}>
+                  <span className="text-white">{kpi.icon}</span>
                   <div>
-                    <div className="text-sm font-black text-white leading-tight">{kpi.value}</div>
-                    <div className="text-xs leading-tight" style={{ color: kpi.color + 'aa' }}>{kpi.label}</div>
+                    <div className="text-sm font-black leading-tight text-white">{kpi.value}</div>
+                    <div className="text-xs leading-tight text-white/80">{kpi.label}</div>
                   </div>
                 </div>
               ))}
@@ -745,36 +850,36 @@ export default function Dashboard() {
             {/* Link */}
             {professional?.slug && (
               <button onClick={() => { copyLink(); setMobileMenuOpen(false) }}
-                className="flex items-center gap-2 text-sm font-bold px-4 py-3 rounded-xl w-full"
-                style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.15)', color: copied ? '#34d399' : '#818cf8', border: `1px solid ${copied ? '#34d39930' : '#6366f130'}` }}>
+                className="flex items-center gap-2 text-sm font-bold px-4 py-3 rounded-xl w-full text-white"
+                style={{ background: copied ? '#059669' : '#2563eb' }}>
                 <Link2 size={14} /> {copied ? 'Copiado!' : 'Copiar meu link'}
               </button>
             )}
             <div className="grid grid-cols-2 gap-2">
-              <a href="/marketplace" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <a href="/marketplace" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl text-white"
+                style={{ background: '#2563eb' }}>
                 <ShoppingCart size={14} /> Marketplace
               </a>
-              <a href="/acordos" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <a href="/acordos" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl text-white"
+                style={{ background: '#2563eb' }}>
                 📋 Acordos
               </a>
-              <a href="/stats" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <a href="/stats" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl text-white"
+                style={{ background: '#2563eb' }}>
                 <BarChart2 size={14} /> Stats
               </a>
-              <a href="/config" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <a href="/config" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl text-white"
+                style={{ background: '#2563eb' }}>
                 ⚙️ Preços
               </a>
-              <a href="/perfil" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <a href="/perfil" className="flex items-center justify-center gap-2 text-sm font-semibold px-3 py-3 rounded-xl text-white"
+                style={{ background: '#2563eb' }}>
                 👤 Perfil
               </a>
             </div>
             <button onClick={handleLogout}
               className="flex items-center justify-center gap-2 text-sm px-3 py-3 rounded-xl"
-              style={{ color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)' }}>
+              style={{ color: '#dc2626', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
               <LogOut size={14} /> Sair da conta
             </button>
           </div>
@@ -894,18 +999,62 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 overflow-x-auto pb-6" style={{ minHeight: 'calc(100vh - 140px)' }}>
-              {COLUMNS.map(col => (
-                <Column key={col.id} {...col} leads={leads} quotes={quotes}
-                  onCardClick={(id: string) => router.push(`/leads/${id}`)}
-                  onUnlock={handleUnlock}
-                  onStatusChange={changeLeadStatus}
-                  isPaid={isPaidEffective(effectivePlan)}
-                  personalQuotaExhausted={personalQuotaExhausted} />
-              ))}
+          <>
+            {/* Grelha 3 colunas × 2 linhas (1 coluna em telemóvel, sem scroll
+                horizontal) — grid-auto-flow em ordem "linha a linha"
+                (BOARD_ORDER) faz o CSS alinhar nativamente a mesma altura
+                dentro de cada linha, mesmo que um estado tenha muito mais
+                pedidos que os outros da mesma linha (ver MAX_VISIBLE_CARDS
+                + "Ver todos" em Column, que evita essa caixa disparar). */}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                {BOARD_ORDER.map(id => {
+                  const col = COLUMNS.find(c => c.id === id)!
+                  return (
+                    <Column key={col.id} {...col} leads={leads} quotes={quotes}
+                      onCardClick={(leadId: string) => router.push(`/leads/${leadId}`)}
+                      onUnlock={handleUnlock}
+                      onStatusChange={changeLeadStatus}
+                      isPaid={isPaidEffective(effectivePlan)}
+                      personalQuotaExhausted={personalQuotaExhausted} />
+                  )
+                })}
+              </div>
+            </DndContext>
+
+            {/* Concluído — largura total das 3 colunas, trabalhos marcados
+                como concluídos + estado da opinião do cliente. Fora do
+                DndContext de propósito: reabrir um trabalho concluído nunca
+                passa por arrastar, só pela ação explícita em /leads/[id]. */}
+            <div className="mt-4 rounded-2xl p-3.5" style={{ background: '#0f1e17', border: '2px solid #34d399' }}>
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
+                <span className="font-bold text-sm" style={{ color: '#f1f5f9' }}>Concluído</span>
+                <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+                  {concludedLeads.length}
+                </span>
+              </div>
+              <p className="text-xs mb-3 pl-4" style={{ color: '#c9a84c' }}>Trabalhos terminados pelo profissional.</p>
+
+              {concludedLeads.length === 0 ? (
+                <div className="rounded-xl py-3 text-center text-xs font-semibold"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(52,211,153,0.4)', color: '#64748b' }}>
+                  Sem trabalhos concluídos ainda
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {concludedLeads.map(lead => (
+                    <ConcludedLeadCard
+                      key={lead.id}
+                      lead={lead}
+                      review={reviewsByLead[lead.id]}
+                      onClick={() => router.push(`/leads/${lead.id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          </DndContext>
+          </>
         )}
       </div>
     </div>

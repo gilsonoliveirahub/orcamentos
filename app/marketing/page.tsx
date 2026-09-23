@@ -20,18 +20,26 @@ export default function MarketingPage() {
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white font-sans">
 
-      {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5">
+      {/* NAV — faixa branca (ao contrário do resto da página, que fica
+          inalterado): logótipo real da marca antes do nome, links em azul
+          escuro, "Pedir orçamento" com contorno azul, "Criar conta" dourado
+          (já era, mantido). Nunca mexe na secção escura abaixo. */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-black/10 shadow-sm">
         <div className="flex items-center justify-between px-5 md:px-8 py-4 md:py-5">
-          <span className="text-xl font-semibold tracking-tight">
-            Faço<span className="text-[#c9a84c]">PorTi</span>
+          <span className="flex items-center gap-2.5">
+            <img src="/icon-512.png" alt="FaçoPorTi"
+              className="w-9 h-9 md:w-10 md:h-10 rounded-xl object-contain flex-shrink-0"
+              style={{ border: '1px solid rgba(15,23,42,0.1)' }} />
+            <span className="text-xl font-semibold tracking-tight text-[#0f172a]">
+              Faço<span className="text-[#c9a84c]">PorTi</span>
+            </span>
           </span>
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
-            <a href="#como-funciona" className="text-sm text-white/60 hover:text-white transition-colors">Como funciona</a>
-            <a href="#precos" className="text-sm text-white/60 hover:text-white transition-colors">Preços</a>
-            <Link href="/login" className="text-sm text-white/60 hover:text-white transition-colors">Entrar</Link>
-            <Link href="/pedir" className="text-sm text-white/60 hover:text-white transition-colors border border-white/20 px-4 py-2 rounded-full hover:border-white/40 transition-colors">
+            <a href="#como-funciona" className="text-sm text-[#1e3a8a] hover:text-[#1d4ed8] transition-colors">Como funciona</a>
+            <a href="#precos" className="text-sm text-[#1e3a8a] hover:text-[#1d4ed8] transition-colors">Preços</a>
+            <Link href="/login" className="text-sm text-[#1e3a8a] hover:text-[#1d4ed8] transition-colors">Entrar</Link>
+            <Link href="/pedir" className="text-sm text-[#1e3a8a] border border-[#1e3a8a]/40 px-4 py-2 rounded-full hover:border-[#1e3a8a] hover:bg-[#1e3a8a]/5 transition-colors">
               Pedir orçamento
             </Link>
             <Link href="/login" className="text-sm bg-[#c9a84c] text-black font-medium px-4 py-2 rounded-full hover:bg-[#e0bf6a] transition-colors">
@@ -46,21 +54,21 @@ export default function MarketingPage() {
             <button onClick={() => setMobileNavOpen(o => !o)}
               className="flex flex-col gap-1.5 p-1"
               aria-label="Menu">
-              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? 'rotate-45 translate-y-2' : ''}`} />
-              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? 'opacity-0' : ''}`} />
-              <span className={`block h-0.5 w-6 bg-white/70 transition-all ${mobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+              <span className={`block h-0.5 w-6 bg-[#1e3a8a] transition-all ${mobileNavOpen ? 'rotate-45 translate-y-2' : ''}`} />
+              <span className={`block h-0.5 w-6 bg-[#1e3a8a] transition-all ${mobileNavOpen ? 'opacity-0' : ''}`} />
+              <span className={`block h-0.5 w-6 bg-[#1e3a8a] transition-all ${mobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`} />
             </button>
           </div>
         </div>
         {/* Mobile menu */}
         {mobileNavOpen && (
-          <div className="md:hidden flex flex-col px-5 pb-5 gap-3 border-t border-white/5">
+          <div className="md:hidden flex flex-col px-5 pb-5 gap-3 border-t border-black/10 bg-white">
             <a href="#como-funciona" onClick={() => setMobileNavOpen(false)}
-              className="text-sm text-white/70 py-3 border-b border-white/5">Como funciona</a>
+              className="text-sm text-[#1e3a8a] py-3 border-b border-black/10">Como funciona</a>
             <a href="#precos" onClick={() => setMobileNavOpen(false)}
-              className="text-sm text-white/70 py-3 border-b border-white/5">Preços</a>
-            <Link href="/pedir" className="text-sm text-white/70 py-3 border-b border-white/5">Pedir orçamento</Link>
-            <Link href="/login" className="text-sm text-white/70 py-3">Entrar</Link>
+              className="text-sm text-[#1e3a8a] py-3 border-b border-black/10">Preços</a>
+            <Link href="/pedir" className="text-sm text-[#1e3a8a] py-3 border-b border-black/10">Pedir orçamento</Link>
+            <Link href="/login" className="text-sm text-[#1e3a8a] py-3">Entrar</Link>
           </div>
         )}
       </nav>

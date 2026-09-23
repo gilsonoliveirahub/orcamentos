@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
-import { emailPedidoDepoimento } from '@/lib/email'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
+import { sendReviewRequestEmail } from '@/lib/complete-lead'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const { data: state } = await supabaseAdmin
       .from('leads')
-      .select('id, professional_id, opened_at, source, locked')
+      .select('id, professional_id, opened_at, source, locked, concluido_at')
       .eq('id', lead_id)
       .maybeSingle()
 
@@ -62,6 +62,16 @@ export async function POST(req: NextRequest) {
     if (status === 'fechado') {
       updatePayload.valor_fechado = valor_fechado_decision === 'informado' ? valor_fechado : null
     }
+    // concluido_at/concluido_by só são gravados na PRIMEIRA vez que o
+    // trabalho é marcado como concluído — um reenvio do pedido de opinião
+    // (chamar este mesmo endpoint outra vez com status='concluido' já
+    // concluído) não pode reescrever quando o trabalho foi de facto
+    // terminado.
+    const isFirstCompletion = status === 'concluido' && !state.concluido_at
+    if (isFirstCompletion) {
+      updatePayload.concluido_at = new Date().toISOString()
+      updatePayload.concluido_by = professional.id
+    }
 
     const { error } = await supabaseAdmin
       .from('leads')
@@ -71,34 +81,14 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    if (status === 'fechado') {
-      const { data: lead } = await supabaseAdmin
-        .from('leads')
-        .select('name, email, professionals(name, email)')
-        .eq('id', lead_id)
-        .single()
-
-      if (lead) {
-        const prof = lead.professionals as any
-        if (prof?.email) {
-          emailPedidoDepoimento({
-            tipo: 'profissional',
-            name: prof.name,
-            email: prof.email,
-            outroNome: lead.name || 'cliente',
-            lead_id,
-          }).catch(() => {})
-        }
-        if (lead.email) {
-          emailPedidoDepoimento({
-            tipo: 'cliente',
-            name: lead.name || 'Cliente',
-            email: lead.email,
-            outroNome: prof?.name || 'profissional',
-            lead_id,
-          }).catch(() => {})
-        }
-      }
+    // Estado "Concluído" (distinto de "Fechado", que só fecha o valor
+    // acordado): dispara o único email de pedido de opinião ao cliente. Fica
+    // gravado como melhor esforço — uma falha de envio nunca reverte nem
+    // bloqueia a conclusão já gravada acima; fica só registada em
+    // notification_log e disponível para reenvio (ver lib/complete-lead.ts).
+    if (status === 'concluido') {
+      const emailResult = await sendReviewRequestEmail(lead_id)
+      return NextResponse.json({ ok: true, email: emailResult })
     }
 
     return NextResponse.json({ ok: true })

@@ -78,10 +78,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: ERROR_MESSAGES.locked, reason: 'locked' }, { status: 403 })
   }
 
-  const [{ data: lead }, { data: quote }] = await Promise.all([
+  const [{ data: lead }, { data: quote }, { data: review }, { data: reviewEmail }] = await Promise.all([
     supabaseAdmin.from('leads').select('*, professionals(*)').eq('id', leadId).single(),
     supabaseAdmin.from('quotes').select('*').eq('lead_id', leadId).maybeSingle(),
+    // Opinião do cliente (no máximo uma por pedido) — devolvida já aqui para
+    // o profissional ver, sem outra chamada, se o "Concluído" já teve
+    // resposta ou ainda está à espera (nunca apresentado como confirmação
+    // do cliente antes de isto existir).
+    supabaseAdmin.from('reviews').select('id, rating, comment, client_name, created_at').eq('lead_id', leadId).maybeSingle(),
+    // Última tentativa de envio do pedido de opinião — para o profissional
+    // ver se falhou (e poder reenviar) sem precisar de olhar para os logs.
+    supabaseAdmin.from('notification_log').select('status, reason, created_at')
+      .eq('lead_id', leadId).eq('kind', 'review_request')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
-  return NextResponse.json({ ok: true, lead, quote: quote ?? null })
+  return NextResponse.json({ ok: true, lead, quote: quote ?? null, review: review ?? null, reviewEmailStatus: reviewEmail ?? null })
 }

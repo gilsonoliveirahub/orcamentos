@@ -8,6 +8,7 @@ import { getAdminLeadAccessState } from '@/lib/admin-lead-access-state'
 const DETAIL_FIELDS = `
   id, name, phone, email, status, source, specialty, zone_requested, lat, lng,
   professional_id, created_at, updated_at, opened_at, locked, valor_fechado,
+  concluido_at, concluido_by,
   current_question, metadata,
   q1_tipo_trabalho, q2_divisoes, q3_area_m2, q4_cor_escura, q5_fissuras,
   q6_mobilias, q7_primer, q8_teto, q9_prazo, q10_orcamentos_anteriores,
@@ -41,6 +42,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq('lead_id', id)
     .order('created_at', { ascending: false })
 
+  // Opinião do cliente (tabela reviews, no máximo uma por pedido — ver
+  // constraint reviews_lead_id_unique) — o painel precisa de a mostrar
+  // separada de "concluído pelo profissional" acima, nunca fundida com ela:
+  // um trabalho pode estar concluído há dias sem o cliente ter respondido.
+  const { data: review } = await supabaseAdmin
+    .from('reviews')
+    .select('id, rating, comment, client_name, created_at')
+    .eq('lead_id', id)
+    .maybeSingle()
+
   const leadRecord = lead as unknown as { phone: string | null }
   let client: { id: string; name: string; email: string | null } | null = null
   if (leadRecord.phone) {
@@ -57,5 +68,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     access_state: getAdminLeadAccessState(lead as unknown as { source: string | null; opened_at: string | null; professional_id: string | null }),
     quotes: quotes || [],
     client, // conta de login associada por telefone, se existir (a maioria dos clientes não tem)
+    review: review || null,
   })
 }

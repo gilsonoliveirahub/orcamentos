@@ -95,6 +95,10 @@ describe('POST /api/leads/open', () => {
             return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'lead-1', name: 'Cliente Real', phone: '351911111111' } }) }) }) }
           }
           if (table === 'quotes') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'reviews') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'notification_log') {
+            return { select: () => { const chain: any = { eq: () => chain, order: () => chain, limit: () => chain, maybeSingle: async () => ({ data: null }) }; return chain } }
+          }
           throw new Error(`tabela inesperada: ${table}`)
         },
       },
@@ -128,6 +132,10 @@ describe('POST /api/leads/open', () => {
             }
           }
           if (table === 'quotes') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'reviews') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'notification_log') {
+            return { select: () => { const chain: any = { eq: () => chain, order: () => chain, limit: () => chain, maybeSingle: async () => ({ data: null }) }; return chain } }
+          }
           throw new Error(`tabela inesperada: ${table}`)
         },
       },
@@ -189,6 +197,10 @@ describe('POST /api/leads/open', () => {
             return { select: () => ({ eq: () => ({ single: async () => ({ data: { ...row, name: 'Cliente Adquirido Antes', phone: '351911112222' } }) }) }) }
           }
           if (table === 'quotes') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'reviews') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null }) }) }) }
+          if (table === 'notification_log') {
+            return { select: () => { const chain: any = { eq: () => chain, order: () => chain, limit: () => chain, maybeSingle: async () => ({ data: null }) }; return chain } }
+          }
           throw new Error(`tabela inesperada: ${table}`)
         },
       },
