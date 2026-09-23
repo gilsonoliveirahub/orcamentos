@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play, Mic, Square } from 'lucide-react'
+import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play, Mic, Square, UserPlus } from 'lucide-react'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, matchesShowIf, generateAnswersSummary, formatCodigoPostal, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
@@ -419,7 +419,15 @@ export default function ProfessionalPublicPage() {
                       </span>
                     </div>
                     {r.comment && <p className="text-sm text-gray-300 leading-relaxed">{r.comment}</p>}
-                    <p className="text-xs text-gray-500 mt-2 font-semibold">— {r.client_name}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <p className="text-xs text-gray-500 font-semibold">— {r.client_name}</p>
+                      {r.source === 'convidado' && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                          style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+                          <UserPlus size={10} /> Cliente convidado pelo profissional
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

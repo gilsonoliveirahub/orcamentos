@@ -19,3 +19,21 @@ export function verifyReviewToken(leadId: string, token: string, secret: string)
   if (expectedBuf.length !== tokenBuf.length) return false
   return timingSafeEqual(expectedBuf, tokenBuf)
 }
+
+// Mesmo mecanismo, mas para convites de avaliação de trabalhos fora do
+// FaçoPorTi (ver migration_review_invites.sql) — prefixo diferente
+// ("review-invite:" em vez de "review-lead:") de propósito, para um token
+// de convite nunca poder ser reaproveitado como token de lead nem vice-versa,
+// mesmo partilhando o mesmo REVIEW_TOKEN_SECRET.
+export function generateInviteToken(inviteId: string, secret: string): string {
+  return createHmac('sha256', secret).update(`review-invite:${inviteId}`).digest('hex')
+}
+
+export function verifyInviteToken(inviteId: string, token: string, secret: string): boolean {
+  if (!/^[0-9a-f]{64}$/.test(token)) return false
+  const expected = generateInviteToken(inviteId, secret)
+  const expectedBuf = Buffer.from(expected, 'hex')
+  const tokenBuf = Buffer.from(token, 'hex')
+  if (expectedBuf.length !== tokenBuf.length) return false
+  return timingSafeEqual(expectedBuf, tokenBuf)
+}

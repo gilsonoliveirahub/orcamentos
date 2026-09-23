@@ -3,13 +3,122 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import { computeProfileCompleteness } from '@/lib/profile-completeness'
 import type { ActiveSubscriptionStatus, SimplifiedSubscriptionStatus } from '@/lib/stripe-plans'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
+
+// Convidar um cliente de um trabalho feito FORA do FaçoPorTi a deixar
+// opinião — sem criar nenhum pedido fictício em `leads` só para isso (ver
+// supabase/migration_review_invites.sql). Um único canal por convite (email
+// OU WhatsApp, nunca os dois — decisão de negócio, 2026-09-23); um único
+// convite pendente por contacto de cada vez, a mensagem de erro do servidor
+// (409) já vem pronta a mostrar quando o profissional tenta repetir.
+function InviteReviewModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('email')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/review-invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_name: name, channel, client_email: channel === 'email' ? email : undefined, client_phone: channel === 'whatsapp' ? phone : undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error || 'Não foi possível criar o convite.')
+        setSaving(false)
+        return
+      }
+      if (json.send_error) {
+        setError(`Convite criado, mas ${channel === 'email' ? 'o email' : 'o WhatsApp'} não foi enviado. Tenta noutra altura.`)
+        setSaving(false)
+        onCreated()
+        return
+      }
+      onCreated()
+      onClose()
+    } catch {
+      setError('Não foi possível criar o convite. Tente novamente.')
+      setSaving(false)
+    }
+  }
+
+  const inputClass = "w-full rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+  const inputStyle = { background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.08)' }
+
+  return (
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl"
+        style={{ background: '#13152a', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h2 className="font-black text-xl text-white">Convidar cliente para avaliar</h2>
+            <p className="text-sm text-gray-500">Para trabalhos feitos fora do FaçoPorTi</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors p-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <p className="text-sm text-gray-400 leading-relaxed">
+            Enviamos ao cliente uma ligação pessoal e segura para deixar a opinião. Aparece no teu perfil marcada como <strong className="text-white">&quot;Cliente convidado pelo profissional&quot;</strong>, separada das avaliações de pedidos feitos aqui.
+          </p>
+
+          {/* Canal — um dos dois, nunca os dois ao mesmo tempo */}
+          <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            <button type="button" onClick={() => setChannel('email')}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors"
+              style={channel === 'email' ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8' } : { color: '#64748b' }}>
+              <Mail size={13} /> Email
+            </button>
+            <button type="button" onClick={() => setChannel('whatsapp')}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors"
+              style={channel === 'whatsapp' ? { background: 'rgba(37,211,102,0.15)', color: '#25d366' } : { color: '#64748b' }}>
+              <Phone size={13} /> WhatsApp
+            </button>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Nome do cliente</label>
+            <input required value={name} onChange={e => setName(e.target.value)} placeholder="Maria Santos" className={inputClass} style={inputStyle} />
+          </div>
+          {channel === 'email' ? (
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Email do cliente</label>
+              <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@exemplo.com" className={inputClass} style={inputStyle} />
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Telemóvel do cliente</label>
+              <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="351 912 345 678" className={inputClass} style={inputStyle} />
+            </div>
+          )}
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+          <button type="submit" disabled={saving}
+            className="w-full font-bold py-3.5 rounded-xl text-sm text-white transition-all flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #c9a84c, #e0bf6a)', color: '#000', opacity: saving ? 0.7 : 1 }}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : channel === 'email' ? <Mail size={16} /> : <Phone size={16} />}
+            {saving ? 'A enviar...' : 'Enviar convite'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 export default function PerfilPage() {
   const router = useRouter()
@@ -26,6 +135,8 @@ export default function PerfilPage() {
   const [specialties, setSpecialties] = useState<string[]>(['Pintura'])
   const [portfolio, setPortfolio] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
+  const [invites, setInvites] = useState<any[]>([])
+  const [showInviteModal, setShowInviteModal] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
@@ -39,6 +150,16 @@ export default function PerfilPage() {
   const touchStartX = useRef<number | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
   const portfolioRef = useRef<HTMLInputElement>(null)
+
+  // Convites de avaliação (trabalhos fora do FaçoPorTi) — separado do
+  // carregamento principal para poder ser chamado outra vez depois de criar
+  // um convite novo, sem recarregar o resto do perfil.
+  async function loadInvites() {
+    const res = await fetch('/api/review-invites')
+    if (!res.ok) return
+    const json = await res.json()
+    setInvites(json.invites || [])
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -68,6 +189,7 @@ export default function PerfilPage() {
       const statusRes = await fetch('/api/stripe/subscription-status')
       const statusJson = await statusRes.json().catch(() => null)
       if (statusJson && !statusJson.error) setSubStatus(statusJson)
+      loadInvites()
       setLoading(false)
     })
   }, [router])
@@ -190,6 +312,10 @@ export default function PerfilPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
+
+      {showInviteModal && (
+        <InviteReviewModal onClose={() => setShowInviteModal(false)} onCreated={loadInvites} />
+      )}
 
       {/* Crop modal */}
       {cropSrc && (
@@ -551,12 +677,63 @@ export default function PerfilPage() {
                     </span>
                   </div>
                   {r.comment && <p className="text-xs text-gray-300 leading-relaxed">{r.comment}</p>}
-                  <p className="text-xs text-gray-500 mt-1.5 font-semibold">— {r.client_name}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <p className="text-xs text-gray-500 font-semibold">— {r.client_name}</p>
+                    {r.source === 'convidado' && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                        style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+                        <UserPlus size={10} /> Cliente convidado pelo profissional
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        {/* Convites de avaliação — trabalhos fora do FaçoPorTi, sem pedido
+            fictício nenhum em leads (ver migration_review_invites.sql). */}
+        <div className="rounded-2xl p-6 space-y-4" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-black text-white">Convites de avaliação</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Para trabalhos feitos fora do FaçoPorTi</p>
+            </div>
+            <button onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0"
+              style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+              <UserPlus size={13} /> Convidar cliente
+            </button>
+          </div>
+          {invites.length === 0 ? (
+            <p className="text-xs text-gray-600">Ainda não convidaste nenhum cliente.</p>
+          ) : (
+            <div className="space-y-2">
+              {invites.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between gap-3 p-3 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="min-w-0">
+                    <p className="text-sm text-white font-semibold truncate">{inv.client_name}</p>
+                    <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                      {inv.channel === 'whatsapp' ? <Phone size={10} /> : <Mail size={10} />}
+                      {inv.channel === 'whatsapp' ? inv.client_phone : inv.client_email}
+                    </p>
+                  </div>
+                  {inv.status === 'completed' ? (
+                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
+                      <CheckCircle size={11} /> Avaliado
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>
+                      <Clock size={11} /> Pendente
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* O meu plano (2026-09-19) — nome do plano, ciclo, estado e preço
             vêm sempre de subStatus (leitura real ao Stripe), nunca de uma

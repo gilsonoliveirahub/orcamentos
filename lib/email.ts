@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateClientOptOutToken, generateProfessionalOptOutToken } from '@/lib/optout'
-import { generateReviewToken } from '@/lib/review-token'
+import { generateReviewToken, generateInviteToken } from '@/lib/review-token'
 
 const FROM = 'FaçoPorTi <contacto@xn--faoporti-t0a.com>'
 // Confirmado com teste real em 2026-07-16: a caixa contacto@ no Hostinger
@@ -373,6 +373,42 @@ export async function emailPedidoDepoimento({
         style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e0bf6a);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
         ⭐ Deixar avaliação →
       </a>
+    </div>
+  `))
+}
+
+// ── Convite de avaliação (trabalho feito fora do FaçoPorTi) ───────────────────
+// Distinto de emailPedidoDepoimento (que é para pedidos da própria
+// plataforma) — este é o profissional a convidar diretamente um cliente seu
+// para deixar opinião sobre um trabalho que não passou por aqui. O link
+// nunca é opcional/omitido como no outro fluxo: sem REVIEW_TOKEN_SECRET
+// configurado, nem faz sentido tentar enviar este email (não há nada válido
+// para pôr no botão), por isso lança em vez de mandar um email quebrado.
+export async function emailConviteAvaliacao({
+  profName, clientName, clientEmail, inviteId,
+}: {
+  profName: string; clientName: string; clientEmail: string; inviteId: string
+}) {
+  const secret = process.env.REVIEW_TOKEN_SECRET
+  if (!secret) throw new Error('REVIEW_TOKEN_SECRET não configurado')
+
+  const reviewLink = `${APP_URL}/avaliar-convite/${inviteId}?token=${generateInviteToken(inviteId, secret)}`
+
+  await sendEmail(clientEmail, `${profName} convidou-te a deixar uma opinião`, wrap(`
+    <div style="background:linear-gradient(135deg,#c9a84c,#e0bf6a);padding:24px 32px">
+      <h2 style="margin:0;color:#000;font-size:20px">⭐ Conta-nos como correu!</h2>
+      <p style="margin:4px 0 0;color:rgba(0,0,0,0.6);font-size:14px">A tua opinião ajuda outros clientes</p>
+    </div>
+    <div style="padding:24px 32px">
+      <p style="color:#94a3b8;margin:0 0 16px">Olá <strong style="color:#fff">${clientName}</strong>,</p>
+      <p style="color:#94a3b8;margin:0 0 24px">
+        <strong style="color:#fff">${profName}</strong> convidou-te a deixar uma opinião sobre um trabalho que fez para ti. Demora menos de 1 minuto e a tua avaliação aparece no perfil público de ${profName} no FaçoPorTi.
+      </p>
+      <a href="${reviewLink}"
+        style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#e0bf6a);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
+        ⭐ Deixar avaliação →
+      </a>
+      <p style="color:#475569;font-size:12px;margin:20px 0 0">Esta ligação é pessoal e só pode ser usada uma vez.</p>
     </div>
   `))
 }

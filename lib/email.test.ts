@@ -373,4 +373,54 @@ describe('email sending (lib/email.ts)', () => {
       expect(body.html).not.toContain('/avaliar/')
     })
   })
+
+  describe('emailConviteAvaliacao — convite direto por email (trabalho fora do FaçoPorTi)', () => {
+    beforeEach(() => {
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
+    })
+
+    it('inclui um token de convite válido no link, verificável por verifyInviteToken', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.REVIEW_TOKEN_SECRET = 'segredo-review-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailConviteAvaliacao } = await import('./email')
+      const { verifyInviteToken } = await import('./review-token')
+      await emailConviteAvaliacao({ profName: 'Ana Pintora', clientName: 'Gilson', clientEmail: 'gilson@example.com', inviteId: 'invite-1' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.to).toEqual(['gilson@example.com'])
+      const match = body.html.match(/\/avaliar-convite\/invite-1\?token=([0-9a-f]{64})/)
+      expect(match).not.toBeNull()
+      expect(verifyInviteToken('invite-1', match![1], 'segredo-review-teste')).toBe(true)
+    })
+
+    it('o token de convite nunca verifica como token de lead (espaços de token separados)', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      process.env.REVIEW_TOKEN_SECRET = 'segredo-review-teste'
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailConviteAvaliacao } = await import('./email')
+      const { verifyReviewToken } = await import('./review-token')
+      await emailConviteAvaliacao({ profName: 'Ana Pintora', clientName: 'Gilson', clientEmail: 'gilson@example.com', inviteId: 'invite-1' })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      const match = body.html.match(/token=([0-9a-f]{64})/)
+      expect(verifyReviewToken('invite-1', match![1], 'segredo-review-teste')).toBe(false)
+    })
+
+    it('sem REVIEW_TOKEN_SECRET configurado: nunca envia (não faz sentido um convite sem link válido)', async () => {
+      process.env.RESEND_API_KEY = 'test_key'
+      delete process.env.REVIEW_TOKEN_SECRET
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+      vi.stubGlobal('fetch', fetchSpy)
+
+      const { emailConviteAvaliacao } = await import('./email')
+      await expect(emailConviteAvaliacao({ profName: 'Ana Pintora', clientName: 'Gilson', clientEmail: 'gilson@example.com', inviteId: 'invite-1' }))
+        .rejects.toThrow('REVIEW_TOKEN_SECRET')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
 })
