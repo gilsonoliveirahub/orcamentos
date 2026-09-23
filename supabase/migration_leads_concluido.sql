@@ -11,12 +11,21 @@
 -- repositório), só depois de aprovação explícita.
 
 alter table leads add column if not exists concluido_at timestamptz;
-alter table leads add column if not exists concluido_by uuid references professionals(id);
+-- SEM "references professionals(id)" de propósito (corrigido em produção
+-- 2026-09-23 depois de detetado no teste pós-publicação): uma 2ª FK de
+-- leads para professionals tornava ambíguo qualquer `professionals(*)`
+-- embutido via PostgREST em TODO o código (o que já existia, ex.
+-- /api/leads/open, /api/admin/leads/[id] — nenhum destes pede a relação
+-- por nome) — partia silenciosamente a página de cada pedido (devolvia
+-- lead: null) em vez de dar erro claro. concluido_by continua a guardar o
+-- uuid do profissional (sempre igual a leads.professional_id, único que
+-- pode concluir) só que sem constraint de integridade referencial formal.
+alter table leads add column if not exists concluido_by uuid;
 
 comment on column leads.concluido_at is
   'Momento em que o profissional marcou este pedido como concluído (Concluído) — definido uma única vez, nunca reescrito por reenvios do email de pedido de opinião.';
 comment on column leads.concluido_by is
-  'Profissional que marcou este pedido como concluído — hoje é sempre o mesmo que leads.professional_id (só o dono do lead pode concluir), guardado à parte para auditoria e para resistir a uma futura mudança de dono do lead.';
+  'Profissional que marcou este pedido como concluído — hoje é sempre o mesmo que leads.professional_id (só o dono do lead pode concluir). Sem FK formal de propósito: ver comentário acima sobre ambiguidade de embed no PostgREST.';
 
 -- Estado 'concluido' passa a válido em leads.status. IMPORTANTE (verificado
 -- por leitura direta à produção antes de aplicar, 2026-09-23): apesar de
