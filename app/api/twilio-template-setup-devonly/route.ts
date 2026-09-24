@@ -12,7 +12,14 @@ export async function POST(req: NextRequest) {
   if (!SETUP_TOKEN) return NextResponse.json({ error: 'setup token não configurado' }, { status: 500 })
 
   const token = req.headers.get('x-setup-token')
-  if (token !== SETUP_TOKEN) return NextResponse.json({ error: 'unauthorized' }, { status: 403 })
+  if (token !== SETUP_TOKEN) {
+    const crypto = await import('crypto')
+    const hash = (s: string) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 12)
+    return NextResponse.json({
+      error: 'unauthorized',
+      debug: { receivedLen: token?.length ?? 0, expectedLen: SETUP_TOKEN.length, receivedHash: token ? hash(token) : null, expectedHash: hash(SETUP_TOKEN) },
+    }, { status: 403 })
+  }
 
   const SID = process.env.TWILIO_ACCOUNT_SID
   const AUTH = process.env.TWILIO_AUTH_TOKEN
