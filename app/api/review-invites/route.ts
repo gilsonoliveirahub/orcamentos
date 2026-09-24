@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
-import { emailConviteAvaliacao } from '@/lib/email'
-import { sendWhatsApp } from '@/lib/whatsapp'
-import { generateInviteToken } from '@/lib/review-token'
+import { sendInviteMessage } from '@/lib/send-review-invite'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,9 +70,10 @@ export async function POST(req: NextRequest) {
       phone = digits
     }
 
-    // Impede um 2º convite pendente para o mesmo contacto — a constraint
-    // única parcial em BD (review_invites_pending_contact_unique) é a
-    // última linha de defesa atómica; este check só serve para dar uma
+    // Impede um 2º convite pendente (ou pedido por confirmar) para o mesmo
+    // contacto — a constraint única parcial em BD
+    // (review_invites_pending_contact_unique, cobre 'pending' e 'requested')
+    // é a última linha de defesa atómica; este check só serve para dar uma
     // mensagem clara em vez do genérico "erro 500" numa corrida normal
     // (não simultânea). Consulta sempre pela coluna do próprio canal — nunca
     // um filtro .or() com valor interpolado (evitava injeção na sintaxe de
@@ -83,7 +82,7 @@ export async function POST(req: NextRequest) {
       .from('review_invites')
       .select('id')
       .eq('professional_id', professional.id)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'requested'])
     const { data: existing } = await (channel === 'email'
       ? existingQuery.ilike('client_email', email!)
       : existingQuery.eq('client_phone', phone!)
@@ -110,33 +109,10 @@ export async function POST(req: NextRequest) {
     // devolve o erro ao profissional (send_error) para ele saber que tem de
     // tentar de outra forma; o convite já criado impede um novo até ficar
     // concluído (não há reenvio automático nesta fase).
-    let sendError: string | null = null
-    if (channel === 'email') {
-      try {
-        await emailConviteAvaliacao({ profName: professional.name, clientName: name, clientEmail: email!, inviteId: invite.id })
-      } catch (err: any) {
-        sendError = err.message
-        console.error(`[review-invites] email não enviado (invite ${invite.id}): ${err.message}`)
-      }
-    } else {
-      const secret = process.env.REVIEW_TOKEN_SECRET
-      if (!secret) {
-        sendError = 'REVIEW_TOKEN_SECRET não configurado'
-        console.error(`[review-invites] ${sendError} — WhatsApp não enviado (invite ${invite.id})`)
-      } else {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://façoporti.com'
-        const link = `${appUrl}/avaliar-convite/${invite.id}?token=${generateInviteToken(invite.id, secret)}`
-        const result = await sendWhatsApp(phone!,
-          `⭐ Olá ${name}! *${professional.name}* convidou-te a deixar uma opinião sobre um trabalho que fez para ti.\n\n` +
-          `Demora menos de 1 minuto: ${link}\n\n` +
-          `Esta ligação é pessoal e só pode ser usada uma vez.`
-        )
-        if (result.status !== 'sent') {
-          sendError = result.reason
-          console.error(`[review-invites] WhatsApp não enviado (invite ${invite.id}): ${result.reason}`)
-        }
-      }
-    }
+    const sendError = await sendInviteMessage(
+      { id: invite.id, client_name: name, channel, client_email: email, client_phone: phone },
+      professional
+    )
 
     return NextResponse.json({ invite, send_error: sendError })
   } catch (err: any) {

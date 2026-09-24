@@ -4,11 +4,186 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play, Mic, Square, UserPlus } from 'lucide-react'
+import { MessageCircle, ChevronRight, ChevronLeft, Star, MapPin, Briefcase, Camera, X, Loader2, Play, Mic, Square, UserPlus, Mail, Phone, CheckCircle } from 'lucide-react'
 import { getProfession, PROFESSIONS, mapAnswersToLeadFields, matchesShowIf, generateAnswersSummary, formatCodigoPostal, type Question, type ProfessionConfig } from '@/lib/professions'
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
 import { useDictation } from '@/lib/useDictation'
+
+// Pedido de avaliação por um visitante do perfil público (sem login) —
+// nunca publica nada sozinho: cria só um pedido em estado 'requested', que
+// o profissional tem de confirmar em /perfil antes de qualquer link ser
+// enviado (ver app/api/review-invites/request/route.ts). Mesmo padrão
+// visual do InviteReviewModal em app/perfil/page.tsx, adaptado a quem
+// preenche é o próprio cliente, não o profissional.
+function RequestReviewModal({ professionalId, professionalName, onClose }: { professionalId: string; professionalName: string; onClose: () => void }) {
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('whatsapp')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/review-invites/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          professional_id: professionalId,
+          client_name: name,
+          channel,
+          client_email: channel === 'email' ? email : undefined,
+          client_phone: channel === 'whatsapp' ? phone : undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error || 'Não foi possível enviar o pedido.')
+        setSaving(false)
+        return
+      }
+      setDone(true)
+    } catch {
+      setError('Não foi possível enviar o pedido. Tenta novamente.')
+      setSaving(false)
+    }
+  }
+
+  const inputClass = "w-full rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+  const inputStyle = { background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.08)' }
+
+  return (
+    <div className="fixed inset-0 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+      <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl"
+        style={{ background: '#13152a', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center justify-between p-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h2 className="font-black text-xl text-white">Avaliar {professionalName}</h2>
+            <p className="text-sm text-gray-500">Foste cliente? Deixa a tua opinião</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors p-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="p-6 space-y-4 text-center">
+            <CheckCircle size={40} className="mx-auto text-emerald-400" />
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Pedido enviado a <strong className="text-white">{professionalName}</strong>. Quando confirmar que foste cliente, vais receber um link para avaliar por {channel === 'email' ? 'email' : 'WhatsApp'}.
+            </p>
+            <button onClick={onClose}
+              className="w-full font-bold py-3 rounded-xl text-sm text-white transition-all"
+              style={{ background: 'rgba(255,255,255,0.08)' }}>
+              Fechar
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <p className="text-sm text-gray-400 leading-relaxed">
+              O teu pedido só fica visível para <strong className="text-white">{professionalName}</strong> confirmar que foste mesmo cliente — só depois disso é enviado um link para avaliares.
+            </p>
+
+            <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button type="button" onClick={() => setChannel('whatsapp')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors"
+                style={channel === 'whatsapp' ? { background: 'rgba(37,211,102,0.15)', color: '#25d366' } : { color: '#64748b' }}>
+                <Phone size={13} /> WhatsApp
+              </button>
+              <button type="button" onClick={() => setChannel('email')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold transition-colors"
+                style={channel === 'email' ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8' } : { color: '#64748b' }}>
+                <Mail size={13} /> Email
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">O teu nome</label>
+              <input required value={name} onChange={e => setName(e.target.value)} placeholder="Maria Santos" className={inputClass} style={inputStyle} />
+            </div>
+            {channel === 'email' ? (
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">O teu email</label>
+                <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="maria@exemplo.com" className={inputClass} style={inputStyle} />
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">O teu telemóvel</label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="351 912 345 678" className={inputClass} style={inputStyle} />
+              </div>
+            )}
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <button type="submit" disabled={saving}
+              className="w-full font-bold py-3.5 rounded-xl text-sm text-white transition-all flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #c9a84c, #e0bf6a)', color: '#000', opacity: saving ? 0.7 : 1 }}>
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
+              {saving ? 'A enviar...' : 'Pedir para avaliar'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Estrelas + lista de avaliações — mostrado no ecrã de escolha de
+// especialidade (quando há mais de uma) e no perfil completo, para quem
+// tem só uma especialidade não deixar de ver isto antes de pedir orçamento.
+type PublicReview = { id: string; rating: number; comment: string | null; client_name: string; source: string }
+
+function PublicReviewsSummary({ reviews, avgRating, onAvaliar }: { reviews: PublicReview[]; avgRating: number; onAvaliar: () => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        {reviews.length > 0 ? (
+          <span className="flex items-center gap-1.5 text-sm font-bold text-amber-400">
+            <Star size={14} fill="currentColor" />
+            {avgRating.toFixed(1)}
+            <span className="text-gray-500 font-normal text-xs">({reviews.length} avaliações)</span>
+          </span>
+        ) : (
+          <span className="text-xs text-gray-600">Ainda sem avaliações</span>
+        )}
+        <button onClick={onAvaliar}
+          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0"
+          style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+          <Star size={12} /> Avaliar
+        </button>
+      </div>
+      {reviews.length > 0 && (
+        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          {reviews.slice(0, 5).map(r => (
+            <div key={r.id} className="p-3 rounded-xl text-left"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex gap-0.5 mb-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <Star key={n} size={11} fill={n <= r.rating ? '#fbbf24' : 'none'}
+                    className={n <= r.rating ? 'text-amber-400' : 'text-gray-700'} />
+                ))}
+              </div>
+              {r.comment && <p className="text-xs text-gray-300 leading-relaxed">{r.comment}</p>}
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs text-gray-500 font-semibold">— {r.client_name}</p>
+                {r.source === 'convidado' && (
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                    style={{ background: 'rgba(201,168,76,0.15)', color: '#c9a84c' }}>
+                    <UserPlus size={9} /> Convidado
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ProfessionalPublicPage() {
   const { slug } = useParams()
@@ -45,6 +220,7 @@ export default function ProfessionalPublicPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null)
+  const [showAvaliarModal, setShowAvaliarModal] = useState(false)
 
   async function loadSpecialtyConfig(spec: string) {
     if (PROFESSIONS[spec]) {
@@ -95,6 +271,8 @@ export default function ProfessionalPublicPage() {
     await loadSpecialtyConfig(spec)
   }
 
+  const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0c1a' }}>
       <div className="w-10 h-10 border-4 border-indigo-900 border-t-indigo-500 rounded-full animate-spin" />
@@ -105,6 +283,9 @@ export default function ProfessionalPublicPage() {
     const specs: string[] = professional.specialties?.length ? professional.specialties : [professional.specialty]
     return (
       <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
+        {showAvaliarModal && (
+          <RequestReviewModal professionalId={professional.id} professionalName={professional.name} onClose={() => setShowAvaliarModal(false)} />
+        )}
         <div style={{ background: 'linear-gradient(135deg, #0d0f1e, #13152a)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="max-w-lg mx-auto px-6 py-6">
             <div className="flex items-center gap-4">
@@ -119,6 +300,9 @@ export default function ProfessionalPublicPage() {
               </div>
             </div>
           </div>
+        </div>
+        <div className="max-w-lg mx-auto px-6 pt-6">
+          <PublicReviewsSummary reviews={reviews} avgRating={avgRating} onAvaliar={() => setShowAvaliarModal(true)} />
         </div>
         <div className="max-w-lg mx-auto px-6 py-8">
           <h2 className="text-2xl font-black text-white mb-2">Qual o serviço?</h2>
@@ -307,8 +491,6 @@ export default function ProfessionalPublicPage() {
       </div>
     </div>
   )
-
-  const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
 
   // ── Perfil público (step 0) ────────────────────────────────────────────────
   if (step === 0) {

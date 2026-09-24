@@ -206,3 +206,161 @@ describe('POST /api/review-invites/[id]', () => {
     expect(json.error).toBe('Já avaliaste este serviço')
   })
 })
+
+function fakePatchRequest(body: unknown): NextRequest {
+  return { json: async () => body } as unknown as NextRequest
+}
+
+function mockAuth(userId: string | null) {
+  vi.doMock('@/lib/supabase-server', () => ({
+    createClient: async () => ({
+      auth: { getUser: async () => ({ data: { user: userId ? { id: userId } : null } }) },
+    }),
+  }))
+}
+
+describe('PATCH /api/review-invites/[id]', () => {
+  beforeEach(() => vi.resetModules())
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.doUnmock('@/lib/supabase-server')
+    vi.doUnmock('@/lib/supabase-admin')
+    vi.doUnmock('@/lib/send-review-invite')
+  })
+
+  it('rejeita ação desconhecida, nunca chega a autenticar', async () => {
+    const from = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'aprovar' }), fakeParams('invite-1'))
+    expect(res.status).toBe(400)
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('sem sessão: 403, nunca toca na BD', async () => {
+    mockAuth(null)
+    const from = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from } }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'confirm' }), fakeParams('invite-1'))
+    expect(res.status).toBe(403)
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it('pedido de outro profissional: 404, nunca deixa agir sobre um id que não é seu', async () => {
+    mockAuth('user-1')
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1', name: 'Ana' } }) }) }) }
+          if (table === 'review_invites') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'invite-1', professional_id: 'outro-prof', status: 'requested' } }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'confirm' }), fakeParams('invite-1'))
+    expect(res.status).toBe(404)
+  })
+
+  it('pedido já tratado (não está em "requested"): 409', async () => {
+    mockAuth('user-1')
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1', name: 'Ana' } }) }) }) }
+          if (table === 'review_invites') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'invite-1', professional_id: 'prof-1', status: 'pending' } }) }) }) }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'confirm' }), fakeParams('invite-1'))
+    expect(res.status).toBe(409)
+  })
+
+  it('rejeitar: marca como rejected, nunca chama o envio', async () => {
+    mockAuth('user-1')
+    let updateArgs: Record<string, unknown> | null = null
+    const sendInviteMessage = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1', name: 'Ana' } }) }) }) }
+          if (table === 'review_invites') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'invite-1', professional_id: 'prof-1', client_name: 'Cliente', channel: 'email', client_email: 'c@example.com', client_phone: null, status: 'requested' } }) }) }),
+              update: (payload: Record<string, unknown>) => { updateArgs = payload; return { eq: async () => ({ error: null }) } },
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/send-review-invite', () => ({ sendInviteMessage }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'reject' }), fakeParams('invite-1'))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.status).toBe('rejected')
+    expect((updateArgs as any).status).toBe('rejected')
+    expect(sendInviteMessage).not.toHaveBeenCalled()
+  })
+
+  it('confirmar: passa a pending e dispara o mesmo envio de convite (email/WhatsApp)', async () => {
+    mockAuth('user-1')
+    let updateArgs: Record<string, unknown> | null = null
+    const sendInviteMessage = vi.fn().mockResolvedValue(null)
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1', name: 'Ana' } }) }) }) }
+          if (table === 'review_invites') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'invite-1', professional_id: 'prof-1', client_name: 'Cliente', channel: 'whatsapp', client_email: null, client_phone: '351912345678', status: 'requested' } }) }) }),
+              update: (payload: Record<string, unknown>) => { updateArgs = payload; return { eq: async () => ({ error: null }) } },
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/send-review-invite', () => ({ sendInviteMessage }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'confirm' }), fakeParams('invite-1'))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.status).toBe('pending')
+    expect(json.send_error).toBeNull()
+    expect((updateArgs as any).status).toBe('pending')
+    expect(sendInviteMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invite-1', channel: 'whatsapp', client_phone: '351912345678' }),
+      expect.objectContaining({ id: 'prof-1', name: 'Ana' })
+    )
+  })
+
+  it('confirmar mas o envio falha: devolve send_error, continua 200 (convite já ficou pending)', async () => {
+    mockAuth('user-1')
+    const sendInviteMessage = vi.fn().mockResolvedValue('twilio_500')
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1', name: 'Ana' } }) }) }) }
+          if (table === 'review_invites') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'invite-1', professional_id: 'prof-1', client_name: 'Cliente', channel: 'whatsapp', client_email: null, client_phone: '351912345678', status: 'requested' } }) }) }),
+              update: () => ({ eq: async () => ({ error: null }) }),
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/send-review-invite', () => ({ sendInviteMessage }))
+    const { PATCH } = await import('./route')
+    const res = await PATCH(fakePatchRequest({ action: 'confirm' }), fakeParams('invite-1'))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.send_error).toBe('twilio_500')
+  })
+})

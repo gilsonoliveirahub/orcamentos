@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone, Bell } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import { computeProfileCompleteness } from '@/lib/profile-completeness'
@@ -137,6 +137,7 @@ export default function PerfilPage() {
   const [reviews, setReviews] = useState<any[]>([])
   const [invites, setInvites] = useState<any[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
@@ -159,6 +160,32 @@ export default function PerfilPage() {
     if (!res.ok) return
     const json = await res.json()
     setInvites(json.invites || [])
+  }
+
+  // Confirmar/rejeitar um pedido de avaliação submetido por um visitante do
+  // perfil público (status 'requested') — só ao confirmar é que o link de
+  // avaliação chega a ser enviado (ver PATCH em
+  // app/api/review-invites/[id]/route.ts).
+  async function handleReviewRequest(id: string, action: 'confirm' | 'reject') {
+    setDecidingRequestId(id)
+    try {
+      const res = await fetch(`/api/review-invites/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        alert(json.error || 'Não foi possível concluir a ação.')
+        return
+      }
+      if (action === 'confirm' && json.send_error) {
+        alert(`Confirmado, mas o envio falhou (${json.send_error}). Tenta noutra altura.`)
+      }
+      await loadInvites()
+    } finally {
+      setDecidingRequestId(null)
+    }
   }
 
   useEffect(() => {
@@ -692,6 +719,45 @@ export default function PerfilPage() {
           </div>
         )}
 
+        {/* Pedidos de avaliação submetidos por visitantes do perfil público
+            (status 'requested') — só aparecem aqui, nunca é enviado nada
+            sem esta confirmação explícita (ver
+            app/api/review-invites/request/route.ts). */}
+        {invites.some(i => i.status === 'requested') && (
+          <div className="rounded-2xl p-6 space-y-4" style={{ background: '#0d0f1e', border: '1px solid rgba(201,168,76,0.3)' }}>
+            <div>
+              <h2 className="font-black text-white flex items-center gap-2"><Bell size={16} style={{ color: '#c9a84c' }} /> Pedidos de avaliação</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Alguém no teu perfil público pediu para avaliar — confirma só se reconheceres como cliente teu.</p>
+            </div>
+            <div className="space-y-2">
+              {invites.filter(i => i.status === 'requested').map(inv => (
+                <div key={inv.id} className="p-3 rounded-xl space-y-2.5"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div className="min-w-0">
+                    <p className="text-sm text-white font-semibold truncate">{inv.client_name}</p>
+                    <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                      {inv.channel === 'whatsapp' ? <Phone size={10} /> : <Mail size={10} />}
+                      {inv.channel === 'whatsapp' ? inv.client_phone : inv.client_email}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleReviewRequest(inv.id, 'confirm')} disabled={decidingRequestId === inv.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg transition-all"
+                      style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', opacity: decidingRequestId === inv.id ? 0.6 : 1 }}>
+                      {decidingRequestId === inv.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Confirmar
+                    </button>
+                    <button onClick={() => handleReviewRequest(inv.id, 'reject')} disabled={decidingRequestId === inv.id}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg transition-all"
+                      style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', opacity: decidingRequestId === inv.id ? 0.6 : 1 }}>
+                      <X size={12} /> Rejeitar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Convites de avaliação — trabalhos fora do FaçoPorTi, sem pedido
             fictício nenhum em leads (ver migration_review_invites.sql). */}
         <div className="rounded-2xl p-6 space-y-4" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -706,11 +772,11 @@ export default function PerfilPage() {
               <UserPlus size={13} /> Convidar cliente
             </button>
           </div>
-          {invites.length === 0 ? (
+          {invites.filter(i => i.status !== 'requested').length === 0 ? (
             <p className="text-xs text-gray-600">Ainda não convidaste nenhum cliente.</p>
           ) : (
             <div className="space-y-2">
-              {invites.map(inv => (
+              {invites.filter(i => i.status !== 'requested').map(inv => (
                 <div key={inv.id} className="flex items-center justify-between gap-3 p-3 rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div className="min-w-0">
@@ -723,6 +789,10 @@ export default function PerfilPage() {
                   {inv.status === 'completed' ? (
                     <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
                       <CheckCircle size={11} /> Avaliado
+                    </span>
+                  ) : inv.status === 'rejected' ? (
+                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8' }}>
+                      <X size={11} /> Rejeitado
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>

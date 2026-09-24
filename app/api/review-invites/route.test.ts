@@ -13,12 +13,12 @@ function mockAuth(userId: string | null) {
   }))
 }
 
-// review_invites.select(...).eq(...).eq(...) termina em .ilike() (canal
+// review_invites.select(...).eq(...).in(...) termina em .ilike() (canal
 // email) ou .eq() (canal whatsapp) — os dois têm de devolver um objeto
 // "thenable" com .maybeSingle(), por isso a chain simula ambos os finais.
 function existingCheckChain(data: unknown) {
   const terminal = { maybeSingle: async () => ({ data }) }
-  return { select: () => ({ eq: () => ({ eq: () => ({ ilike: () => terminal, eq: () => terminal }) }) }) }
+  return { select: () => ({ eq: () => ({ in: () => ({ ilike: () => terminal, eq: () => terminal }) }) }) }
 }
 
 describe('POST /api/review-invites', () => {
