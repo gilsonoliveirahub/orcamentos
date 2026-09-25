@@ -116,3 +116,79 @@ describe('sendWhatsApp', () => {
     expect(result).toEqual({ status: 'failed', reason: 'network_error' })
   })
 })
+
+describe('sendWhatsAppTemplate', () => {
+  beforeEach(() => vi.resetModules())
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('envia ContentSid + ContentVariables (nunca Body de texto livre) e devolve o messageSid', async () => {
+    process.env.TWILIO_ACCOUNT_SID = 'ACxxx'
+    process.env.TWILIO_AUTH_TOKEN = 'tokenxxx'
+    process.env.TWILIO_WHATSAPP_FROM = '+14245872587'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM123' }) })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { sendWhatsAppTemplate } = await import('./whatsapp')
+    const result = await sendWhatsAppTemplate({
+      to: '351912345678',
+      contentSid: 'HXabc',
+      contentVariables: { '1': 'Maria', '2': 'Ana Pintora', '3': 'https://x/avaliar-convite/1' },
+    })
+
+    expect(result).toEqual({ status: 'sent', messageSid: 'SM123' })
+    const [, options] = fetchSpy.mock.calls[0]
+    const body = new URLSearchParams(options.body)
+    expect(body.get('ContentSid')).toBe('HXabc')
+    expect(JSON.parse(body.get('ContentVariables')!)).toEqual({ '1': 'Maria', '2': 'Ana Pintora', '3': 'https://x/avaliar-convite/1' })
+    expect(body.has('Body')).toBe(false)
+    expect(body.has('StatusCallback')).toBe(false)
+  })
+
+  it('inclui StatusCallback quando fornecido', async () => {
+    process.env.TWILIO_ACCOUNT_SID = 'ACxxx'
+    process.env.TWILIO_AUTH_TOKEN = 'tokenxxx'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sid: 'SM123' }) })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const { sendWhatsAppTemplate } = await import('./whatsapp')
+    await sendWhatsAppTemplate({
+      to: '351912345678', contentSid: 'HXabc', contentVariables: {},
+      statusCallbackUrl: 'https://x/api/webhook/twilio-status',
+    })
+
+    const [, options] = fetchSpy.mock.calls[0]
+    const body = new URLSearchParams(options.body)
+    expect(body.get('StatusCallback')).toBe('https://x/api/webhook/twilio-status')
+  })
+
+  it('credenciais em falta: skipped, nunca chama a rede', async () => {
+    process.env.TWILIO_ACCOUNT_SID = ''
+    process.env.TWILIO_AUTH_TOKEN = ''
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { sendWhatsAppTemplate } = await import('./whatsapp')
+    const result = await sendWhatsAppTemplate({ to: '351912345678', contentSid: 'HXabc', contentVariables: {} })
+
+    expect(result).toEqual({ status: 'skipped', reason: 'missing_credentials' })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('erro da Twilio (ex: modelo ainda não aprovado): failed com o código, nunca lança', async () => {
+    process.env.TWILIO_ACCOUNT_SID = 'ACxxx'
+    process.env.TWILIO_AUTH_TOKEN = 'tokenxxx'
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ code: 63016, message: 'not approved' }) })
+    vi.stubGlobal('fetch', fetchSpy)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { sendWhatsAppTemplate } = await import('./whatsapp')
+    const result = await sendWhatsAppTemplate({ to: '351912345678', contentSid: 'HXabc', contentVariables: {} })
+
+    expect(result).toEqual({ status: 'failed', reason: 'twilio_63016' })
+  })
+})

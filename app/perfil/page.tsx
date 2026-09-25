@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone, Bell } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, PauseCircle, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone, Bell, RefreshCw, Ban, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import { computeProfileCompleteness } from '@/lib/profile-completeness'
+import { computeEffectiveAvailability, AVAILABILITY_STATUSES, AVAILABILITY_LABELS, type AvailabilityStatus } from '@/lib/professional-availability'
 import type { ActiveSubscriptionStatus, SimplifiedSubscriptionStatus } from '@/lib/stripe-plans'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
@@ -138,6 +139,7 @@ export default function PerfilPage() {
   const [invites, setInvites] = useState<any[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null)
+  const [whatsappOperational, setWhatsappOperational] = useState(true)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
@@ -146,7 +148,8 @@ export default function PerfilPage() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarLightbox, setAvatarLightbox] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<number | null>(null)
-  const [acceptingLeads, setAcceptingLeads] = useState(true)
+  const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>('disponivel')
+  const [availableFrom, setAvailableFrom] = useState('')
   const [togglingAccepting, setTogglingAccepting] = useState(false)
   const touchStartX = useRef<number | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -160,13 +163,17 @@ export default function PerfilPage() {
     if (!res.ok) return
     const json = await res.json()
     setInvites(json.invites || [])
+    setWhatsappOperational(!!json.whatsapp_operational)
   }
 
-  // Confirmar/rejeitar um pedido de avaliação submetido por um visitante do
-  // perfil público (status 'requested') — só ao confirmar é que o link de
-  // avaliação chega a ser enviado (ver PATCH em
-  // app/api/review-invites/[id]/route.ts).
-  async function handleReviewRequest(id: string, action: 'confirm' | 'reject') {
+  // Todas as ações do profissional sobre um convite (confirmar/rejeitar um
+  // pedido, reenviar, cancelar) passam por aqui — mesmo endpoint PATCH, o
+  // servidor é que valida se a ação faz sentido no estado atual (ver
+  // app/api/review-invites/[id]/route.ts). send_error só se aplica a
+  // confirm/resend, que são os únicos que tentam mesmo enviar. De propósito
+  // não há nenhuma ação para apagar a avaliação de um cliente.
+  async function handleInviteAction(id: string, action: 'confirm' | 'reject' | 'resend' | 'cancel', confirmMessage?: string) {
+    if (confirmMessage && !confirm(confirmMessage)) return
     setDecidingRequestId(id)
     try {
       const res = await fetch(`/api/review-invites/${id}`, {
@@ -179,8 +186,27 @@ export default function PerfilPage() {
         alert(json.error || 'Não foi possível concluir a ação.')
         return
       }
-      if (action === 'confirm' && json.send_error) {
-        alert(`Confirmado, mas o envio falhou (${json.send_error}). Tenta noutra altura.`)
+      if ((action === 'confirm' || action === 'resend') && json.send_error) {
+        alert(`Feito, mas o envio falhou (${json.send_error}). Tenta noutra altura.`)
+      }
+      await loadInvites()
+    } finally {
+      setDecidingRequestId(null)
+    }
+  }
+
+  // Elimina o CONVITE em si (nunca uma avaliação — não existe nenhuma ação
+  // para isso) — só rejeitados, cancelados, ou pendentes cujo envio falhou
+  // aceitam isto do lado do servidor, é só para limpar a lista.
+  async function handleDeleteInvite(id: string) {
+    if (!confirm('Eliminar este convite da lista? Não pode ser desfeito.')) return
+    setDecidingRequestId(id)
+    try {
+      const res = await fetch(`/api/review-invites/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        alert(json.error || 'Não foi possível eliminar.')
+        return
       }
       await loadInvites()
     } finally {
@@ -201,10 +227,15 @@ export default function PerfilPage() {
         description: prof.description || '',
       })
       setSpecialties(prof.specialties?.length ? prof.specialties : [prof.specialty || 'Pintura'])
-      // ?? true: se a coluna ainda não existir na BD (migração por aplicar)
-      // ou nunca tiver sido definida, o profissional conta como disponível —
-      // nunca esconder pedidos por omissão.
-      setAcceptingLeads(prof.accepting_leads ?? true)
+      // Mostra sempre o estado EFETIVO (ver lib/professional-availability.ts)
+      // — se "indisponível até {data}" já passou, o próprio formulário já
+      // aparece como "Disponível" em vez de confundir com uma data no
+      // passado. Se availability_status ainda não existir na BD (migração
+      // por aplicar), cai no antigo accepting_leads — nunca esconder pedidos
+      // por omissão.
+      const effective = computeEffectiveAvailability(prof)
+      setAvailabilityStatus(effective)
+      setAvailableFrom(prof.availability_status === 'indisponivel' ? (prof.available_from || '') : '')
       const [{ data: portfolioData }, { data: reviewsData }] = await Promise.all([
         supabase.from('professional_portfolio').select('*').eq('professional_id', prof.id).order('sort_order').order('created_at'),
         supabase.from('reviews').select('*').eq('professional_id', prof.id).order('created_at', { ascending: false }),
@@ -237,11 +268,23 @@ export default function PerfilPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  async function handleToggleAccepting() {
+  // accepting_leads (coluna antiga) fica sempre escrita em sincronia — várias
+  // partes do código e a ficha de admin ainda a leem diretamente (ver
+  // lib/professional-availability.ts).
+  async function handleAvailabilityChange(status: AvailabilityStatus, fromDate: string) {
     setTogglingAccepting(true)
-    const next = !acceptingLeads
-    const { error } = await supabase.from('professionals').update({ accepting_leads: next }).eq('id', professional.id)
-    if (!error) setAcceptingLeads(next)
+    const nextAvailableFrom = status === 'indisponivel' && fromDate ? fromDate : null
+    const { error } = await supabase.from('professionals').update({
+      availability_status: status,
+      available_from: nextAvailableFrom,
+      accepting_leads: status !== 'indisponivel',
+    }).eq('id', professional.id)
+    if (!error) {
+      setAvailabilityStatus(status)
+      setAvailableFrom(nextAvailableFrom || '')
+    } else {
+      alert('Não foi possível guardar a disponibilidade. Tenta novamente.')
+    }
     setTogglingAccepting(false)
   }
 
@@ -538,23 +581,42 @@ export default function PerfilPage() {
         <form onSubmit={handleSave} className="rounded-2xl p-6 space-y-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
           <h2 className="font-black text-white">Editar informações</h2>
 
-          <div className="flex items-center justify-between gap-4 rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center gap-3 min-w-0">
-              {acceptingLeads
-                ? <Play size={16} className="text-emerald-400 flex-shrink-0" />
-                : <Pause size={16} className="text-amber-400 flex-shrink-0" />}
+              {availabilityStatus === 'disponivel' && <Play size={16} className="text-emerald-400 flex-shrink-0" />}
+              {availabilityStatus === 'parcial' && <PauseCircle size={16} className="text-amber-400 flex-shrink-0" />}
+              {availabilityStatus === 'indisponivel' && <Pause size={16} className="text-red-400 flex-shrink-0" />}
               <div className="min-w-0">
-                <div className="text-sm font-bold text-white">{acceptingLeads ? 'A receber pedidos' : 'Em pausa'}</div>
-                <div className="text-xs text-gray-500">Pausa temporária: continuas a ver o marketplace, mas não podes adquirir novos pedidos.</div>
+                <div className="text-sm font-bold text-white">{AVAILABILITY_LABELS[availabilityStatus]}</div>
+                <div className="text-xs text-gray-500">
+                  {availabilityStatus === 'disponivel' && 'A aceitar pedidos normalmente.'}
+                  {availabilityStatus === 'parcial' && 'Continuas a aceitar pedidos — os clientes veem um aviso de capacidade reduzida.'}
+                  {availabilityStatus === 'indisponivel' && 'Continuas a ver o marketplace, mas não podes adquirir novos pedidos.'}
+                </div>
               </div>
             </div>
-            <button type="button" onClick={handleToggleAccepting} disabled={togglingAccepting}
-              className="flex-shrink-0 text-xs font-bold px-3 py-2 rounded-xl transition-all"
-              style={acceptingLeads
-                ? { background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }
-                : { background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
-              {togglingAccepting ? '...' : acceptingLeads ? 'Pausar' : 'Reativar'}
-            </button>
+            <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              {AVAILABILITY_STATUSES.map(s => (
+                <button key={s} type="button" disabled={togglingAccepting}
+                  onClick={() => handleAvailabilityChange(s, availableFrom)}
+                  className="flex-1 py-2 text-xs font-bold transition-colors"
+                  style={availabilityStatus === s
+                    ? { background: s === 'disponivel' ? 'rgba(52,211,153,0.15)' : s === 'parcial' ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)', color: s === 'disponivel' ? '#34d399' : s === 'parcial' ? '#fbbf24' : '#f87171' }
+                    : { color: '#64748b' }}>
+                  {AVAILABILITY_LABELS[s]}
+                </button>
+              ))}
+            </div>
+            {availabilityStatus === 'indisponivel' && (
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Disponível a partir de (opcional)</label>
+                <input type="date" value={availableFrom} disabled={togglingAccepting}
+                  onChange={e => handleAvailabilityChange('indisponivel', e.target.value)}
+                  className="rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  style={{ background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.08)' }} />
+                <p className="text-xs text-gray-600 mt-1.5">Assim que a data chegar, voltas a aparecer disponível automaticamente — não precisas de voltar aqui.</p>
+              </div>
+            )}
           </div>
 
           <div>
@@ -741,12 +803,12 @@ export default function PerfilPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => handleReviewRequest(inv.id, 'confirm')} disabled={decidingRequestId === inv.id}
+                    <button onClick={() => handleInviteAction(inv.id, 'confirm')} disabled={decidingRequestId === inv.id}
                       className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg transition-all"
                       style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', opacity: decidingRequestId === inv.id ? 0.6 : 1 }}>
                       {decidingRequestId === inv.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Confirmar
                     </button>
-                    <button onClick={() => handleReviewRequest(inv.id, 'reject')} disabled={decidingRequestId === inv.id}
+                    <button onClick={() => handleInviteAction(inv.id, 'reject')} disabled={decidingRequestId === inv.id}
                       className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2 rounded-lg transition-all"
                       style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', opacity: decidingRequestId === inv.id ? 0.6 : 1 }}>
                       <X size={12} /> Rejeitar
@@ -786,19 +848,65 @@ export default function PerfilPage() {
                       {inv.channel === 'whatsapp' ? inv.client_phone : inv.client_email}
                     </p>
                   </div>
-                  {inv.status === 'completed' ? (
-                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
-                      <CheckCircle size={11} /> Avaliado
-                    </span>
-                  ) : inv.status === 'rejected' ? (
-                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8' }}>
-                      <X size={11} /> Rejeitado
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>
-                      <Clock size={11} /> Pendente
-                    </span>
-                  )}
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {inv.status === 'completed' ? (
+                      <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
+                        <CheckCircle size={11} /> Avaliado
+                      </span>
+                    ) : inv.status === 'rejected' ? (
+                      <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8' }}>
+                        <X size={11} /> Rejeitado
+                      </span>
+                    ) : inv.status === 'cancelled' ? (
+                      <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(148,163,184,0.12)', color: '#94a3b8' }}>
+                        <X size={11} /> Cancelado
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}>
+                        <Clock size={11} /> Pendente
+                      </span>
+                    )}
+                    {/* Estado real do envio — distinto do estado do convite
+                        acima: "pendente" só diz que ainda não avaliou, isto
+                        diz se a mensagem chegou a sair. Erro sempre visível,
+                        nunca escondido atrás de "Pendente" genérico. */}
+                    {inv.status === 'pending' && inv.send_status === 'failed' && (
+                      <span className="text-xs font-bold" style={{ color: '#f87171' }} title={inv.send_error || ''}>
+                        Falha no envio{inv.send_error ? `: ${inv.send_error}` : ''}
+                      </span>
+                    )}
+                    {inv.status === 'pending' && inv.send_status === 'sent' && (
+                      <span className="text-xs text-gray-500">Enviado, a aguardar confirmação</span>
+                    )}
+                    {inv.status === 'pending' && inv.send_status === 'delivered' && (
+                      <span className="text-xs" style={{ color: '#34d399' }}>Entregue</span>
+                    )}
+
+                    {/* Ações — só as que fazem sentido no estado atual.
+                        "Reenviar" fica de fora para WhatsApp enquanto o
+                        modelo não estiver aprovado (whatsapp_operational),
+                        para nunca repetir a mesma falha sem avisar. */}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {inv.status === 'pending' && (inv.channel === 'email' || whatsappOperational) && (
+                        <button onClick={() => handleInviteAction(inv.id, 'resend')} disabled={decidingRequestId === inv.id}
+                          className="text-xs font-semibold flex items-center gap-1 disabled:opacity-50" style={{ color: '#818cf8' }}>
+                          <RefreshCw size={11} /> Reenviar
+                        </button>
+                      )}
+                      {inv.status === 'pending' && (
+                        <button onClick={() => handleInviteAction(inv.id, 'cancel', 'Cancelar este convite? O link deixa de funcionar.')} disabled={decidingRequestId === inv.id}
+                          className="text-xs font-semibold flex items-center gap-1 disabled:opacity-50" style={{ color: '#f87171' }}>
+                          <Ban size={11} /> Cancelar
+                        </button>
+                      )}
+                      {(inv.status === 'rejected' || inv.status === 'cancelled' || (inv.status === 'pending' && inv.send_status === 'failed')) && (
+                        <button onClick={() => handleDeleteInvite(inv.id)} disabled={decidingRequestId === inv.id}
+                          className="text-xs font-semibold flex items-center gap-1 disabled:opacity-50" style={{ color: '#64748b' }}>
+                          <Trash2 size={11} /> Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

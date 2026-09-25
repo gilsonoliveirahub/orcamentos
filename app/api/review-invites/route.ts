@@ -29,11 +29,23 @@ export async function GET() {
 
   const { data: invites } = await supabaseAdmin
     .from('review_invites')
-    .select('id, client_name, channel, client_email, client_phone, status, created_at, completed_at')
+    .select('id, client_name, channel, client_email, client_phone, status, created_at, completed_at, send_status, send_error')
     .eq('professional_id', professional.id)
     .order('created_at', { ascending: false })
 
-  return NextResponse.json({ invites: invites || [] })
+  // A UI só mostra "Reenviar" para um convite WhatsApp pendente quando isto
+  // é true. TWILIO_REVIEW_INVITE_CONTENT_SID só prova que existe um SID
+  // configurado, nunca que a Meta aprovou o modelo — por isso exige também
+  // TWILIO_REVIEW_INVITE_TEMPLATE_APPROVED='true', uma flag manual que só
+  // deve ser ligada depois de confirmar o estado "Approved" no WhatsApp
+  // Manager da Meta (nunca inferida pela app). Sem isto, reenviar ia só
+  // repetir a mesma falha (ver lib/send-review-invite.ts). Email não
+  // depende de nenhuma aprovação externa, está sempre operacional.
+  const whatsappOperational =
+    !!process.env.TWILIO_REVIEW_INVITE_CONTENT_SID &&
+    process.env.TWILIO_REVIEW_INVITE_TEMPLATE_APPROVED === 'true'
+
+  return NextResponse.json({ invites: invites || [], whatsapp_operational: whatsappOperational })
 }
 
 // POST — cria um convite e envia por email ou WhatsApp (um dos dois, nunca
