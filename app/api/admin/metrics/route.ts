@@ -10,7 +10,11 @@ import {
   computeEventsByDay,
   computeByOriginChannel,
   computeUniqueVisitors,
+  computeUniqueVisitorsProfilesSum,
   computeByProfessional,
+  computeProfilesTotals,
+  fetchNullProfessionalBucketTotals,
+  fetchUtmCampaignTotals,
 } from '@/lib/metrics'
 
 export async function GET(req: NextRequest) {
@@ -53,6 +57,17 @@ export async function GET(req: NextRequest) {
     // Quando há filtro por profissional(is), devolve-se antes a soma por profissional.
     const platformUnique = professionalIds ? null : computeUniqueVisitors(uniqueRows, null)
     const by_professional = await computeByProfessional(summaryRows, uniqueRows)
+    const perfis_publicos = { ...computeProfilesTotals(summaryRows), unique_visitors: professionalIds ? null : computeUniqueVisitorsProfilesSum(uniqueRows) }
+    // Área profissional (captação) vs site geral — só fazem sentido sem
+    // filtro de profissional (são sempre tráfego sem professional_id) e lêem
+    // analytics_events em bruto (ver fetchNullProfessionalBucketTotals).
+    const nullProfessionalBuckets = professionalIds ? null : await fetchNullProfessionalBucketTotals({ from, to })
+    // Campanhas (utm_campaign) — respeita o mesmo filtro de profissional(is)
+    // já resolvido acima, ao contrário dos blocos área profissional/site
+    // (que só fazem sentido sem filtro, por serem sempre tráfego sem
+    // professional_id). Uma campanha paga pode apontar para um perfil
+    // específico, por isso não faz sentido restringir isto a "sem filtro".
+    const by_utm_campaign = await fetchUtmCampaignTotals({ from, to, professionalIds })
 
     return NextResponse.json({
       totals,
@@ -60,8 +75,12 @@ export async function GET(req: NextRequest) {
       events_by_day,
       by_origin_channel,
       unique_visitors_platform: platformUnique, // null quando filtrado por profissional — ver by_professional
+      perfis_publicos, // /p/[slug] — clientes a consultar um profissional específico
+      area_profissional: nullProfessionalBuckets?.area_profissional ?? null, // /comecar, /juntar, /exclusivo, registo de profissional
+      site: nullProfessionalBuckets?.site ?? null, // páginas gerais + registo de cliente
       by_professional,
-      note: 'unique_visitors_daily_sum é a soma dos visitantes únicos aproximados de cada dia — pode contar a mesma pessoa em dias diferentes.',
+      by_utm_campaign, // ver lib/metrics.ts fetchUtmCampaignTotals — só cobre a retenção de 90 dias de analytics_events
+      note: 'unique_visitors_daily_sum e os unique_visitors dos blocos são aproximados — podem contar a mesma pessoa mais de uma vez (dias diferentes, ou profissionais/páginas diferentes visitados pela mesma pessoa).',
     })
   } catch (err) {
     console.error('[api/admin/metrics] erro:', err instanceof Error ? err.message : err)

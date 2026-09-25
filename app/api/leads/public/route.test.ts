@@ -21,7 +21,7 @@ function mockNotifyLeadDefault() {
 describe('POST /api/leads/public — registo de request_completed', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
     mockNotifyLeadDefault()
   })
 
@@ -134,7 +134,7 @@ describe('POST /api/leads/public — registo de request_completed', () => {
 describe('POST /api/leads/public — consentimento de marketing do CLIENTE', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
     mockNotifyLeadDefault()
   })
   afterEach(() => {
@@ -224,7 +224,7 @@ describe('POST /api/leads/public — consentimento de marketing do CLIENTE', () 
 describe('POST /api/leads/public — proteção idempotente e notificação server-side (P0, 2026-09-18)', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
   })
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }

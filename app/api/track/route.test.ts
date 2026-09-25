@@ -14,20 +14,24 @@ function fakeRequest(body: unknown, headers: Record<string, string> = {}): NextR
 describe('POST /api/track', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
   })
 
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
     vi.restoreAllMocks()
     vi.doUnmock('@/lib/supabase-admin')
+    vi.doUnmock('@/lib/supabase-server')
   })
 
-  function mockSupabase({ professional = null, insertError = null }: { professional?: { id: string } | null; insertError?: { message: string } | null } = {}) {
+  function mockSupabase({ professional = null, insertError = null, admin = null }: { professional?: { id: string } | null; insertError?: { message: string } | null; admin?: { id: string } | null } = {}) {
     const insertedRows: Record<string, unknown>[] = []
     const from = vi.fn((table: string) => {
       if (table === 'professionals') {
         return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: professional }) }) }) }
+      }
+      if (table === 'admins') {
+        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: admin }) }) }) }
       }
       if (table === 'analytics_events') {
         return {
@@ -176,5 +180,58 @@ describe('POST /api/track', () => {
     expect(row).not.toHaveProperty('user_agent')
     expect(row).not.toHaveProperty('userAgent')
     expect(JSON.stringify(row)).not.toContain('Mozilla/5.0 (real browser)')
+  })
+
+  it('fora de produção (VERCEL_ENV != production): nunca grava, mesmo com um pedido válido', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const { insertedRows } = mockSupabase()
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ event_type: 'page_view', path: '/' }))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.tracked).toBe(false)
+    expect(insertedRows).toHaveLength(0)
+  })
+
+  it('ambiente local (VERCEL_ENV nunca definido): nunca grava', async () => {
+    delete process.env.VERCEL_ENV
+    const { insertedRows } = mockSupabase()
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ event_type: 'page_view', path: '/' }))
+    expect(insertedRows).toHaveLength(0)
+  })
+
+  it('cabeçalho x-analytics-test presente: nunca grava, mesmo com um pedido válido', async () => {
+    const { insertedRows } = mockSupabase()
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ event_type: 'page_view', path: '/' }, { 'x-analytics-test': '1' }))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.tracked).toBe(false)
+    expect(insertedRows).toHaveLength(0)
+  })
+
+  it('admin autenticado: a própria navegação nunca conta como visita', async () => {
+    vi.doMock('@/lib/supabase-server', () => ({
+      createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'admin-user-1' } } }) } }),
+    }))
+    const { insertedRows } = mockSupabase({ admin: { id: 'admin-1' } })
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ event_type: 'page_view', path: '/' }))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.tracked).toBe(false)
+    expect(insertedRows).toHaveLength(0)
+  })
+
+  it('utilizador autenticado mas que não é admin: visita continua a ser gravada normalmente', async () => {
+    vi.doMock('@/lib/supabase-server', () => ({
+      createClient: async () => ({ auth: { getUser: async () => ({ data: { user: { id: 'user-normal-1' } } }) } }),
+    }))
+    const { insertedRows } = mockSupabase({ professional: null, admin: null })
+    const { POST } = await import('./route')
+    const res = await POST(fakeRequest({ event_type: 'page_view', path: '/' }))
+    expect(res.status).toBe(200)
+    expect(insertedRows).toHaveLength(1)
   })
 })

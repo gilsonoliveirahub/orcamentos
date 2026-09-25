@@ -8,11 +8,15 @@ export const EVENT_TYPES = [
   'request_completed',
   'whatsapp_click',
   'email_click',
+  'registration_completed',
 ] as const
 export type AnalyticsEventType = typeof EVENT_TYPES[number]
 
 // Eventos que só podem ser gravados pelo próprio servidor (nunca aceites via /api/track)
-export const SERVER_ONLY_EVENT_TYPES: readonly AnalyticsEventType[] = ['request_completed']
+export const SERVER_ONLY_EVENT_TYPES: readonly AnalyticsEventType[] = ['request_completed', 'registration_completed']
+
+export const REGISTRATION_ROLES = ['profissional', 'cliente'] as const
+export type RegistrationRole = typeof REGISTRATION_ROLES[number]
 
 export const ORIGIN_CHANNELS = ['facebook', 'instagram', 'whatsapp', 'google', 'ia', 'direto', 'outro'] as const
 export type OriginChannel = typeof ORIGIN_CHANNELS[number]
@@ -20,12 +24,27 @@ export type OriginChannel = typeof ORIGIN_CHANNELS[number]
 export const SOURCES = ['pessoal', 'marketplace'] as const
 export type AnalyticsSource = typeof SOURCES[number]
 
-const FIXED_PATHS = ['/', '/contactos', '/pedir', '/comecar', '/juntar'] as const
+const FIXED_PATHS = ['/', '/contactos', '/pedir', '/comecar', '/juntar', '/exclusivo'] as const
 const SLUG_PATH_RE = /^\/p\/[a-z0-9-]{1,80}$/
 
 export function isAllowedPath(path: string): boolean {
   if ((FIXED_PATHS as readonly string[]).includes(path)) return true
   return SLUG_PATH_RE.test(path)
+}
+
+// Páginas de entrada/registo destinadas a PROFISSIONAIS (captação — nunca
+// enviam cliente nenhum, só CTA para /login?tab=register) — distintas do
+// resto do "site" (home, /pedir, /contactos, registo de CLIENTE). Usado só
+// para eventos sem professional_id (page_view/registration_completed);
+// visitas a /p/[slug] já são sempre de clientes a consultar um perfil
+// específico e nunca passam por esta classificação (têm professional_id
+// preenchido, ver app/api/track/route.ts).
+const PROFESSIONAL_RECRUITMENT_PATHS = ['/comecar', '/juntar', '/exclusivo', '/registo/profissional'] as const
+
+export type NullProfessionalBucket = 'area_profissional' | 'site'
+
+export function classifyNullProfessionalPath(path: string): NullProfessionalBucket {
+  return (PROFESSIONAL_RECRUITMENT_PATHS as readonly string[]).includes(path) ? 'area_profissional' : 'site'
 }
 
 // User-Agents de crawlers/bots/pré-visualizações conhecidos — nunca contam
@@ -41,6 +60,17 @@ export function isKnownBot(userAgent: string | null | undefined): boolean {
 
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+}
+
+// true só em produção real na Vercel (VERCEL_ENV='production'). Preview
+// deployments e ambiente local ficam sempre de fora — sem isto, cada preview
+// de PR e cada teste manual em localhost inflacionava os números reais.
+// Único ponto de decisão, usado tanto pelos dois eventos server-only aqui
+// (recordRequestCompleted/recordRegistrationCompleted) como por
+// app/api/track/route.ts (eventos vindos do browser) — nenhum dos dois
+// grava nada fora de produção.
+export function isProductionTraffic(): boolean {
+  return process.env.VERCEL_ENV === 'production'
 }
 
 /**
@@ -132,6 +162,7 @@ export async function recordRequestCompleted(params: {
   utmCampaign?: string | null
   originChannel?: OriginChannel | null
 }) {
+  if (!isProductionTraffic()) return
   const secret = process.env.ANALYTICS_HASH_SECRET
   if (!secret) {
     console.error('[analytics] ANALYTICS_HASH_SECRET em falta — request_completed não registado')
@@ -159,6 +190,45 @@ export async function recordRequestCompleted(params: {
   })
   if (error) {
     console.error(`[analytics] falha ao registar request_completed: ${error.message}`)
+  }
+}
+
+/**
+ * Regista um registo concluído (conta de profissional ou de cliente criada
+ * com sucesso). Mesmo padrão de recordRequestCompleted — só chamado a partir
+ * de app/api/auth/register/route.ts depois do insert em `professionals`/
+ * `clients` ter sucesso, nunca aceite via /api/track. `professional_id` fica
+ * sempre null (nem o profissional que se está a registar tem id atribuído
+ * antes deste momento, nem um cliente pertence a nenhum profissional
+ * específico) — por isso conta sempre como tráfego "do site", nunca de um
+ * perfil individual. O papel (profissional/cliente) vai no `path`, já que a
+ * tabela não tem nenhuma coluna livre própria para isso.
+ */
+export async function recordRegistrationCompleted(params: {
+  ip: string
+  userAgent: string
+  role: RegistrationRole
+}) {
+  if (!isProductionTraffic()) return
+  const secret = process.env.ANALYTICS_HASH_SECRET
+  if (!secret) {
+    console.error('[analytics] ANALYTICS_HASH_SECRET em falta — registration_completed não registado')
+    return
+  }
+  if (isKnownBot(params.userAgent)) return
+
+  const visitorHash = hashVisitor(params.ip, params.userAgent, secret)
+
+  const { error } = await supabaseAdmin.from('analytics_events').insert({
+    event_type: 'registration_completed',
+    professional_id: null,
+    visitor_hash: visitorHash,
+    source: null,
+    path: `/registo/${params.role}`,
+    origin_channel: null,
+  })
+  if (error) {
+    console.error(`[analytics] falha ao registar registration_completed: ${error.message}`)
   }
 }
 

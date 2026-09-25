@@ -2,12 +2,14 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { createClient } from '@/lib/supabase-server'
 import {
   EVENT_TYPES,
   SERVER_ONLY_EVENT_TYPES,
   SOURCES,
   isAllowedPath,
   isKnownBot,
+  isProductionTraffic,
   hashVisitor,
   sanitizeUtm,
   extractHostname,
@@ -15,6 +17,23 @@ import {
   clientIpFrom,
   type AnalyticsEventType,
 } from '@/lib/analytics'
+
+// A própria navegação de um admin autenticado (a rever o site, a testar uma
+// funcionalidade) nunca deve contar como visita real — nunca é o público que
+// os anúncios pagos tentam medir. Verifica a sessão pelos cookies do próprio
+// pedido (mesma origem, chegam sempre); sem sessão ou sem ser admin, devolve
+// false sem erro (não bloqueia visitantes normais).
+async function isAuthenticatedAdmin(): Promise<boolean> {
+  try {
+    const userClient = await createClient()
+    const { data: { user } } = await userClient.auth.getUser()
+    if (!user) return false
+    const { data: admin } = await supabaseAdmin.from('admins').select('id').eq('user_id', user.id).maybeSingle()
+    return !!admin
+  } catch {
+    return false
+  }
+}
 
 // Nenhum outro campo é aceite — nunca metadata livre, nunca nome/email/telefone/mensagem.
 const ALLOWED_FIELDS = new Set([
@@ -82,6 +101,23 @@ export async function POST(req: NextRequest) {
 
     const userAgent = req.headers.get('user-agent') || ''
     if (isKnownBot(userAgent)) {
+      return NextResponse.json({ success: true, tracked: false })
+    }
+
+    // Fora de produção (preview/local), nunca grava — evita poluir os
+    // números reais com testes manuais e deployments de PR.
+    if (!isProductionTraffic()) {
+      return NextResponse.json({ success: true, tracked: false })
+    }
+
+    // Marcador explícito para tráfego de teste (QA manual, scripts) — nunca
+    // usado por visitantes reais, só definido de propósito por quem está a testar.
+    if (req.headers.get('x-analytics-test')) {
+      return NextResponse.json({ success: true, tracked: false })
+    }
+
+    // A navegação do próprio admin nunca deve contar como visita real.
+    if (await isAuthenticatedAdmin()) {
       return NextResponse.json({ success: true, tracked: false })
     }
 

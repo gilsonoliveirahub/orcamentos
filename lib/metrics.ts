@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { EVENT_TYPES, type AnalyticsEventType } from '@/lib/analytics'
+import { EVENT_TYPES, classifyNullProfessionalPath, type AnalyticsEventType, type NullProfessionalBucket } from '@/lib/analytics'
 
 export type DailySummaryRow = {
   day: string
@@ -63,7 +63,81 @@ export function computeConversionRates(totals: Record<AnalyticsEventType, number
     view_to_started: safe(totals.request_started, totals.page_view),
     started_to_completed: safe(totals.request_completed, totals.request_started),
     view_to_completed: safe(totals.request_completed, totals.page_view),
+    view_to_registration: safe(totals.registration_completed, totals.page_view),
   }
+}
+
+/**
+ * Totais de "Perfis públicos" (/p/[slug] — clientes a consultar o perfil de
+ * UM profissional específico para pedir orçamento). Corresponde sempre a
+ * professional_id preenchido — /p/[slug] é a única página pública que
+ * associa eventos a um profissional (ver app/api/track/route.ts). Nunca
+ * inclui páginas de captação de profissionais nem o site geral.
+ */
+export function computeProfilesTotals(rows: DailySummaryRow[]): Record<AnalyticsEventType, number> {
+  const totals = Object.fromEntries(EVENT_TYPES.map(t => [t, 0])) as Record<AnalyticsEventType, number>
+  for (const row of rows) {
+    if (!row.professional_id) continue
+    if (!(EVENT_TYPES as readonly string[]).includes(row.event_type)) continue
+    totals[row.event_type as AnalyticsEventType] += row.event_count
+  }
+  return totals
+}
+
+/**
+ * Visitantes únicos aproximados de "Perfis públicos" (soma entre TODOS os
+ * profissionais, por dia) — mesmo aviso de computeUniqueVisitors: pode
+ * contar a mesma pessoa mais de uma vez (dias diferentes OU profissionais
+ * diferentes que a mesma pessoa tenha visitado).
+ */
+export function computeUniqueVisitorsProfilesSum(rows: DailyUniqueVisitorsRow[]): number {
+  return rows.filter(r => r.professional_id !== null).reduce((sum, r) => sum + r.unique_visitors, 0)
+}
+
+export type NullProfessionalBucketTotals = Record<AnalyticsEventType, number> & { unique_visitors: number }
+
+/**
+ * "Área profissional" (páginas de entrada/registo destinadas a
+ * profissionais — /comecar, /juntar, /exclusivo, registo de profissional)
+ * vs "Site" (home, /contactos, /pedir, registo de cliente) — as duas únicas
+ * categorias de tráfego SEM professional_id (/p/[slug] nunca entra aqui,
+ * fica sempre em computeProfilesTotals). analytics_daily_summary não guarda
+ * `path` (só o agrega por dia/profissional/tipo/origem), por isso esta
+ * distinção lê analytics_events em bruto — só as linhas professional_id
+ * null, dentro do período pedido. Retenção de analytics_events é 90 dias
+ * (ver migration_analytics.sql): períodos mais antigos não têm estes dados.
+ */
+export async function fetchNullProfessionalBucketTotals(filters: { from?: string; to?: string }): Promise<{
+  area_profissional: NullProfessionalBucketTotals
+  site: NullProfessionalBucketTotals
+}> {
+  let query = supabaseAdmin
+    .from('analytics_events')
+    .select('event_type, path, visitor_hash')
+    .is('professional_id', null)
+  if (filters.from) query = query.gte('created_at', `${filters.from}T00:00:00.000Z`)
+  if (filters.to) {
+    const toExclusive = new Date(`${filters.to}T00:00:00.000Z`)
+    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1)
+    query = query.lt('created_at', toExclusive.toISOString())
+  }
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  const empty = (): NullProfessionalBucketTotals =>
+    ({ ...Object.fromEntries(EVENT_TYPES.map(t => [t, 0])), unique_visitors: 0 }) as NullProfessionalBucketTotals
+  const totals: Record<NullProfessionalBucket, NullProfessionalBucketTotals> = { area_profissional: empty(), site: empty() }
+  const visitors: Record<NullProfessionalBucket, Set<string>> = { area_profissional: new Set(), site: new Set() }
+
+  for (const row of (data || []) as { event_type: string; path: string; visitor_hash: string }[]) {
+    if (!(EVENT_TYPES as readonly string[]).includes(row.event_type)) continue
+    const bucket = classifyNullProfessionalPath(row.path)
+    totals[bucket][row.event_type as AnalyticsEventType] += 1
+    visitors[bucket].add(row.visitor_hash)
+  }
+  totals.area_profissional.unique_visitors = visitors.area_profissional.size
+  totals.site.unique_visitors = visitors.site.size
+  return totals
 }
 
 export function computeEventsByDay(rows: DailySummaryRow[]): Array<{ day: string; event_type: string; count: number }> {
@@ -107,6 +181,77 @@ export function computeUniqueVisitors(rows: DailyUniqueVisitorsRow[], profession
     .sort((a, b) => a.day.localeCompare(b.day))
   const daily_sum = filtered.reduce((sum, r) => sum + r.unique_visitors, 0)
   return { by_day, daily_sum }
+}
+
+export type UtmCampaignRow = {
+  utm_campaign: string
+  utm_source: string | null
+  utm_medium: string | null
+  page_view: number
+  request_started: number
+  request_completed: number
+  registration_completed: number
+  unique_visitors: number
+  conversion_rate: number // request_completed / page_view
+}
+
+/**
+ * Resultados por campanha (utm_campaign) — a métrica pensada especificamente
+ * para responder "os anúncios pagos estão a gerar registos e pedidos, ou só
+ * visitas?". Tal como fetchNullProfessionalBucketTotals, lê analytics_events
+ * em bruto (utm_campaign não é uma dimensão de analytics_daily_summary), por
+ * isso só cobre a retenção de 90 dias dos eventos individuais — períodos
+ * mais antigos não têm este detalhe. utm_source/utm_medium mostrados são os
+ * do primeiro evento visto por campanha (normalmente estáveis dentro da
+ * mesma campanha, mas não garantidamente únicos se a UTM for reutilizada
+ * com fontes diferentes).
+ */
+export async function fetchUtmCampaignTotals(filters: { from?: string; to?: string; professionalIds?: string[] | null }): Promise<UtmCampaignRow[]> {
+  let query = supabaseAdmin
+    .from('analytics_events')
+    .select('event_type, utm_campaign, utm_source, utm_medium, visitor_hash, professional_id')
+    .not('utm_campaign', 'is', null)
+  if (filters.from) query = query.gte('created_at', `${filters.from}T00:00:00.000Z`)
+  if (filters.to) {
+    const toExclusive = new Date(`${filters.to}T00:00:00.000Z`)
+    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1)
+    query = query.lt('created_at', toExclusive.toISOString())
+  }
+  if (filters.professionalIds) query = query.in('professional_id', filters.professionalIds)
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  type Row = { event_type: string; utm_campaign: string; utm_source: string | null; utm_medium: string | null; visitor_hash: string }
+  const byCampaign = new Map<string, { utm_source: string | null; utm_medium: string | null; counts: Record<string, number>; visitors: Set<string> }>()
+
+  for (const row of (data || []) as Row[]) {
+    if (!(EVENT_TYPES as readonly string[]).includes(row.event_type)) continue
+    let entry = byCampaign.get(row.utm_campaign)
+    if (!entry) {
+      entry = { utm_source: row.utm_source, utm_medium: row.utm_medium, counts: {}, visitors: new Set() }
+      byCampaign.set(row.utm_campaign, entry)
+    }
+    entry.counts[row.event_type] = (entry.counts[row.event_type] || 0) + 1
+    entry.visitors.add(row.visitor_hash)
+  }
+
+  return Array.from(byCampaign.entries())
+    .map(([utm_campaign, e]) => {
+      const page_view = e.counts.page_view || 0
+      const request_completed = e.counts.request_completed || 0
+      return {
+        utm_campaign,
+        utm_source: e.utm_source,
+        utm_medium: e.utm_medium,
+        page_view,
+        request_started: e.counts.request_started || 0,
+        request_completed,
+        registration_completed: e.counts.registration_completed || 0,
+        unique_visitors: e.visitors.size,
+        conversion_rate: page_view > 0 ? Number((request_completed / page_view).toFixed(4)) : 0,
+      }
+    })
+    .sort((a, b) => b.page_view - a.page_view)
 }
 
 export type ProfessionalRanking = {

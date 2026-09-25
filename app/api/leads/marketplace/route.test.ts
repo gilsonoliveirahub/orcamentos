@@ -38,7 +38,7 @@ function mockSupabase() {
 describe('POST /api/leads/marketplace — sem atribuição automática (removida 2026-07-16)', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
   })
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
@@ -120,7 +120,7 @@ describe('POST /api/leads/marketplace — sem atribuição automática (removida
 describe('POST /api/leads/marketplace — consentimento de marketing do CLIENTE', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
   })
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }

@@ -15,6 +15,7 @@ import {
   sanitizeUtm,
   extractHostname,
   normalizeOriginChannel,
+  classifyNullProfessionalPath,
   EVENT_TYPES,
   SERVER_ONLY_EVENT_TYPES,
   clientIpFrom,
@@ -71,6 +72,22 @@ describe('isAllowedPath', () => {
     expect(isAllowedPath('/p/<script>alert(1)</script>')).toBe(false)
     expect(isAllowedPath('/p/')).toBe(false)
     expect(isAllowedPath('not-a-path')).toBe(false)
+  })
+})
+
+describe('classifyNullProfessionalPath', () => {
+  it('classifica páginas de captação de profissionais + registo de profissional como "area_profissional"', () => {
+    expect(classifyNullProfessionalPath('/comecar')).toBe('area_profissional')
+    expect(classifyNullProfessionalPath('/juntar')).toBe('area_profissional')
+    expect(classifyNullProfessionalPath('/exclusivo')).toBe('area_profissional')
+    expect(classifyNullProfessionalPath('/registo/profissional')).toBe('area_profissional')
+  })
+
+  it('classifica páginas gerais + registo de cliente como "site"', () => {
+    expect(classifyNullProfessionalPath('/')).toBe('site')
+    expect(classifyNullProfessionalPath('/contactos')).toBe('site')
+    expect(classifyNullProfessionalPath('/pedir')).toBe('site')
+    expect(classifyNullProfessionalPath('/registo/cliente')).toBe('site')
   })
 })
 
@@ -159,13 +176,14 @@ describe('normalizeOriginChannel', () => {
 })
 
 describe('event type whitelist', () => {
-  it('marks request_completed as server-only', () => {
+  it('marks request_completed and registration_completed as server-only', () => {
     expect(SERVER_ONLY_EVENT_TYPES).toContain('request_completed')
+    expect(SERVER_ONLY_EVENT_TYPES).toContain('registration_completed')
   })
 
-  it('has exactly the 6 expected event types', () => {
+  it('has exactly the 7 expected event types', () => {
     expect([...EVENT_TYPES].sort()).toEqual([
-      'email_click', 'page_view', 'quote_cta_click', 'request_completed', 'request_started', 'whatsapp_click',
+      'email_click', 'page_view', 'quote_cta_click', 'registration_completed', 'request_completed', 'request_started', 'whatsapp_click',
     ])
   })
 })
@@ -187,7 +205,7 @@ describe('recordRequestCompleted', () => {
 
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste' }
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
   })
 
   afterEach(() => {
@@ -261,5 +279,115 @@ describe('recordRequestCompleted', () => {
       utm_campaign: 'lancamento',
       origin_channel: 'facebook',
     })
+  })
+
+  it('fora de produção (VERCEL_ENV != production): nunca insere, mesmo com segredo configurado', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const insert = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: () => ({ insert }) } }))
+
+    const { recordRequestCompleted } = await import('./analytics')
+    await recordRequestCompleted({ ip: '1.2.3.4', userAgent: 'Mozilla/5.0', professionalId: null, source: 'marketplace', path: '/pedir' })
+
+    expect(insert).not.toHaveBeenCalled()
+  })
+})
+
+describe('recordRegistrationCompleted', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...ORIGINAL_ENV, ANALYTICS_HASH_SECRET: 'segredo-teste', VERCEL_ENV: 'production' }
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+    vi.restoreAllMocks()
+    vi.doUnmock('@/lib/supabase-admin')
+  })
+
+  it('insere um registration_completed com professional_id sempre null, hash em vez de dados brutos', async () => {
+    const insertedRows: Record<string, unknown>[] = []
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: { from: () => ({ insert: (row: Record<string, unknown>) => { insertedRows.push(row); return Promise.resolve({ error: null }) } }) },
+    }))
+
+    const { recordRegistrationCompleted } = await import('./analytics')
+    await recordRegistrationCompleted({ ip: '1.2.3.4', userAgent: 'Mozilla/5.0', role: 'profissional' })
+
+    expect(insertedRows).toHaveLength(1)
+    expect(insertedRows[0].event_type).toBe('registration_completed')
+    expect(insertedRows[0].professional_id).toBeNull()
+    expect(insertedRows[0].path).toBe('/registo/profissional')
+    expect(JSON.stringify(insertedRows[0])).not.toContain('1.2.3.4')
+    expect(insertedRows[0].visitor_hash).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('distingue o papel (profissional vs cliente) no path', async () => {
+    const insertedRows: Record<string, unknown>[] = []
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: { from: () => ({ insert: (row: Record<string, unknown>) => { insertedRows.push(row); return Promise.resolve({ error: null }) } }) },
+    }))
+
+    const { recordRegistrationCompleted } = await import('./analytics')
+    await recordRegistrationCompleted({ ip: '1.2.3.4', userAgent: 'Mozilla/5.0', role: 'cliente' })
+
+    expect(insertedRows[0].path).toBe('/registo/cliente')
+  })
+
+  it('não insere nada quando ANALYTICS_HASH_SECRET está em falta', async () => {
+    delete process.env.ANALYTICS_HASH_SECRET
+    const insert = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: () => ({ insert }) } }))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { recordRegistrationCompleted } = await import('./analytics')
+    await recordRegistrationCompleted({ ip: '1.2.3.4', userAgent: 'Mozilla/5.0', role: 'profissional' })
+
+    expect(insert).not.toHaveBeenCalled()
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('ANALYTICS_HASH_SECRET'))
+  })
+
+  it('nunca regista um bot como registo concluído', async () => {
+    const insert = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: () => ({ insert }) } }))
+
+    const { recordRegistrationCompleted } = await import('./analytics')
+    await recordRegistrationCompleted({ ip: '1.2.3.4', userAgent: 'curl/8.0', role: 'profissional' })
+
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('fora de produção (VERCEL_ENV != production): nunca insere, mesmo com segredo configurado', async () => {
+    process.env.VERCEL_ENV = 'development'
+    const insert = vi.fn()
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: () => ({ insert }) } }))
+
+    const { recordRegistrationCompleted } = await import('./analytics')
+    await recordRegistrationCompleted({ ip: '1.2.3.4', userAgent: 'Mozilla/5.0', role: 'profissional' })
+
+    expect(insert).not.toHaveBeenCalled()
+  })
+})
+
+describe('isProductionTraffic', () => {
+  const ORIGINAL_ENV = { ...process.env }
+  afterEach(() => { process.env = { ...ORIGINAL_ENV } })
+
+  it('true só quando VERCEL_ENV === "production"', async () => {
+    process.env.VERCEL_ENV = 'production'
+    const { isProductionTraffic } = await import('./analytics')
+    expect(isProductionTraffic()).toBe(true)
+  })
+
+  it('false em preview, development, ou quando nunca definido (local)', async () => {
+    const { isProductionTraffic } = await import('./analytics')
+    process.env.VERCEL_ENV = 'preview'
+    expect(isProductionTraffic()).toBe(false)
+    process.env.VERCEL_ENV = 'development'
+    expect(isProductionTraffic()).toBe(false)
+    delete process.env.VERCEL_ENV
+    expect(isProductionTraffic()).toBe(false)
   })
 })
