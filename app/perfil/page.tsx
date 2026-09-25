@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, PauseCircle, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone, Bell, RefreshCw, Ban, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Copy, CheckCircle, Loader2, ExternalLink, Settings, Camera, X, Star, Play, Pause, ZoomIn, ZoomOut, Crown, Zap, AlertTriangle, Info, ShieldCheck, Mail, Clock, UserPlus, Phone, Bell, RefreshCw, Ban, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { SPECIALTY_LIST, PROFESSIONS } from '@/lib/professions'
 import { computeProfileCompleteness } from '@/lib/profile-completeness'
-import { computeEffectiveAvailability, AVAILABILITY_STATUSES, AVAILABILITY_LABELS, type AvailabilityStatus } from '@/lib/professional-availability'
 import type { ActiveSubscriptionStatus, SimplifiedSubscriptionStatus } from '@/lib/stripe-plans'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
@@ -148,8 +147,7 @@ export default function PerfilPage() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarLightbox, setAvatarLightbox] = useState(false)
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState<number | null>(null)
-  const [availabilityStatus, setAvailabilityStatus] = useState<AvailabilityStatus>('disponivel')
-  const [availableFrom, setAvailableFrom] = useState('')
+  const [acceptingLeads, setAcceptingLeads] = useState(true)
   const [togglingAccepting, setTogglingAccepting] = useState(false)
   const touchStartX = useRef<number | null>(null)
   const avatarRef = useRef<HTMLInputElement>(null)
@@ -227,15 +225,10 @@ export default function PerfilPage() {
         description: prof.description || '',
       })
       setSpecialties(prof.specialties?.length ? prof.specialties : [prof.specialty || 'Pintura'])
-      // Mostra sempre o estado EFETIVO (ver lib/professional-availability.ts)
-      // — se "indisponível até {data}" já passou, o próprio formulário já
-      // aparece como "Disponível" em vez de confundir com uma data no
-      // passado. Se availability_status ainda não existir na BD (migração
-      // por aplicar), cai no antigo accepting_leads — nunca esconder pedidos
-      // por omissão.
-      const effective = computeEffectiveAvailability(prof)
-      setAvailabilityStatus(effective)
-      setAvailableFrom(prof.availability_status === 'indisponivel' ? (prof.available_from || '') : '')
+      // ?? true: se a coluna ainda não existir na BD (migração por aplicar)
+      // ou nunca tiver sido definida, o profissional conta como disponível —
+      // nunca esconder pedidos por omissão.
+      setAcceptingLeads(prof.accepting_leads ?? true)
       const [{ data: portfolioData }, { data: reviewsData }] = await Promise.all([
         supabase.from('professional_portfolio').select('*').eq('professional_id', prof.id).order('sort_order').order('created_at'),
         supabase.from('reviews').select('*').eq('professional_id', prof.id).order('created_at', { ascending: false }),
@@ -268,23 +261,11 @@ export default function PerfilPage() {
     setTimeout(() => setSaved(false), 2500)
   }
 
-  // accepting_leads (coluna antiga) fica sempre escrita em sincronia — várias
-  // partes do código e a ficha de admin ainda a leem diretamente (ver
-  // lib/professional-availability.ts).
-  async function handleAvailabilityChange(status: AvailabilityStatus, fromDate: string) {
+  async function handleToggleAccepting() {
     setTogglingAccepting(true)
-    const nextAvailableFrom = status === 'indisponivel' && fromDate ? fromDate : null
-    const { error } = await supabase.from('professionals').update({
-      availability_status: status,
-      available_from: nextAvailableFrom,
-      accepting_leads: status !== 'indisponivel',
-    }).eq('id', professional.id)
-    if (!error) {
-      setAvailabilityStatus(status)
-      setAvailableFrom(nextAvailableFrom || '')
-    } else {
-      alert('Não foi possível guardar a disponibilidade. Tenta novamente.')
-    }
+    const next = !acceptingLeads
+    const { error } = await supabase.from('professionals').update({ accepting_leads: next }).eq('id', professional.id)
+    if (!error) setAcceptingLeads(next)
     setTogglingAccepting(false)
   }
 
@@ -581,42 +562,23 @@ export default function PerfilPage() {
         <form onSubmit={handleSave} className="rounded-2xl p-6 space-y-5" style={{ background: '#0d0f1e', border: '1px solid rgba(255,255,255,0.06)' }}>
           <h2 className="font-black text-white">Editar informações</h2>
 
-          <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center justify-between gap-4 rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center gap-3 min-w-0">
-              {availabilityStatus === 'disponivel' && <Play size={16} className="text-emerald-400 flex-shrink-0" />}
-              {availabilityStatus === 'parcial' && <PauseCircle size={16} className="text-amber-400 flex-shrink-0" />}
-              {availabilityStatus === 'indisponivel' && <Pause size={16} className="text-red-400 flex-shrink-0" />}
+              {acceptingLeads
+                ? <Play size={16} className="text-emerald-400 flex-shrink-0" />
+                : <Pause size={16} className="text-amber-400 flex-shrink-0" />}
               <div className="min-w-0">
-                <div className="text-sm font-bold text-white">{AVAILABILITY_LABELS[availabilityStatus]}</div>
-                <div className="text-xs text-gray-500">
-                  {availabilityStatus === 'disponivel' && 'A aceitar pedidos normalmente.'}
-                  {availabilityStatus === 'parcial' && 'Continuas a aceitar pedidos — os clientes veem um aviso de capacidade reduzida.'}
-                  {availabilityStatus === 'indisponivel' && 'Continuas a ver o marketplace, mas não podes adquirir novos pedidos.'}
-                </div>
+                <div className="text-sm font-bold text-white">{acceptingLeads ? 'A receber pedidos' : 'Em pausa'}</div>
+                <div className="text-xs text-gray-500">Pausa temporária: continuas a ver o marketplace, mas não podes adquirir novos pedidos.</div>
               </div>
             </div>
-            <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-              {AVAILABILITY_STATUSES.map(s => (
-                <button key={s} type="button" disabled={togglingAccepting}
-                  onClick={() => handleAvailabilityChange(s, availableFrom)}
-                  className="flex-1 py-2 text-xs font-bold transition-colors"
-                  style={availabilityStatus === s
-                    ? { background: s === 'disponivel' ? 'rgba(52,211,153,0.15)' : s === 'parcial' ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)', color: s === 'disponivel' ? '#34d399' : s === 'parcial' ? '#fbbf24' : '#f87171' }
-                    : { color: '#64748b' }}>
-                  {AVAILABILITY_LABELS[s]}
-                </button>
-              ))}
-            </div>
-            {availabilityStatus === 'indisponivel' && (
-              <div>
-                <label className="text-xs font-semibold text-gray-500 mb-1.5 block uppercase tracking-wide">Disponível a partir de (opcional)</label>
-                <input type="date" value={availableFrom} disabled={togglingAccepting}
-                  onChange={e => handleAvailabilityChange('indisponivel', e.target.value)}
-                  className="rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  style={{ background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.08)' }} />
-                <p className="text-xs text-gray-600 mt-1.5">Assim que a data chegar, voltas a aparecer disponível automaticamente — não precisas de voltar aqui.</p>
-              </div>
-            )}
+            <button type="button" onClick={handleToggleAccepting} disabled={togglingAccepting}
+              className="flex-shrink-0 text-xs font-bold px-3 py-2 rounded-xl transition-all"
+              style={acceptingLeads
+                ? { background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }
+                : { background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+              {togglingAccepting ? '...' : acceptingLeads ? 'Pausar' : 'Reativar'}
+            </button>
           </div>
 
           <div>
