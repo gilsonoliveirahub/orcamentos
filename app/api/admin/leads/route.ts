@@ -5,11 +5,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getAuthenticatedAdmin } from '@/lib/admin-auth'
 import { getAdminLeadAccessState, type AdminLeadAccessState } from '@/lib/admin-lead-access-state'
 import { isAbandonedLead } from '@/lib/reliability'
+import { computeLeadCompleteness } from '@/lib/lead-completeness'
 
 // marketplace_credits vem junto porque a área Marketplace mostra o saldo
 // atual do profissional que adquiriu cada lead (nunca um histórico de
-// transações, que não existe).
-const LIST_FIELDS = 'id, name, phone, email, status, source, specialty, zone_requested, professional_id, created_at, opened_at, locked, valor_fechado, professionals(name, specialty, zone, marketplace_credits)'
+// transações, que não existe). metadata entra só para computeLeadCompleteness
+// (notas/fotos/áreas por confirmar) — nunca exposta em bruto na tabela,
+// só o resumo derivado (missingCount/checks).
+const LIST_FIELDS = 'id, name, phone, email, status, source, specialty, zone_requested, professional_id, created_at, opened_at, locked, valor_fechado, metadata, professionals(name, specialty, zone, marketplace_credits)'
 
 // Vista administrativa global de leads/pedidos — nunca substitui nem altera
 // o fluxo do profissional (dashboard_leads(), lead_is_authorized, etc.):
@@ -33,6 +36,7 @@ export async function GET(req: NextRequest) {
   const accessState = searchParams.get('access_state') as AdminLeadAccessState | null
   const abandonedOnly = searchParams.get('abandoned') === 'true'
   const q = (searchParams.get('q') || '').trim().toLowerCase()
+  const incompleteOnly = searchParams.get('incomplete') === 'true'
 
   let query = supabaseAdmin.from('leads').select(LIST_FIELDS).order('created_at', { ascending: false })
   if (from) query = query.gte('created_at', from)
@@ -50,15 +54,21 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  let rows = (data || []).map(l => ({
-    ...l,
-    access_state: getAdminLeadAccessState(l),
-    abandoned: isAbandonedLead(l),
-  }))
+  let rows = (data || []).map(l => {
+    const { metadata, ...rest } = l as typeof l & { metadata: Record<string, unknown> | null }
+    const { checks, missingCount } = computeLeadCompleteness({ source: l.source, zone_requested: l.zone_requested, metadata })
+    return {
+      ...rest,
+      access_state: getAdminLeadAccessState(l),
+      abandoned: isAbandonedLead(l),
+      completeness: { checks, missingCount },
+    }
+  })
 
   if (zone) rows = rows.filter(l => (l.zone_requested as string | null)?.toLowerCase().includes(zone))
   if (accessState) rows = rows.filter(l => l.access_state === accessState)
   if (abandonedOnly) rows = rows.filter(l => l.abandoned)
+  if (incompleteOnly) rows = rows.filter(l => l.completeness.missingCount > 0)
   if (q) {
     rows = rows.filter(l =>
       (l.name as string | null)?.toLowerCase().includes(q) ||

@@ -21,10 +21,10 @@ const now = new Date()
 const oldDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString() // 60 dias atrás
 
 const leads = [
-  { id: 'l-aberto', name: 'Cliente A', phone: '111', email: null, status: 'novo', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Lisboa', professional_id: 'p1', created_at: now.toISOString(), opened_at: now.toISOString(), locked: null, valor_fechado: null, professionals: { name: 'Ana', specialty: 'Pintura', zone: 'Lisboa' } },
-  { id: 'l-bloqueado', name: 'Cliente B', phone: '222', email: null, status: 'novo', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Porto', professional_id: 'p1', created_at: oldDate, opened_at: null, locked: null, valor_fechado: null, professionals: { name: 'Ana', specialty: 'Pintura', zone: 'Lisboa' } },
-  { id: 'l-disponivel', name: 'Cliente C', phone: '333', email: 'c@x.com', status: 'novo', source: 'marketplace', specialty: 'Jardinagem', zone_requested: 'Faro', professional_id: null, created_at: now.toISOString(), opened_at: null, locked: true, valor_fechado: null, professionals: null },
-  { id: 'l-adquirido', name: 'Cliente D', phone: '444', email: null, status: 'fechado', source: 'marketplace', specialty: 'Jardinagem', zone_requested: 'Faro', professional_id: 'p2', created_at: now.toISOString(), opened_at: null, locked: false, valor_fechado: 400, professionals: { name: 'Bruno', specialty: 'Jardinagem', zone: 'Faro' } },
+  { id: 'l-aberto', name: 'Cliente A', phone: '111', email: null, status: 'novo', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Lisboa', professional_id: 'p1', created_at: now.toISOString(), opened_at: now.toISOString(), locked: null, valor_fechado: null, metadata: { notas: 'Descrição bem detalhada do trabalho pretendido, mais de vinte caracteres.', media_urls: ['a.jpg'] }, professionals: { name: 'Ana', specialty: 'Pintura', zone: 'Lisboa' } },
+  { id: 'l-bloqueado', name: 'Cliente B', phone: '222', email: null, status: 'novo', source: 'pessoal', specialty: 'Pintura', zone_requested: 'Porto', professional_id: 'p1', created_at: oldDate, opened_at: null, locked: null, valor_fechado: null, metadata: null, professionals: { name: 'Ana', specialty: 'Pintura', zone: 'Lisboa' } },
+  { id: 'l-disponivel', name: 'Cliente C', phone: '333', email: 'c@x.com', status: 'novo', source: 'marketplace', specialty: 'Jardinagem', zone_requested: 'Faro', professional_id: null, created_at: now.toISOString(), opened_at: null, locked: true, valor_fechado: null, metadata: null, professionals: null },
+  { id: 'l-adquirido', name: 'Cliente D', phone: '444', email: null, status: 'fechado', source: 'marketplace', specialty: 'Jardinagem', zone_requested: 'Faro', professional_id: 'p2', created_at: now.toISOString(), opened_at: null, locked: false, valor_fechado: 400, metadata: null, professionals: { name: 'Bruno', specialty: 'Jardinagem', zone: 'Faro' } },
 ]
 
 describe('GET /api/admin/leads', () => {
@@ -105,6 +105,27 @@ describe('GET /api/admin/leads', () => {
     calls.length = 0
     await GET(fakeRequest('?status=fechado'))
     expect(calls).toContainEqual({ method: 'eq', args: ['status', 'fechado'] })
+  })
+
+  it('inclui a qualidade (completeness) de cada lead, nunca expõe metadata em bruto', async () => {
+    mockDeps()
+    const { GET } = await import('./route')
+    const res = await GET(fakeRequest(''))
+    const json = await res.json()
+    const byId = Object.fromEntries(json.leads.map((l: { id: string }) => [l.id, l]))
+    expect(byId['l-aberto'].completeness.missingCount).toBe(0)
+    expect(byId['l-disponivel'].completeness.missingCount).toBeGreaterThan(0)
+    expect(json.leads.every((l: Record<string, unknown>) => !('metadata' in l))).toBe(true)
+  })
+
+  it('filtra só leads incompletos', async () => {
+    mockDeps()
+    const { GET } = await import('./route')
+    const res = await GET(fakeRequest('?incomplete=true'))
+    const json = await res.json()
+    const ids = json.leads.map((l: { id: string }) => l.id)
+    expect(ids).not.toContain('l-aberto')
+    expect(ids).toContain('l-disponivel')
   })
 
   it('filtra por zona (substring) e por pesquisa nome/telefone/email', async () => {

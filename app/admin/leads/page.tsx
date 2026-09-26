@@ -12,6 +12,7 @@ type LeadRow = {
   status: string | null; source: string | null; specialty: string | null; zone_requested: string | null
   professional_id: string | null; created_at: string; valor_fechado: number | null
   access_state: AdminLeadAccessState; abandoned: boolean
+  completeness: { missingCount: number; checks: { key: string; label: string; met: boolean }[] }
   professionals: { name: string; specialty: string | null; zone: string | null } | null
 }
 
@@ -49,6 +50,7 @@ function AdminLeadsPageInner() {
   const [zone, setZone] = useState('')
   const [accessState, setAccessState] = useState('')
   const [abandoned, setAbandoned] = useState(searchParamsInit.get('abandoned') === 'true')
+  const [incompleteOnly, setIncompleteOnly] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -70,6 +72,7 @@ function AdminLeadsPageInner() {
     if (zone) params.set('zone', zone)
     if (accessState) params.set('access_state', accessState)
     if (abandoned) params.set('abandoned', 'true')
+    if (incompleteOnly) params.set('incomplete', 'true')
 
     fetch(`/api/admin/leads?${params.toString()}`)
       .then(async res => {
@@ -79,7 +82,7 @@ function AdminLeadsPageInner() {
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Falha ao carregar leads'))
       .finally(() => setLoading(false))
-  }, [checking, q, status, source, specialty, zone, accessState, abandoned])
+  }, [checking, q, status, source, specialty, zone, accessState, abandoned, incompleteOnly])
 
   const specialties = Array.from(new Set(leads.map(l => l.specialty).filter(Boolean))) as string[]
 
@@ -156,6 +159,9 @@ function AdminLeadsPageInner() {
           <label className="flex items-center gap-2 text-xs text-gray-400 pb-1.5">
             <input type="checkbox" checked={abandoned} onChange={e => setAbandoned(e.target.checked)} /> Só abandonados (+30d)
           </label>
+          <label className="flex items-center gap-2 text-xs text-gray-400 pb-1.5">
+            <input type="checkbox" checked={incompleteOnly} onChange={e => setIncompleteOnly(e.target.checked)} /> Só incompletos
+          </label>
         </div>
 
         {error && <div className="text-sm text-center py-3 px-4 rounded-xl mb-4" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>}
@@ -174,6 +180,7 @@ function AdminLeadsPageInner() {
                   <th className="px-4 py-3">Especialidade / Zona</th>
                   <th className="px-4 py-3">Origem</th>
                   <th className="px-4 py-3">Acesso</th>
+                  <th className="px-4 py-3">Qualidade</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-right">Data</th>
@@ -190,6 +197,13 @@ function AdminLeadsPageInner() {
                       <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: `${ACCESS_COLOR[l.access_state]}22`, color: ACCESS_COLOR[l.access_state] }}>
                         {ADMIN_LEAD_ACCESS_STATE_LABELS[l.access_state]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3" title={l.completeness.checks.filter(c => !c.met).map(c => c.label).join(', ')}>
+                      {l.completeness.missingCount === 0 ? (
+                        <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>Completo</span>
+                      ) : (
+                        <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>{l.completeness.missingCount} em falta</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ background: `${STATUS_COLOR[l.status || ''] || '#64748b'}22`, color: STATUS_COLOR[l.status || ''] || '#64748b' }}>
