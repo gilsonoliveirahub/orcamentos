@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { emailBoasVindas, emailNovaProfissao, emailNovoRegisto } from '@/lib/email'
 import { SPECIALTY_LIST } from '@/lib/professions'
 import { toFriendlyMessage } from '@/lib/friendly-error'
+import { recordRegistrationCompleted, clientIpFrom } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (role === 'professional') {
+      // Idempotência: um pedido repetido com o mesmo user_id (ex.: nova
+      // tentativa depois de uma resposta perdida) nunca deve criar um
+      // segundo perfil nem contar um segundo registo. `clients.user_id` já
+      // tem unique constraint na base de dados; `professionals.user_id` não
+      // tem, por isso a verificação fica aqui.
+      const { data: existingProfessional } = await supabaseAdmin
+        .from('professionals')
+        .select('id')
+        .eq('user_id', user_id)
+        .maybeSingle()
+      if (existingProfessional) {
+        return NextResponse.json({ ok: true })
+      }
+
       const baseSlug = name
         .toLowerCase()
         .normalize('NFD')
@@ -56,6 +71,7 @@ export async function POST(req: NextRequest) {
 
       emailBoasVindas({ name, email, slug }).catch(() => {})
       emailNovoRegisto({ tipo: 'profissional', name, email, phone, specialty, slug }).catch(() => {})
+      recordRegistrationCompleted({ ip: clientIpFrom(req.headers), userAgent: req.headers.get('user-agent') || '', role: 'profissional' }).catch(() => {})
 
       if (!SPECIALTY_LIST.includes(specialty)) {
         // Gera perguntas via Claude e notifica admin
@@ -79,6 +95,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: toFriendlyMessage(error.message) }, { status: 400 })
       }
       emailNovoRegisto({ tipo: 'cliente', name, email, phone }).catch(() => {})
+      recordRegistrationCompleted({ ip: clientIpFrom(req.headers), userAgent: req.headers.get('user-agent') || '', role: 'cliente' }).catch(() => {})
     }
 
     return NextResponse.json({ ok: true })
