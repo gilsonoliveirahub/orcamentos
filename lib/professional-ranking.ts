@@ -15,7 +15,14 @@
 //      dentro deles quando ainda estão empatados;
 //   7. antiguidade (desempate final, como já era).
 
-export type ProfessionalForRanking = { id: string; plan: string | null; created_at: string; accepting_leads?: boolean | null }
+import { isAcceptingLeads } from '@/lib/professional-availability'
+
+export type ProfessionalForRanking = {
+  id: string; plan: string | null; created_at: string
+  accepting_leads?: boolean | null
+  availability_status?: string | null
+  available_from?: string | null
+}
 export type ReliabilityScoresById = Record<string, {
   score: number
   total: number
@@ -47,9 +54,11 @@ export function sortProfessionalsForRanking<T extends ProfessionalForRanking>(
   const activeCount = (id: string) => scores?.[id]?.active_count ?? 0
   // null/undefined = sem dado de velocidade — nunca compara pior nem melhor.
   const responseHours = (id: string) => scores?.[id]?.avg_response_hours ?? null
-  // undefined/null (coluna ainda por migrar ou nunca definida) conta sempre
-  // como disponível — nunca penaliza por omissão.
-  const isAccepting = (p: T) => p.accepting_leads !== false
+  // 'parcial' conta como aceitar (só um sinal público de capacidade
+  // reduzida, nunca bloqueia); undefined/null (coluna ainda por migrar ou
+  // nunca definida) conta sempre como disponível — nunca penaliza por
+  // omissão. Ver lib/professional-availability.ts.
+  const isAccepting = (p: T) => isAcceptingLeads(p)
 
   return [...professionals].sort((a, b) => {
     const planDiff = planScore(b.plan) - planScore(a.plan)

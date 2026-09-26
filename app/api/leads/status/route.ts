@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import { isLeadAuthorized } from '@/lib/lead-authorization'
 import { sendReviewRequestEmail } from '@/lib/complete-lead'
+import { recordLeadStatusChange } from '@/lib/lead-status-history'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { data: state } = await supabaseAdmin
       .from('leads')
-      .select('id, professional_id, opened_at, source, locked, concluido_at')
+      .select('id, professional_id, opened_at, source, locked, concluido_at, status')
       .eq('id', lead_id)
       .maybeSingle()
 
@@ -80,6 +81,13 @@ export async function POST(req: NextRequest) {
       .eq('professional_id', professional.id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // Percurso dos leads (admin) — só regista quando o estado muda mesmo
+    // (nunca um resubmit do mesmo estado). Melhor esforço, nunca bloqueia a
+    // resposta — a mudança de estado real já está gravada acima.
+    if (state.status !== status) {
+      recordLeadStatusChange({ leadId: lead_id, fromStatus: state.status, toStatus: status, changedBy: professional.id }).catch(() => {})
+    }
 
     // Estado "Concluído" (distinto de "Fechado", que só fecha o valor
     // acordado): dispara o único email de pedido de opinião ao cliente. Fica

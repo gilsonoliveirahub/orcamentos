@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { geocodeZone, computeDistanceKm, formatDistanceKm } from '@/lib/geo'
 import { professionalSpecialties } from '@/lib/professional-specialties'
 import { notifyLeadCreated } from '@/lib/notify-lead'
+import { isAcceptingLeads } from '@/lib/professional-availability'
 
 export const MARKETPLACE_RADIUS_KM = 50
 
@@ -127,7 +128,7 @@ export async function acquireMarketplaceLead(params: { leadId: string; professio
 
   const { data: prof } = await supabaseAdmin
     .from('professionals')
-    .select('zone, accepting_leads')
+    .select('zone, accepting_leads, availability_status, available_from')
     .eq('id', professionalId)
     .maybeSingle()
 
@@ -139,9 +140,11 @@ export async function acquireMarketplaceLead(params: { leadId: string; professio
   // plano/crédito/especialidade/raio) porque não há nada de financeiro em
   // jogo aqui — o pior cenário de uma corrida rara com o toggle é adquirir
   // um pedido extra, não perder dinheiro nem duplicar cobrança.
-  // === false é deliberado: coluna ausente (undefined, antes da migração
-  // ser aplicada) ou nunca definida conta sempre como "disponível".
-  if (prof.accepting_leads === false) return { ok: false, error: 'unavailable' }
+  // isAcceptingLeads (lib/professional-availability.ts) resolve o estado
+  // efetivo — 'parcial' continua a aceitar, 'indisponivel' com
+  // available_from já passada volta a aceitar sozinho, e cai sempre no
+  // antigo accepting_leads enquanto availability_status não existir/for null.
+  if (!isAcceptingLeads(prof)) return { ok: false, error: 'unavailable' }
 
   // Coordenadas do profissional calculadas aqui (zona vem da própria BD,
   // nunca do cliente) e passadas à função SQL, que faz a confirmação final

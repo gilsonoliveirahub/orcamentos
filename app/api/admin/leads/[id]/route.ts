@@ -63,11 +63,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     client = clientRow
   }
 
+  // Percurso — melhor esforço: lead_status_history só existe depois de
+  // aplicada migration_lead_status_history.sql; antes disso (ou em qualquer
+  // outra falha), devolve lista vazia em vez de rebentar o resto da ficha.
+  const { data: statusHistory } = await supabaseAdmin
+    .from('lead_status_history')
+    .select('id, from_status, to_status, changed_at, professionals(name)')
+    .eq('lead_id', id)
+    .order('changed_at', { ascending: true })
+
   return NextResponse.json({
     lead,
     access_state: getAdminLeadAccessState(lead as unknown as { source: string | null; opened_at: string | null; professional_id: string | null }),
     quotes: quotes || [],
     client, // conta de login associada por telefone, se existir (a maioria dos clientes não tem)
     review: review || null,
+    status_history: statusHistory || [],
   })
 }

@@ -27,7 +27,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 // local) — incluí-la aqui partia esta rota com um 500 em produção.
 // Confirmado via leitura direta (information_schema.columns) antes desta
 // correção.
-const PUBLIC_SELECT = 'id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, reviews(rating), professional_portfolio(id, url, type)'
+const PUBLIC_SELECT = 'id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, availability_status, available_from, reviews(rating), professional_portfolio(id, url, type)'
 
 export async function GET() {
   try {

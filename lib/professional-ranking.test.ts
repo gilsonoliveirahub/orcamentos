@@ -68,6 +68,24 @@ describe('sortProfessionalsForRanking', () => {
     expect(sorted.map(p => p.id)).toEqual(['sem-campo', 'pausado'])
   })
 
+  it('disponibilidade "parcial" conta como aceitar — nunca fica atrás de quem está indisponível', () => {
+    const profs = [
+      { id: 'indisponivel', plan: 'pro', created_at: '2020-01-01T00:00:00Z', availability_status: 'indisponivel' },
+      { id: 'parcial', plan: 'pro', created_at: '2026-01-01T00:00:00Z', availability_status: 'parcial' },
+    ]
+    const sorted = sortProfessionalsForRanking(profs, {})
+    expect(sorted.map(p => p.id)).toEqual(['parcial', 'indisponivel'])
+  })
+
+  it('indisponível com available_from já passada volta a contar como disponível na ordenação', () => {
+    const profs = [
+      { id: 'antigo-e-indisponivel-mas-voltou', plan: 'pro', created_at: '2020-01-01T00:00:00Z', availability_status: 'indisponivel', available_from: '2000-01-01' },
+      { id: 'realmente-indisponivel', plan: 'pro', created_at: '2026-01-01T00:00:00Z', availability_status: 'indisponivel' },
+    ]
+    const sorted = sortProfessionalsForRanking(profs, {})
+    expect(sorted.map(p => p.id)).toEqual(['antigo-e-indisponivel-mas-voltou', 'realmente-indisponivel'])
+  })
+
   it('mesmo plano, disponibilidade e fiabilidade: desempata por menos pedidos ativos agora (mais capacidade primeiro)', () => {
     const profs = [
       { id: 'sobrecarregado', plan: 'pro', created_at: '2020-01-01T00:00:00Z' },

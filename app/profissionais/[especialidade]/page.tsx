@@ -20,7 +20,7 @@ type Props = { params: Promise<{ especialidade: string }> }
 async function getActiveProfessionalsBySpecialty(specialty: string) {
   const { data } = await supabaseAdmin
     .from('professionals')
-    .select('id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, reviews(rating), professional_portfolio(id, url, type)')
+    .select('id, name, slug, specialty, specialties, zone, description, avatar_url, plan, created_at, accepting_leads, availability_status, available_from, reviews(rating), professional_portfolio(id, url, type)')
     .eq('active', true)
     .or(`specialty.eq.${specialty},specialties.cs.{${specialty}}`)
   const professionals = data || []

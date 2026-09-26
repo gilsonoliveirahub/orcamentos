@@ -24,7 +24,7 @@ describe('GET /api/admin/leads/[id]', () => {
   const client = { id: 'c1', name: 'Cliente X', email: 'x@x.com' }
   const review = { id: 'r1', rating: 5, comment: 'Excelente', client_name: 'Cliente X', created_at: '2026-01-07T00:00:00Z' }
 
-  function mockDeps({ isAdmin = true, leadData = lead, reviewData = null as unknown }: { isAdmin?: boolean; leadData?: unknown; reviewData?: unknown } = {}) {
+  function mockDeps({ isAdmin = true, leadData = lead, reviewData = null as unknown, statusHistory = [] as unknown[] }: { isAdmin?: boolean; leadData?: unknown; reviewData?: unknown; statusHistory?: unknown[] } = {}) {
     vi.doMock('@/lib/admin-auth', () => ({ getAuthenticatedAdmin: async () => (isAdmin ? { id: 'admin-1' } : null) }))
     vi.doMock('@/lib/supabase-admin', () => ({
       supabaseAdmin: {
@@ -33,6 +33,7 @@ describe('GET /api/admin/leads/[id]', () => {
           if (table === 'quotes') return { select: () => ({ eq: () => ({ order: async () => ({ data: quotes, error: null }) }) }) }
           if (table === 'clients') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: client }) }) }) }
           if (table === 'reviews') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: reviewData }) }) }) }
+          if (table === 'lead_status_history') return { select: () => ({ eq: () => ({ order: async () => ({ data: statusHistory, error: null }) }) }) }
           throw new Error(`tabela inesperada: ${table}`)
         },
       },
@@ -87,5 +88,25 @@ describe('GET /api/admin/leads/[id]', () => {
 
     expect(res.status).toBe(200)
     expect(json.review).toEqual(review)
+  })
+
+  it('devolve o percurso (status_history) ordenado, vazio quando não há nenhum registo', async () => {
+    mockDeps()
+    const { GET } = await import('./route')
+    const res = await GET({} as unknown as NextRequest, fakeParams('lead-1'))
+    const json = await res.json()
+    expect(json.status_history).toEqual([])
+  })
+
+  it('percurso: devolve as transições reais quando existem', async () => {
+    const history = [
+      { id: 'h1', from_status: null, to_status: 'novo', changed_at: '2026-01-01T00:00:00Z', professionals: null },
+      { id: 'h2', from_status: 'novo', to_status: 'qualificado', changed_at: '2026-01-02T00:00:00Z', professionals: { name: 'Ana' } },
+    ]
+    mockDeps({ statusHistory: history })
+    const { GET } = await import('./route')
+    const res = await GET({} as unknown as NextRequest, fakeParams('lead-1'))
+    const json = await res.json()
+    expect(json.status_history).toEqual(history)
   })
 })

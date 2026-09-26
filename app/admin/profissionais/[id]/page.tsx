@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { ADMIN_PLAN_LABELS, type AdminPlanLabel } from '@/lib/admin-plan-label'
 import { Section, Field, Stat, fmtDate } from '@/components/admin/AdminFicha'
+import { computeEffectiveAvailability, AVAILABILITY_LABELS } from '@/lib/professional-availability'
 
 type Ficha = {
   professional: {
@@ -18,7 +19,7 @@ type Ficha = {
     current_period_start: string | null; current_period_end: string | null
     pending_plan: string | null; marketplace_credits: number | null
     stripe_customer_id: string | null; stripe_subscription_id: string | null
-    accepting_leads: boolean | null; created_at: string
+    accepting_leads: boolean | null; availability_status: string | null; available_from: string | null; created_at: string
   }
   effective_plan: AdminPlanLabel
   activity: {
@@ -199,7 +200,9 @@ export default function AdminProfissionalFichaPage() {
               <Field label="Zona" value={p.zone} />
               <Field label="Especialidade(s)" value={(p.specialties?.length ? p.specialties : [p.specialty].filter(Boolean)).join(', ') || '—'} />
               <Field label="Regista desde" value={fmtDate(p.created_at)} />
-              <Field label="A aceitar leads (marketplace)" value={p.accepting_leads === false ? 'Pausado' : 'Sim'} />
+              <Field label="Disponibilidade" value={
+                `${AVAILABILITY_LABELS[computeEffectiveAvailability(p)]}${p.availability_status === 'indisponivel' && p.available_from ? ` (a partir de ${fmtDate(p.available_from)})` : ''}`
+              } />
               <Field label="Estado" value={p.active ? 'Ativo' : 'Inativo'} />
             </div>
           </Section>

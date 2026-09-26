@@ -1,6 +1,7 @@
-import { MapPin, Briefcase, Star, ChevronRight } from 'lucide-react'
+import { MapPin, Briefcase, Star, ChevronRight, Clock3 } from 'lucide-react'
 import Link from 'next/link'
 import { PROFESSIONS } from '@/lib/professions'
+import { computeEffectiveAvailability } from '@/lib/professional-availability'
 
 // Extraído de app/profissionais/page.tsx (era local, ProfCard) para ser
 // reutilizável também pelas páginas de especialidade
@@ -21,6 +22,7 @@ export default function ProfessionalCard({ prof, distanceLabel }: { prof: any; d
 
   const photoItems = portfolio.filter((p: any) => !p.type || p.type === 'image')
   const thumbs = photoItems.slice(0, 3)
+  const availability = computeEffectiveAvailability(prof)
 
   return (
     <Link
@@ -76,6 +78,16 @@ export default function ProfessionalCard({ prof, distanceLabel }: { prof: any; d
               {distanceLabel && (
                 <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#34d399' }}>
                   <MapPin size={10} /> {distanceLabel}
+                </span>
+              )}
+              {availability === 'parcial' && (
+                <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>
+                  <Clock3 size={10} /> Disponibilidade limitada
+                </span>
+              )}
+              {availability === 'indisponivel' && (
+                <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-lg" style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+                  <Clock3 size={10} /> Indisponível{prof.available_from ? ` até ${new Date(prof.available_from + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}` : ''}
                 </span>
               )}
             </div>

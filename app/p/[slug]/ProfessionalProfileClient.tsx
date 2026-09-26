@@ -9,6 +9,22 @@ import { getProfession, PROFESSIONS, mapAnswersToLeadFields, matchesShowIf, gene
 import { track, currentCampaignContext } from '@/lib/track-client'
 import { estimatePriceRange, PUBLIC_ESTIMATE_MAX_MARGIN, PUBLIC_ESTIMATE_ENABLED } from '@/lib/quote-estimate'
 import { useDictation } from '@/lib/useDictation'
+import { computeEffectiveAvailability } from '@/lib/professional-availability'
+
+function AvailabilityBadge({ prof }: { prof: { availability_status?: string | null; available_from?: string | null; accepting_leads?: boolean | null } }) {
+  const availability = computeEffectiveAvailability(prof)
+  if (availability === 'disponivel') return null
+  const isParcial = availability === 'parcial'
+  const label = isParcial
+    ? 'Disponibilidade limitada'
+    : `Indisponível${prof.available_from ? ` até ${new Date(prof.available_from + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' })}` : ''}`
+  return (
+    <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg"
+      style={isParcial ? { background: 'rgba(251,191,36,0.15)', color: '#fbbf24' } : { background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+      {label}
+    </span>
+  )
+}
 
 // Pedido de avaliação por um visitante do perfil público (sem login) —
 // nunca publica nada sozinho: cria só um pedido em estado 'requested', que
@@ -299,6 +315,7 @@ export default function ProfessionalPublicPage() {
                 )}
               </div>
             </div>
+            <div className="mt-3"><AvailabilityBadge prof={professional} /></div>
           </div>
         </div>
         <div className="max-w-lg mx-auto px-6 pt-6">
@@ -534,6 +551,7 @@ export default function ProfessionalPublicPage() {
               ) : (
                 <span className="text-xs text-gray-600">Novo profissional</span>
               )}
+              <AvailabilityBadge prof={professional} />
             </div>
           </div>
         </div>

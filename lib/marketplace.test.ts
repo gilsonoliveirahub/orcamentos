@@ -261,6 +261,37 @@ describe('acquireMarketplaceLead', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
+  it('disponibilidade "parcial": continua a aceitar, nunca bloqueia a aquisição', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { ok: true } })
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { zone: 'Lisboa', availability_status: 'parcial' } }) }) }) }
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from, rpc } }))
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated: vi.fn().mockResolvedValue({ ok: true }) }))
+
+    const { acquireMarketplaceLead } = await import('./marketplace')
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+
+    expect(result).toEqual({ ok: true, leadId: 'lead-1' })
+    expect(rpc).toHaveBeenCalled()
+  })
+
+  it('indisponível mas com available_from já passada: volta a aceitar sozinho', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { ok: true } })
+    const from = vi.fn((table: string) => {
+      if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { zone: 'Lisboa', availability_status: 'indisponivel', available_from: '2000-01-01' } }) }) }) }
+      throw new Error(`tabela inesperada: ${table}`)
+    })
+    vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from, rpc } }))
+    vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated: vi.fn().mockResolvedValue({ ok: true }) }))
+
+    const { acquireMarketplaceLead } = await import('./marketplace')
+    const result = await acquireMarketplaceLead({ leadId: 'lead-1', professionalId: 'prof-1' })
+
+    expect(result).toEqual({ ok: true, leadId: 'lead-1' })
+  })
+
   it('accepting_leads ausente (coluna ainda não existe / nunca definida): trata como disponível', async () => {
     mockZoneAndRpc('Lisboa', { data: { ok: true } })
     vi.doMock('@/lib/notify-lead', () => ({ notifyLeadCreated: vi.fn().mockResolvedValue({ ok: true }) }))

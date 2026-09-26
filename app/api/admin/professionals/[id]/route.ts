@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ professional: after })
 }
 
-const PROFESSIONAL_FICHA_FIELDS = 'id, name, email, phone, specialty, specialties, zone, active, slug, plan, trial_ends_at, current_period_start, current_period_end, pending_plan, marketplace_credits, stripe_customer_id, stripe_subscription_id, accepting_leads, created_at'
+const PROFESSIONAL_FICHA_FIELDS = 'id, name, email, phone, specialty, specialties, zone, active, slug, plan, trial_ends_at, current_period_start, current_period_end, pending_plan, marketplace_credits, stripe_customer_id, stripe_subscription_id, accepting_leads, availability_status, available_from, created_at'
 
 // Ficha administrativa: identificação + plano/subscrição (dados diretos da
 // tabela) + atividade/desempenho (reutiliza lib/reliability, lib/conversion,

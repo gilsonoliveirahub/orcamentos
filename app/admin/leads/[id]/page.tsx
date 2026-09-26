@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { LogOut, Loader2, ArrowLeft, User, Briefcase, FileText, Image as ImageIcon, Euro, CheckCircle2, Star, Clock } from 'lucide-react'
+import { LogOut, Loader2, ArrowLeft, User, Briefcase, FileText, Image as ImageIcon, Euro, CheckCircle2, Star, Clock, GitCommitVertical } from 'lucide-react'
 import { Section, Field, fmtDateTime } from '@/components/admin/AdminFicha'
 import { ADMIN_LEAD_ACCESS_STATE_LABELS, type AdminLeadAccessState } from '@/lib/admin-lead-access-state'
 
@@ -24,6 +24,7 @@ type LeadDetail = {
   quotes: Array<{ id: string; valor_min: number | null; valor_max: number | null; valor_final: number | null; proposal_text: string | null; status: string; created_at: string }>
   client: { id: string; name: string; email: string | null } | null
   review: { id: string; rating: number; comment: string | null; client_name: string; created_at: string } | null
+  status_history: Array<{ id: string; from_status: string | null; to_status: string; changed_at: string; professionals: { name: string } | null }>
 }
 
 const ACCESS_COLOR: Record<AdminLeadAccessState, string> = { aberto: '#34d399', bloqueado: '#f87171', disponivel: '#60a5fa', adquirido: '#c084fc', desconhecido: '#64748b' }
@@ -95,8 +96,11 @@ export default function AdminLeadDetailPage() {
     )
   }
 
-  const { lead, access_state, quotes, client, review } = data
+  const { lead, access_state, quotes, client, review, status_history } = data
   const fotos = (lead.q11_fotos_url || []).filter(Boolean)
+
+  const STATUS_LABELS: Record<string, string> = { novo: 'Novo', qualificado: 'Qualificado', visita: 'Visita', proposta: 'Proposta', fechado: 'Fechado', perdido: 'Perdido', concluido: 'Concluído' }
+  const statusLabel = (s: string | null) => (s ? STATUS_LABELS[s] || s : 'criação do pedido')
 
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
@@ -153,6 +157,33 @@ export default function AdminLeadDetailPage() {
                   <Clock size={14} /> Ainda sem opinião do cliente
                 </div>
               )}
+            </div>
+          </Section>
+        )}
+
+        {/* Percurso — histórico real de mudanças de estado (lead_status_history,
+            ver lib/lead-status-history.ts). Vazio até a migração ser aplicada
+            e o lead ter pelo menos uma mudança de estado depois disso — nunca
+            reconstrói histórico anterior à migração, que não existe. */}
+        {status_history.length > 0 && (
+          <Section title="Percurso" icon={<GitCommitVertical size={16} />}>
+            <div className="space-y-0">
+              {status_history.map((h, i) => (
+                <div key={h.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: '#818cf8' }} />
+                    {i < status_history.length - 1 && <div className="w-px flex-1" style={{ background: 'rgba(255,255,255,0.1)' }} />}
+                  </div>
+                  <div className="pb-4">
+                    <p className="text-sm text-white">
+                      <span className="text-gray-500">{statusLabel(h.from_status)}</span>
+                      <span className="text-gray-600 mx-1.5">→</span>
+                      <span className="font-semibold">{statusLabel(h.to_status)}</span>
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">{fmtDateTime(h.changed_at)}{h.professionals?.name ? ` · ${h.professionals.name}` : ''}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </Section>
         )}

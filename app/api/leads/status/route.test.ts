@@ -20,6 +20,7 @@ describe('POST /api/leads/status', () => {
     vi.doUnmock('@/lib/supabase-server')
     vi.doUnmock('@/lib/supabase-admin')
     vi.doUnmock('@/lib/complete-lead')
+    vi.doUnmock('@/lib/lead-status-history')
   })
 
   it('bloqueia quem não está autenticado, sem tocar na base de dados', async () => {
@@ -356,5 +357,57 @@ describe('POST /api/leads/status', () => {
     expect(json.ok).toBe(true)
     expect((updateArgs as any).status).toBe('concluido')
     expect(json.email).toEqual({ status: 'failed', reason: 'Resend error 500' })
+  })
+
+  it('percurso: regista a transição no histórico quando o estado muda de facto', async () => {
+    mockAuth('user-1')
+    const recordLeadStatusChange = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false, concluido_at: null, status: 'novo' } }) }) }),
+              update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/complete-lead', () => ({ sendReviewRequestEmail: vi.fn() }))
+    vi.doMock('@/lib/lead-status-history', () => ({ recordLeadStatusChange }))
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-1', status: 'qualificado' }))
+
+    expect(recordLeadStatusChange).toHaveBeenCalledWith({ leadId: 'lead-1', fromStatus: 'novo', toStatus: 'qualificado', changedBy: 'prof-1' })
+  })
+
+  it('percurso: nunca regista quando o estado pedido é igual ao atual (resubmissão)', async () => {
+    mockAuth('user-1')
+    const recordLeadStatusChange = vi.fn().mockResolvedValue(undefined)
+    vi.doMock('@/lib/supabase-admin', () => ({
+      supabaseAdmin: {
+        from: (table: string) => {
+          if (table === 'professionals') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'prof-1' } }) }) }) }
+          if (table === 'leads') {
+            return {
+              select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'lead-1', professional_id: 'prof-1', opened_at: '2026-07-17T00:00:00Z', source: 'pessoal', locked: false, concluido_at: '2026-08-01T00:00:00Z', status: 'concluido' } }) }) }),
+              update: () => ({ eq: () => ({ eq: async () => ({ error: null }) }) }),
+            }
+          }
+          throw new Error(`tabela inesperada: ${table}`)
+        },
+      },
+    }))
+    vi.doMock('@/lib/complete-lead', () => ({ sendReviewRequestEmail: vi.fn().mockResolvedValue({ status: 'skipped', reason: 'already_sent' }) }))
+    vi.doMock('@/lib/lead-status-history', () => ({ recordLeadStatusChange }))
+
+    const { POST } = await import('./route')
+    await POST(fakeRequest({ lead_id: 'lead-1', status: 'concluido' }))
+
+    expect(recordLeadStatusChange).not.toHaveBeenCalled()
   })
 })
