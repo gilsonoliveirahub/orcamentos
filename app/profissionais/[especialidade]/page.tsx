@@ -8,6 +8,7 @@ import { PROFESSIONS } from '@/lib/professions'
 import ProfessionalCard from '@/components/ProfessionalCard'
 import { sortProfessionalsForRanking } from '@/lib/professional-ranking'
 import { buildReliabilityScores } from '@/lib/professional-reliability-scores'
+import { computeUniqueZones, formatZonesSummary } from '@/lib/specialty-zones'
 
 type Props = { params: Promise<{ especialidade: string }> }
 
@@ -43,8 +44,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (professionals.length === 0) return { title: 'Especialidade não encontrada | FaçoPorTi' }
 
   const label = PROFESSIONS[specialty]?.label || specialty
+  const zonesSummary = formatZonesSummary(computeUniqueZones(professionals))
   const title = `${label} em Portugal — ${professionals.length} profissional${professionals.length === 1 ? '' : 'is'} | FaçoPorTi`
-  const description = `Encontre profissionais de ${label.toLowerCase()} no FaçoPorTi. Peça um orçamento diretamente, sem concorrência entre profissionais.`
+  const description = zonesSummary
+    ? `Encontre profissionais de ${label.toLowerCase()} em ${zonesSummary}. Peça um orçamento diretamente no FaçoPorTi, sem concorrência entre profissionais.`
+    : `Encontre profissionais de ${label.toLowerCase()} no FaçoPorTi. Peça um orçamento diretamente, sem concorrência entre profissionais.`
 
   return {
     title,
@@ -63,11 +67,16 @@ export default async function EspecialidadePage({ params }: Props) {
   if (professionals.length === 0) notFound()
 
   const label = PROFESSIONS[specialty]?.label || specialty
+  const zones = computeUniqueZones(professionals)
+  const zonesSummary = formatZonesSummary(zones)
 
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: `${label} em Portugal`,
+    // areaServed só com zonas reais dos profissionais listados agora — nunca
+    // inventadas, nunca uma lista fixa de cidades portuguesas.
+    ...(zones.length > 0 ? { areaServed: zones.map(zone => ({ '@type': 'Place', name: zone })) } : {}),
     mainEntity: {
       '@type': 'ItemList',
       itemListElement: professionals.map((p, i) => ({
@@ -94,6 +103,7 @@ export default async function EspecialidadePage({ params }: Props) {
           </div>
           <p className="text-gray-500 text-sm ml-7">
             {professionals.length} profissional{professionals.length === 1 ? '' : 'is'} disponível{professionals.length === 1 ? '' : 'is'}
+            {zonesSummary ? ` — ${zonesSummary}` : ''}
           </p>
         </div>
       </div>
