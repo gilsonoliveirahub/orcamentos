@@ -62,7 +62,7 @@ export default function AdminFinanceiroPage() {
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
@@ -81,7 +81,7 @@ export default function AdminFinanceiroPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         <div>
           <h2 className="text-lg font-black text-white mb-1 flex items-center gap-2"><Euro size={18} /> Valor gerado aos profissionais</h2>
           <p className="text-xs text-gray-600 mb-4">Dinheiro que os clientes pagaram aos profissionais através da plataforma — nunca receita da FaçoPorTi.</p>

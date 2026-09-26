@@ -115,7 +115,7 @@ function AdminProfissionaisPageInner() {
   return (
     <div className="min-h-screen" style={{ background: '#0a0c1a' }}>
       <div style={{ background: '#0d0f1e', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -136,7 +136,7 @@ function AdminProfissionaisPageInner() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Filtros */}
         <div className="rounded-2xl p-4 flex flex-wrap gap-3 items-end mb-6" style={cardStyle}>
           <div className="flex-1 min-w-[200px]">
