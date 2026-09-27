@@ -33,6 +33,12 @@ export async function POST(req: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: prof.email,
+      // MB WAY e Multibanco só existem para pagamentos únicos (nunca
+      // subscrições — Stripe não permite) e cobrem toda a gama de valores
+      // dos pacotes de créditos (9,90€–371,25€): MB WAY vai até 5.000€,
+      // Multibanco até 99.999€ (confirmado em docs.stripe.com/payments/mb-way
+      // e /payments/multibanco, 2026-09-27) — nenhum pack fica de fora.
+      payment_method_types: ['card', 'multibanco', 'mb_way'],
       metadata: { professional_id: prof.id, credits: String(selectedPack.credits), type: 'credits' },
       line_items: [
         {

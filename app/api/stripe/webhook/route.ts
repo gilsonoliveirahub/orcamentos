@@ -54,6 +54,45 @@ function logAmbiguousCustomer(context: string, customerId: string | null, profes
   console.error(`[webhook/stripe] ${context}: stripe_customer_id=${customerId} associado a ${professionalIds.length} profissionais (${professionalIds.join(', ')}) — evento ${eventId} ignorado, nunca escolhido arbitrariamente.`)
 }
 
+/**
+ * Credita marketplace_credits e envia o email de confirmação. Chamado tanto
+ * por checkout.session.completed (métodos síncronos: cartão, MB WAY) como
+ * por checkout.session.async_payment_succeeded (Multibanco — confirmação
+ * pode demorar dias) — a mesma Checkout Session pode por isso passar por
+ * aqui a partir de DOIS eventos Stripe diferentes (stripe_webhook_events só
+ * protege contra reentrega do MESMO event_id, nunca contra isto).
+ *
+ * fulfill_credit_purchase() (migration_credit_purchase_fulfillment_atomic.sql)
+ * é quem garante mesmo a atribuição única: identifica a compra por
+ * session.id (chave primária de stripe_credit_fulfillments), nunca credita
+ * duas vezes a mesma sessão, e incrementa marketplace_credits num único
+ * UPDATE atómico com a linha do profissional bloqueada — nunca um
+ * SELECT+UPDATE em dois passos em JS (risco de lost update com compras
+ * simultâneas). Esta função só decide se envia o email de confirmação
+ * (nunca reenviado quando already_fulfilled).
+ */
+async function fulfillCreditsSession(professional_id: string, session: Stripe.Checkout.Session) {
+  const credits = parseInt(session.metadata?.credits || '0')
+  const valorEur = session.metadata?.amount_eur || `${credits} créditos`
+
+  const { data, error } = await supabaseAdmin.rpc('fulfill_credit_purchase', {
+    p_session_id: session.id,
+    p_professional_id: professional_id,
+    p_credits: credits,
+  })
+  if (error || !data?.ok || data.already_fulfilled) return
+
+  const { data: prof } = await supabaseAdmin
+    .from('professionals')
+    .select('name, email')
+    .eq('id', professional_id)
+    .single()
+  if (prof) emailNovoPagamento({
+    tipo: 'creditos', name: prof.name, email: prof.email,
+    valor: valorEur,
+  }).catch(() => {})
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')
@@ -94,16 +133,14 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (session.metadata?.type === 'credits') {
-        const credits = parseInt(session.metadata.credits || '0')
-        const valorEur = session.metadata.amount_eur || `${credits} créditos`
-        await supabaseAdmin
-          .from('professionals')
-          .update({ marketplace_credits: (prof?.marketplace_credits || 0) + credits })
-          .eq('id', professional_id)
-        if (prof) emailNovoPagamento({
-          tipo: 'creditos', name: prof.name, email: prof.email,
-          valor: valorEur,
-        }).catch(() => {})
+        // Multibanco é assíncrono (voucher pago dias depois) — nesse caso
+        // payment_status ainda é 'unpaid' quando este evento chega, e
+        // creditar agora daria créditos sem receber o dinheiro. Só credita
+        // já quando o próprio Stripe confirma o pagamento ('paid', cartão
+        // ou MB WAY); Multibanco fica para checkout.session.async_payment_succeeded.
+        if (session.payment_status === 'paid') {
+          await fulfillCreditsSession(professional_id, session)
+        }
       } else {
         const newSubId = session.subscription as string | undefined
         const sub = newSubId ? await stripe.subscriptions.retrieve(newSubId) : null
@@ -148,6 +185,18 @@ export async function POST(req: NextRequest) {
         // operação começou entretanto, antes deste webhook chegar).
         if (checkoutIdempotencyKey) await releaseCheckoutLock(professional_id, checkoutIdempotencyKey)
       }
+    }
+  }
+
+  // Confirmação assíncrona de um pagamento Multibanco (o cliente só paga o
+  // voucher dias depois, fora do checkout) — é só agora que o dinheiro
+  // chegou de facto. Só se aplica a créditos: subscrições nunca usam
+  // Multibanco (Stripe não permite em modo subscription).
+  if (event.type === 'checkout.session.async_payment_succeeded') {
+    const session = event.data.object as Stripe.Checkout.Session
+    const professional_id = session.metadata?.professional_id
+    if (professional_id && session.metadata?.type === 'credits') {
+      await fulfillCreditsSession(professional_id, session)
     }
   }
 

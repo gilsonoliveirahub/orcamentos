@@ -27,6 +27,7 @@ function mockStripe({ retrieve, update }: { retrieve: ReturnType<typeof vi.fn>; 
 type MockDb = {
   from: ReturnType<typeof vi.fn>
   updatesByTable: Record<string, Record<string, unknown>[]>
+  rpc: ReturnType<typeof vi.fn>
 }
 
 // Mock genérico, indexado por tabela. Dois modos de leitura de
@@ -41,11 +42,12 @@ type MockDb = {
 //    omissão, se só `professionalSelect` for dado, é devolvido como lista
 //    de 1 item — mantém os testes antigos simples de escrever.
 function mockDb({
-  professionalSelect, professionalsByCustomer, isDuplicateEvent = false,
+  professionalSelect, professionalsByCustomer, isDuplicateEvent = false, rpc,
 }: {
   professionalSelect?: unknown
   professionalsByCustomer?: unknown[]
   isDuplicateEvent?: boolean
+  rpc?: ReturnType<typeof vi.fn>
 }): MockDb {
   const updatesByTable: Record<string, Record<string, unknown>[]> = { professionals: [], stripe_webhook_events: [] }
   const from = vi.fn((table: string) => {
@@ -77,7 +79,31 @@ function mockDb({
     }
     throw new Error(`tabela inesperada: ${table}`)
   })
-  return { from, updatesByTable }
+  return { from, updatesByTable, rpc: rpc ?? vi.fn().mockResolvedValue({ data: null, error: null }) }
+}
+
+// Simula fulfill_credit_purchase() (migration_credit_purchase_fulfillment_atomic.sql):
+// idempotente por session_id (um Set faz de chave primária +
+// ON CONFLICT DO NOTHING), incremento só na primeira vez que cada
+// session_id passa por aqui — mesmo contrato da função SQL real. Serve
+// para testar que app/api/stripe/webhook chama o RPC com os parâmetros
+// certos e reage bem a already_fulfilled, não para testar a atomicidade
+// do Postgres em si (isso só a própria função SQL, revista à parte, garante).
+function mockCreditFulfillmentRpc(initialBalance = 0) {
+  let balance = initialBalance
+  const fulfilledSessions = new Set<string>()
+  const rpc = vi.fn(async (fnName: string, params: Record<string, unknown>) => {
+    if (fnName !== 'fulfill_credit_purchase') throw new Error(`rpc inesperado: ${fnName}`)
+    const sessionId = params.p_session_id as string
+    const credits = params.p_credits as number
+    if (fulfilledSessions.has(sessionId)) {
+      return { data: { ok: true, already_fulfilled: true, balance }, error: null }
+    }
+    fulfilledSessions.add(sessionId)
+    balance += credits
+    return { data: { ok: true, already_fulfilled: false, balance }, error: null }
+  })
+  return { rpc, getBalance: () => balance, getFulfilledSessions: () => fulfilledSessions }
 }
 
 const STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
@@ -195,6 +221,126 @@ describe('POST /api/stripe/webhook', () => {
       expect(json).toEqual({ ok: true, duplicate: true })
       expect(db.updatesByTable.professionals).toHaveLength(0) // não creditou de novo
       expect(retrieve).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('créditos — pagamento único (cartão/MB WAY síncronos, Multibanco assíncrono)', () => {
+    it('checkout.session.completed com payment_status "paid" (cartão ou MB WAY) credita de imediato', async () => {
+      mockStripe({ retrieve: vi.fn() })
+      const fulfillment = mockCreditFulfillmentRpc(3)
+      const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com' }, rpc: fulfillment.rpc })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from, rpc: db.rpc } }))
+      const email = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: email }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({
+        id: 'evt_credito_pago',
+        type: 'checkout.session.completed',
+        data: { object: { id: 'cs_test_pago', metadata: { professional_id: 'prof-1', type: 'credits', credits: '5' }, payment_status: 'paid' } },
+      }))
+
+      expect(fulfillment.rpc).toHaveBeenCalledWith('fulfill_credit_purchase', {
+        p_session_id: 'cs_test_pago', p_professional_id: 'prof-1', p_credits: 5,
+      })
+      expect(fulfillment.getBalance()).toBe(8)
+      expect(email).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'creditos' }))
+    })
+
+    it('checkout.session.completed com payment_status "unpaid" (Multibanco a aguardar o voucher) nunca credita', async () => {
+      mockStripe({ retrieve: vi.fn() })
+      const fulfillment = mockCreditFulfillmentRpc(3)
+      const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com' }, rpc: fulfillment.rpc })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from, rpc: db.rpc } }))
+      const email = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: email }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({
+        id: 'evt_credito_pendente',
+        type: 'checkout.session.completed',
+        data: { object: { id: 'cs_test_pendente', metadata: { professional_id: 'prof-1', type: 'credits', credits: '5' }, payment_status: 'unpaid' } },
+      }))
+
+      expect(fulfillment.rpc).not.toHaveBeenCalled()
+      expect(fulfillment.getBalance()).toBe(3)
+      expect(email).not.toHaveBeenCalled()
+    })
+
+    it('checkout.session.async_payment_succeeded credita depois do voucher Multibanco ser pago', async () => {
+      mockStripe({ retrieve: vi.fn() })
+      const fulfillment = mockCreditFulfillmentRpc(3)
+      const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com' }, rpc: fulfillment.rpc })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from, rpc: db.rpc } }))
+      const email = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: email }))
+
+      const { POST } = await import('./route')
+      await POST(fakeRequest({
+        id: 'evt_multibanco_pago',
+        type: 'checkout.session.async_payment_succeeded',
+        data: { object: { id: 'cs_test_multibanco', metadata: { professional_id: 'prof-1', type: 'credits', credits: '5' }, payment_status: 'paid' } },
+      }))
+
+      expect(fulfillment.getBalance()).toBe(8)
+      expect(email).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'creditos' }))
+    })
+
+    it('a MESMA Checkout Session a chegar por completed (paid) e por async_payment_succeeded só credita uma vez', async () => {
+      // Cenário real que motivou a correção: nada garante, a nível do
+      // Stripe, que uma sessão nunca dispare os dois eventos como "pagos"
+      // — fulfill_credit_purchase() é a rede de segurança, identificando a
+      // compra por session.id (não por event.id, que já é sempre diferente
+      // entre os dois eventos).
+      mockStripe({ retrieve: vi.fn() })
+      const fulfillment = mockCreditFulfillmentRpc(0)
+      const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com' }, rpc: fulfillment.rpc })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from, rpc: db.rpc } }))
+      const email = vi.fn().mockResolvedValue(undefined)
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: email }))
+
+      const { POST } = await import('./route')
+      const sessionObject = { id: 'cs_test_dupla_entrega', metadata: { professional_id: 'prof-1', type: 'credits', credits: '5' } }
+
+      await POST(fakeRequest({
+        id: 'evt_completed',
+        type: 'checkout.session.completed',
+        data: { object: { ...sessionObject, payment_status: 'paid' } },
+      }))
+      await POST(fakeRequest({
+        id: 'evt_async_succeeded',
+        type: 'checkout.session.async_payment_succeeded',
+        data: { object: { ...sessionObject, payment_status: 'paid' } },
+      }))
+
+      expect(fulfillment.getBalance()).toBe(5) // creditado só pela primeira chamada, nunca duas vezes
+      expect(email).toHaveBeenCalledTimes(1)
+    })
+
+    it('duas compras diferentes do mesmo profissional em paralelo: nenhuma se perde (sem lost update)', async () => {
+      mockStripe({ retrieve: vi.fn() })
+      const fulfillment = mockCreditFulfillmentRpc(0)
+      const db = mockDb({ professionalSelect: { name: 'Prof', email: 'prof@example.com' }, rpc: fulfillment.rpc })
+      vi.doMock('@/lib/supabase-admin', () => ({ supabaseAdmin: { from: db.from, rpc: db.rpc } }))
+      vi.doMock('@/lib/email', () => ({ emailNovoPagamento: vi.fn().mockResolvedValue(undefined) }))
+
+      const { POST } = await import('./route')
+
+      await Promise.all([
+        POST(fakeRequest({
+          id: 'evt_compra_a',
+          type: 'checkout.session.completed',
+          data: { object: { id: 'cs_test_compra_a', metadata: { professional_id: 'prof-1', type: 'credits', credits: '5' }, payment_status: 'paid' } },
+        })),
+        POST(fakeRequest({
+          id: 'evt_compra_b',
+          type: 'checkout.session.completed',
+          data: { object: { id: 'cs_test_compra_b', metadata: { professional_id: 'prof-1', type: 'credits', credits: '10' }, payment_status: 'paid' } },
+        })),
+      ])
+
+      expect(fulfillment.getBalance()).toBe(15) // 5 + 10 — nenhuma das duas compras foi perdida
+      expect(fulfillment.getFulfilledSessions()).toEqual(new Set(['cs_test_compra_a', 'cs_test_compra_b']))
     })
   })
 
