@@ -55,8 +55,20 @@ export async function GET(req: NextRequest) {
   // O role só tem EXECUTE nesta RPC e USAGE no schema, nunca SELECT em
   // tabelas; nunca usa SUPABASE_SERVICE_ROLE_KEY. TLS sempre validado contra
   // o CA real da Supabase (rejectUnauthorized + ca fixado), nunca desligado.
+  //
+  // Nunca passar `connectionString` directamente ao Client: o pg-connection-string
+  // interpreta `sslmode` da própria URL (mesmo sem o termo estar presente) e
+  // ignora o `ca` explícito, validando contra o conjunto de CAs por omissão do
+  // Node — que não conhece a CA própria da Supabase, falhando com
+  // "self-signed certificate in certificate chain". Por isso os campos são
+  // extraídos à mão e passados em separado, nunca via connectionString.
+  const parsedUrl = new URL(dbUrl)
   const client = new Client({
-    connectionString: dbUrl,
+    host: parsedUrl.hostname,
+    port: Number(parsedUrl.port || 5432),
+    database: parsedUrl.pathname.replace(/^\//, '') || 'postgres',
+    user: decodeURIComponent(parsedUrl.username),
+    password: decodeURIComponent(parsedUrl.password),
     ssl: { rejectUnauthorized: true, ca: SUPABASE_ROOT_CA },
     connectionTimeoutMillis: 10000,
   })

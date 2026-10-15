@@ -95,12 +95,20 @@ describe('/api/internal/site-ops/summary', () => {
     expect(body.leads.closed_value_sum).toBe(375)
     expect(body.analytics.unique_visitors_daily_sum).toBe(4)
 
+    // Nunca connectionString — teria de ser extraído em campos discretos
+    // (ver comentário no route.ts sobre o bug do pg-connection-string/sslmode
+    // ignorar o CA explícito).
     expect(Client).toHaveBeenCalledWith(
       expect.objectContaining({
-        connectionString: VALID_DB_URL,
+        host: 'aws-1-eu-west-1.pooler.supabase.com',
+        port: 6543,
+        database: 'postgres',
+        user: 'site_ops_readonly_server.ref',
+        password: 'senha-ficticia',
         ssl: expect.objectContaining({ rejectUnauthorized: true, ca: expect.stringContaining('BEGIN CERTIFICATE') }),
       })
     )
+    expect(Client).not.toHaveBeenCalledWith(expect.objectContaining({ connectionString: expect.anything() }))
     expect(connect).toHaveBeenCalledTimes(1)
     expect(query).toHaveBeenCalledTimes(1)
     expect(query).toHaveBeenCalledWith('select public.site_ops_readonly_summary() as summary')
