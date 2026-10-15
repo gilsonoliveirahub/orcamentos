@@ -12,7 +12,7 @@ import {
 } from '@/lib/site-ops-readonly-summary'
 
 const TOKEN_ENV = 'SITE_FACOPORTI_OPS_READONLY_TOKEN'
-const RPC_JWT_ENV = 'SITE_FACOPORTI_OPS_RPC_JWT'
+const RPC_SECRET_KEY_ENV = 'SITE_FACOPORTI_OPS_RPC_SECRET_KEY'
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store, private' }
 
 function jsonNoStore(body: unknown, init?: ResponseInit) {
@@ -44,21 +44,25 @@ export async function GET(req: NextRequest) {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const rpcJwt = process.env[RPC_JWT_ENV]
-  if (!supabaseUrl || !supabaseAnonKey || !tokenConfigured(rpcJwt)) {
+  const rpcSecretKey = process.env[RPC_SECRET_KEY_ENV]
+  if (!supabaseUrl || !tokenConfigured(rpcSecretKey)) {
     return jsonNoStore({ error: 'Credencial RPC read-only não configurada' }, { status: 503 })
   }
 
   try {
-    // Usa a anon key apenas como apikey pública do projeto Supabase e um JWT
-    // server-side de papel dedicado no header Authorization para executar só a
-    // RPC agregada site_ops_readonly_summary(). Não lê nem usa
-    // SUPABASE_SERVICE_ROLE_KEY e não concede SELECT direto/anónimo às tabelas
-    // privadas.
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    // rpcSecretKey é uma chave sb_secret_... dedicada (API Keys novas da
+    // Supabase), criada com secret_jwt_template.role = site_ops_readonly_server.
+    // NÃO é um JWT — é um token opaco. Por isso vai só no header `apikey`
+    // (comportamento nativo do supabase-js quando passada como key do
+    // createClient), nunca montado à mão como `Authorization: Bearer`: a
+    // Supabase documenta explicitamente que colar uma chave nova no header
+    // Authorization como JWT é rejeitado nas Edge Functions e, na API REST,
+    // passa uma verificação superficial sem autenticar de facto — a
+    // autenticação e a troca pelo role dedicado acontecem só via `apikey`,
+    // dentro do gateway da Supabase. Nunca usa SUPABASE_SERVICE_ROLE_KEY e
+    // nunca concede SELECT direto/anónimo às tabelas privadas.
+    const supabase = createClient(supabaseUrl, rpcSecretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { Authorization: `Bearer ${rpcJwt}` } },
     })
 
     const summary = await fetchSiteOpsReadonlySummary(supabase)

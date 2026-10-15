@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SiteOpsReadonlySummary } from '@/lib/site-ops-readonly-summary'
 
 const VALID_TOKEN = 'readonly-token-ficticio-com-mais-de-24-caracteres'
-const VALID_RPC_JWT = 'rpc-jwt-ficticio-servidor-com-mais-de-24-caracteres'
+const VALID_RPC_SECRET_KEY = 'sb_secret_ficticia_com_mais_de_24_caracteres'
 
 const SUMMARY: SiteOpsReadonlySummary = {
   generated_at: '2026-10-07T12:00:00.000Z',
@@ -61,9 +61,8 @@ describe('/api/internal/site-ops/summary', () => {
 
   it('rejeita token ausente e errado sem consultar Supabase e com cache privado/no-store', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_JWT', VALID_RPC_JWT)
+    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-publica-ficticia')
     const { route, createClient } = await loadRoute()
 
     const missing = await route.GET(request() as never)
@@ -76,11 +75,10 @@ describe('/api/internal/site-ops/summary', () => {
     expect(createClient).not.toHaveBeenCalled()
   })
 
-  it('com token correto chama uma única RPC agregada com JWT dedicado server-side, sem PII nem cache público', async () => {
+  it('com token correto chama uma única RPC agregada com a secret key dedicada só no apikey, sem PII nem cache público', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_JWT', VALID_RPC_JWT)
+    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-publica-ficticia')
     const { route, rpc, createClient } = await loadRoute()
 
     const response = await route.GET(request(VALID_TOKEN) as never)
@@ -92,12 +90,13 @@ describe('/api/internal/site-ops/summary', () => {
     expect(body.leads.total).toBe(3)
     expect(body.leads.closed_value_sum).toBe(375)
     expect(body.analytics.unique_visitors_daily_sum).toBe(4)
+    // Match exato (não objectContaining): confirma que NÃO existe nenhum
+    // `global.headers.Authorization` montado à mão com a secret key — ela
+    // só pode ir como apikey, via comportamento nativo do supabase-js.
     expect(createClient).toHaveBeenCalledWith(
       'https://example.supabase.co',
-      'anon-key-publica-ficticia',
-      expect.objectContaining({
-        global: { headers: { Authorization: `Bearer ${VALID_RPC_JWT}` } },
-      })
+      VALID_RPC_SECRET_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
     )
     expect(rpc).toHaveBeenCalledTimes(1)
     expect(rpc).toHaveBeenCalledWith('site_ops_readonly_summary')
@@ -105,9 +104,8 @@ describe('/api/internal/site-ops/summary', () => {
 
   it('propaga erro RPC/RLS como 500 e nunca devolve zeros silenciosos', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_JWT', VALID_RPC_JWT)
+    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'anon-key-publica-ficticia')
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { route } = await loadRoute({ data: null, error: { message: 'permission denied' } })
 
