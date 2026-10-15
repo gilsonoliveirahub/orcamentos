@@ -175,4 +175,10 @@ grant site_ops_readonly_server to authenticator;
 -- professionals, analytics_daily_summary ou analytics_daily_unique_visitors.
 -- RLS/policies existentes do produto devem ser auditadas no alvo antes de aplicar.
 
+-- Liga diretamente via Postgres (shared pooler), não via PostgREST/API Keys
+-- (secret_jwt_template exige plano Pro). Só o FLAG de login fica aqui — a
+-- password em si é definida à parte, fora de controlo de versão, nunca
+-- escrita neste ficheiro nem em nenhum outro ficheiro do repositório.
+alter role site_ops_readonly_server login;
+
 commit;

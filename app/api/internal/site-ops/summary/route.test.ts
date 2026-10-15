@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SiteOpsReadonlySummary } from '@/lib/site-ops-readonly-summary'
 
 const VALID_TOKEN = 'readonly-token-ficticio-com-mais-de-24-caracteres'
-const VALID_RPC_SECRET_KEY = 'sb_secret_ficticia_com_mais_de_24_caracteres'
+const VALID_DB_URL = 'postgresql://site_ops_readonly_server.ref:senha-ficticia@aws-1-eu-west-1.pooler.supabase.com:6543/postgres'
 
 const SUMMARY: SiteOpsReadonlySummary = {
   generated_at: '2026-10-07T12:00:00.000Z',
@@ -37,13 +37,19 @@ const SUMMARY: SiteOpsReadonlySummary = {
   },
 }
 
-async function loadRoute(rpcResult: { data: unknown; error: { message: string } | null } = { data: SUMMARY, error: null }) {
+async function loadRoute(queryResult: { rows: Array<{ summary: unknown }> } | null = { rows: [{ summary: SUMMARY }] }, connectError: Error | null = null) {
   vi.resetModules()
-  const rpc = vi.fn().mockResolvedValue(rpcResult)
-  const createClient = vi.fn(() => ({ rpc }))
-  vi.doMock('@supabase/supabase-js', () => ({ createClient }))
+  const connect = connectError ? vi.fn().mockRejectedValue(connectError) : vi.fn().mockResolvedValue(undefined)
+  const query = queryResult
+    ? vi.fn().mockResolvedValue(queryResult)
+    : vi.fn().mockRejectedValue(new Error('permission denied'))
+  const end = vi.fn().mockResolvedValue(undefined)
+  const Client = vi.fn(function ClientMock() {
+    return { connect, query, end }
+  })
+  vi.doMock('pg', () => ({ Client }))
   const route = await import('./route')
-  return { route, rpc, createClient }
+  return { route, connect, query, end, Client }
 }
 
 function request(token?: string) {
@@ -56,14 +62,13 @@ describe('/api/internal/site-ops/summary', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
-    vi.doUnmock('@supabase/supabase-js')
+    vi.doUnmock('pg')
   })
 
-  it('rejeita token ausente e errado sem consultar Supabase e com cache privado/no-store', async () => {
+  it('rejeita token ausente e errado sem ligar à base e com cache privado/no-store', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    const { route, createClient } = await loadRoute()
+    vi.stubEnv('SITE_FACOPORTI_OPS_DB_URL', VALID_DB_URL)
+    const { route, Client } = await loadRoute()
 
     const missing = await route.GET(request() as never)
     const wrong = await route.GET(request('token-errado-com-mais-de-24-caracteres') as never)
@@ -72,14 +77,13 @@ describe('/api/internal/site-ops/summary', () => {
     expect(wrong.status).toBe(403)
     expect(missing.headers.get('Cache-Control')).toBe('no-store, private')
     expect(wrong.headers.get('Cache-Control')).toBe('no-store, private')
-    expect(createClient).not.toHaveBeenCalled()
+    expect(Client).not.toHaveBeenCalled()
   })
 
-  it('com token correto chama uma única RPC agregada com a secret key dedicada só no apikey, sem PII nem cache público', async () => {
+  it('com token correto liga via pg com TLS validado (CA fixado) e sem credenciais Supabase, sem PII', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
-    const { route, rpc, createClient } = await loadRoute()
+    vi.stubEnv('SITE_FACOPORTI_OPS_DB_URL', VALID_DB_URL)
+    const { route, query, connect, end, Client } = await loadRoute()
 
     const response = await route.GET(request(VALID_TOKEN) as never)
     const body = await response.json()
@@ -90,24 +94,24 @@ describe('/api/internal/site-ops/summary', () => {
     expect(body.leads.total).toBe(3)
     expect(body.leads.closed_value_sum).toBe(375)
     expect(body.analytics.unique_visitors_daily_sum).toBe(4)
-    // Match exato (não objectContaining): confirma que NÃO existe nenhum
-    // `global.headers.Authorization` montado à mão com a secret key — ela
-    // só pode ir como apikey, via comportamento nativo do supabase-js.
-    expect(createClient).toHaveBeenCalledWith(
-      'https://example.supabase.co',
-      VALID_RPC_SECRET_KEY,
-      { auth: { persistSession: false, autoRefreshToken: false } }
+
+    expect(Client).toHaveBeenCalledWith(
+      expect.objectContaining({
+        connectionString: VALID_DB_URL,
+        ssl: expect.objectContaining({ rejectUnauthorized: true, ca: expect.stringContaining('BEGIN CERTIFICATE') }),
+      })
     )
-    expect(rpc).toHaveBeenCalledTimes(1)
-    expect(rpc).toHaveBeenCalledWith('site_ops_readonly_summary')
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledWith('select public.site_ops_readonly_summary() as summary')
+    expect(end).toHaveBeenCalledTimes(1)
   })
 
-  it('propaga erro RPC/RLS como 500 e nunca devolve zeros silenciosos', async () => {
+  it('propaga erro de ligação/query como 500, fecha a ligação e nunca devolve zeros silenciosos', async () => {
     vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
-    vi.stubEnv('SITE_FACOPORTI_OPS_RPC_SECRET_KEY', VALID_RPC_SECRET_KEY)
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('SITE_FACOPORTI_OPS_DB_URL', VALID_DB_URL)
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const { route } = await loadRoute({ data: null, error: { message: 'permission denied' } })
+    const { route, end } = await loadRoute(null)
 
     const response = await route.GET(request(VALID_TOKEN) as never)
     const body = await response.json()
@@ -115,6 +119,19 @@ describe('/api/internal/site-ops/summary', () => {
     expect(response.status).toBe(500)
     expect(response.headers.get('Cache-Control')).toBe('no-store, private')
     expect(body).toEqual({ error: 'Falha ao gerar resumo read-only' })
+    expect(end).toHaveBeenCalledTimes(1)
+  })
+
+  it('fecha sempre a ligação mesmo quando client.connect() falha', async () => {
+    vi.stubEnv('SITE_FACOPORTI_OPS_READONLY_TOKEN', VALID_TOKEN)
+    vi.stubEnv('SITE_FACOPORTI_OPS_DB_URL', VALID_DB_URL)
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { route, end } = await loadRoute(undefined, new Error('self-signed certificate in certificate chain'))
+
+    const response = await route.GET(request(VALID_TOKEN) as never)
+
+    expect(response.status).toBe(500)
+    expect(end).toHaveBeenCalledTimes(1)
   })
 
   it('recusa métodos de escrita explicitamente', async () => {

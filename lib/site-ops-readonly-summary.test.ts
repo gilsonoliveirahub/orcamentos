@@ -3,7 +3,7 @@ import {
   extractBearerToken,
   fetchSiteOpsReadonlySummary,
   verifySiteOpsReadonlyToken,
-  type SupabaseReadonlyRpcClient,
+  type SiteOpsSummaryQueryClient,
   type SiteOpsReadonlySummary,
 } from './site-ops-readonly-summary'
 
@@ -45,47 +45,54 @@ describe('site ops read-only summary RPC contract', () => {
 
   it('aceita somente JSON agregado conhecido e preserva totais fictícios exatos', async () => {
     const calls: string[] = []
-    const supabase: SupabaseReadonlyRpcClient = {
-      async rpc(functionName) {
-        calls.push(functionName)
-        return { data: FIXTURE_SUMMARY, error: null }
+    const client: SiteOpsSummaryQueryClient = {
+      async query(sql) {
+        calls.push(sql)
+        return { rows: [{ summary: FIXTURE_SUMMARY }] }
       },
     }
 
-    await expect(fetchSiteOpsReadonlySummary(supabase)).resolves.toEqual(FIXTURE_SUMMARY)
-    expect(calls).toEqual(['site_ops_readonly_summary'])
+    await expect(fetchSiteOpsReadonlySummary(client)).resolves.toEqual(FIXTURE_SUMMARY)
+    expect(calls).toEqual(['select public.site_ops_readonly_summary() as summary'])
   })
 
-  it('propaga erro de RPC/RLS em vez de converter permissão negada em zero', async () => {
-    const supabase: SupabaseReadonlyRpcClient = {
-      async rpc() {
-        return { data: null, error: { message: 'permission denied for function site_ops_readonly_summary' } }
+  it('propaga erro de query/permissão em vez de converter permissão negada em zero', async () => {
+    const client: SiteOpsSummaryQueryClient = {
+      async query() {
+        throw new Error('permission denied for function site_ops_readonly_summary')
       },
     }
 
-    await expect(fetchSiteOpsReadonlySummary(supabase)).rejects.toThrow('permission denied')
+    await expect(fetchSiteOpsReadonlySummary(client)).rejects.toThrow('permission denied')
+  })
+
+  it('rejeita resposta vazia em vez de devolver zeros silenciosos', async () => {
+    const client: SiteOpsSummaryQueryClient = {
+      async query() {
+        return { rows: [] }
+      },
+    }
+
+    await expect(fetchSiteOpsReadonlySummary(client)).rejects.toThrow('Resposta vazia')
   })
 
   it('rejeita payload com PII/identificadores mesmo vindo da RPC', async () => {
-    const supabase: SupabaseReadonlyRpcClient = {
-      async rpc() {
-        return { data: { ...FIXTURE_SUMMARY, email: 'cliente@example.com' }, error: null }
+    const client: SiteOpsSummaryQueryClient = {
+      async query() {
+        return { rows: [{ summary: { ...FIXTURE_SUMMARY, email: 'cliente@example.com' } }] }
       },
     }
 
-    await expect(fetchSiteOpsReadonlySummary(supabase)).rejects.toThrow('campo pessoal')
+    await expect(fetchSiteOpsReadonlySummary(client)).rejects.toThrow('campo pessoal')
   })
 
-  it('não oferece API para SELECT direto paginado em tabelas privadas', async () => {
-    const supabase = {
-      from: vi.fn(),
-      rpc: vi.fn().mockResolvedValue({ data: FIXTURE_SUMMARY, error: null }),
-    }
+  it('não faz nenhuma outra chamada além da RPC agregada', async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ summary: FIXTURE_SUMMARY }] })
+    const client = { query }
 
-    await fetchSiteOpsReadonlySummary(supabase)
-    expect(supabase.rpc).toHaveBeenCalledTimes(1)
-    expect(supabase.rpc).toHaveBeenCalledWith('site_ops_readonly_summary')
-    expect(supabase.from).not.toHaveBeenCalled()
+    await fetchSiteOpsReadonlySummary(client)
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledWith('select public.site_ops_readonly_summary() as summary')
   })
 
   it('valida token dedicado por comparação constante e rejeita segredo ausente/fraco', () => {

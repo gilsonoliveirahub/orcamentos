@@ -33,11 +33,8 @@ export type SiteOpsReadonlySummary = {
   }
 }
 
-export type SupabaseReadonlyRpcClient = {
-  rpc(functionName: 'site_ops_readonly_summary'): PromiseLike<{
-    data: unknown
-    error: { message: string } | null
-  }>
+export type SiteOpsSummaryQueryClient = {
+  query(sql: string): PromiseLike<{ rows: Array<{ summary: unknown }> }>
 }
 
 const TOKEN_MIN_LENGTH = 24
@@ -96,8 +93,8 @@ export function extractBearerToken(authorization: string | null) {
   return match?.[1]?.trim() || null
 }
 
-export async function fetchSiteOpsReadonlySummary(supabase: SupabaseReadonlyRpcClient) {
-  const { data, error } = await supabase.rpc('site_ops_readonly_summary')
-  if (error) throw new Error(error.message)
-  return normalizeRpcPayload(data)
+export async function fetchSiteOpsReadonlySummary(client: SiteOpsSummaryQueryClient) {
+  const { rows } = await client.query('select public.site_ops_readonly_summary() as summary')
+  if (!rows[0]) throw new Error('Resposta vazia da RPC site_ops_readonly_summary')
+  return normalizeRpcPayload(rows[0].summary)
 }
