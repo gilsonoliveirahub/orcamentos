@@ -48,11 +48,7 @@ export default function UpgradePage() {
 
   const handlePortal = async () => {
     setOpeningPortal(true)
-    const res = await fetch('/api/stripe/portal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ professional_id: professional.id }),
-    })
+    const res = await fetch('/api/stripe/portal', { method: 'POST' })
     const { url, error } = await res.json()
     if (url) window.location.href = url
     else { alert(error || 'Erro ao abrir portal'); setOpeningPortal(false) }
