@@ -152,19 +152,19 @@ export default function MarketingPage() {
               step: '01',
               title: 'Crias o teu link profissional',
               desc: 'Recebes um link próprio e partilhas no WhatsApp, Instagram ou onde quiseres.',
-              image: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=600&q=80',
+              image: '/images/home-steps/step-1-link.jpg',
             },
             {
               step: '02',
               title: 'O cliente envia o pedido',
               desc: 'Responde a perguntas simples, envia fotos e recebe um orçamento estimado.',
-              image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&q=80',
+              image: '/images/home-steps/step-2-request.jpg',
             },
             {
               step: '03',
               title: 'Recebes o pedido pronto para fechar',
               desc: 'Recebes tudo organizado, com orçamento estimado e contacto direto para responder rapidamente.',
-              image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80',
+              image: '/images/home-steps/step-3-ready.jpg',
             },
           ].map((item) => (
             <div key={item.step} className="group relative bg-white/3 border border-white/8 rounded-3xl overflow-hidden hover:border-[#c9a84c]/30 transition-colors">

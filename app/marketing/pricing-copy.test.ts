@@ -4,10 +4,11 @@ import { join } from 'path'
 import { HOMEPAGE_FAQ } from '@/lib/homepage-faq'
 import { CREDIT_PACKS } from '@/lib/marketplace-credits'
 
-// P2 (2026-09-18): pacotes de créditos do marketplace atualizados (1/10/25/
-// 50 créditos, todos com IVA incluído, substituindo os antigos 10/25/50 por
-// 20€/45€/75€ sem IVA mencionado) — o mínimo real passou de 1,50€/lead
-// (pack50 antigo) para 7,43€/lead (pack50 novo, ver lib/marketplace-credits.ts).
+// Preços 2026-10-17 (aprovados pelo proprietário, substituem os de
+// 2026-09-18) — o mínimo real passou de 7,43€/lead (pack50 anterior,
+// valor já com IVA embutido) para 17,53€/lead (pack50 novo, ver
+// lib/marketplace-credits.ts — agora com `baseEur` sem IVA + `perLeadEur`
+// de referência já com os 23% de IVA, o que o cliente paga de facto).
 // Este teste lê os ficheiros fonte diretamente (não renderiza os
 // componentes, que são 'use client' e não têm harness de DOM neste
 // projeto) para travar as menções de preço contra nova divergência
@@ -15,15 +16,16 @@ import { CREDIT_PACKS } from '@/lib/marketplace-credits'
 const marketingSource = readFileSync(join(__dirname, 'page.tsx'), 'utf-8')
 const cheapestPack = CREDIT_PACKS[CREDIT_PACKS.length - 1]
 
-describe('coerência do preço mínimo do marketplace na homepage (P2, 2026-09-18)', () => {
+describe('coerência do preço mínimo do marketplace na homepage (preços 2026-10-17)', () => {
   it('a secção de preços da homepage anuncia "Leads exclusivos desde €X,XX — IVA incluído", calculado a partir do pacote mais barato (nunca um número fixo no texto)', () => {
-    expect(cheapestPack.perLeadEur).toBe(7.43)
+    expect(cheapestPack.perLeadEur).toBe(17.53)
     expect(marketingSource).toMatch(/Leads exclusivos desde €\{formatEur\(.*perLeadEur.*\)\} — IVA incluído/)
   })
 
-  it('já não menciona nenhum dos valores antigos e incorretos (2,5€ ou 1,50€)', () => {
+  it('já não menciona nenhum dos valores antigos e incorretos (2,5€, 1,50€ ou o mínimo anterior de 7,43€)', () => {
     expect(marketingSource).not.toMatch(/desde 2,5€/)
     expect(marketingSource).not.toMatch(/desde 1,50€/)
+    expect(marketingSource).not.toMatch(/desde 7,43€/)
   })
 
   it('mostra claramente que os preços incluem IVA', () => {
@@ -40,9 +42,9 @@ describe('coerência do preço mínimo do marketplace na homepage (P2, 2026-09-1
     expect(marketingSource).toMatch(/CREDIT_PACKS/)
   })
 
-  it('a FAQ da mesma homepage menciona o mesmo valor mínimo (7,43€, IVA incluído), sem divergir', () => {
+  it('a FAQ da mesma homepage menciona o mesmo valor mínimo (17,53€, IVA incluído), sem divergir', () => {
     const faqText = HOMEPAGE_FAQ.map(item => item.a).join(' ')
-    expect(faqText).toMatch(/desde 7,43€ por lead, IVA incluído/)
+    expect(faqText).toMatch(/desde 17,53€ por lead, IVA incluído/)
   })
 })
 
@@ -51,6 +53,12 @@ describe('coerência do preço mínimo do marketplace na homepage (P2, 2026-09-1
 // valores mostrados) e o "Em breve" (P2, texto informativo sem checkout)
 // sai. Fica aqui e não em checkout/route.test.ts porque é especificamente
 // sobre a apresentação pública, não sobre a API.
+//
+// Preços 2026-10-17: Starter/Pro mensais (29€/59€) ainda NÃO entraram
+// nesta publicação — bloqueados por falta dos novos Price IDs no Stripe
+// (ver relatório). O anual antigo (193,80€/397,80€, -15% do mensal 19€/39€
+// ainda em vigor) continua coerente enquanto o mensal não mudar — por
+// isso este bloco fica tal como estava, sem alterações.
 describe('planos anuais — seletor funcional, "Em breve" removido (P5, 2026-09-19)', () => {
   it('existe um seletor Mensal/Anual (estado pricingCycle + os dois botões)', () => {
     expect(marketingSource).toMatch(/pricingCycle/)

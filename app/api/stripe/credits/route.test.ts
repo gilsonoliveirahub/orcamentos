@@ -25,7 +25,7 @@ function mockProfessional(prof: unknown) {
   }))
 }
 
-describe('POST /api/stripe/credits — P2 (2026-09-18): novos pacotes, todos com IVA incluído', () => {
+describe('POST /api/stripe/credits — preços 2026-10-17: novos pacotes, unit_amount SEM IVA + automatic_tax', () => {
   beforeEach(() => vi.resetModules())
   afterEach(() => { vi.restoreAllMocks(); vi.doUnmock('stripe'); vi.doUnmock('@/lib/supabase-admin') })
 
@@ -45,15 +45,17 @@ describe('POST /api/stripe/credits — P2 (2026-09-18): novos pacotes, todos com
     expect(res.status).toBe(404)
   })
 
+  // cents = baseEur (sem IVA) em cêntimos — é este o valor que vai para o
+  // Stripe; automatic_tax acrescenta o IVA real (23%) no checkout.
   const cases: Array<{ pack: string; credits: number; cents: number }> = [
-    { pack: 'pack1', credits: 1, cents: 990 },
-    { pack: 'pack10', credits: 10, cents: 8910 },
-    { pack: 'pack25', credits: 25, cents: 21038 },
-    { pack: 'pack50', credits: 50, cents: 37125 },
+    { pack: 'pack1', credits: 1, cents: 1900 },
+    { pack: 'pack10', credits: 10, cents: 17100 },
+    { pack: 'pack25', credits: 25, cents: 40375 },
+    { pack: 'pack50', credits: 50, cents: 71250 },
   ]
 
   for (const { pack, credits, cents } of cases) {
-    it(`pack "${pack}": cria sessão Stripe com unit_amount=${cents} cêntimos e metadata.credits="${credits}" (verdade do servidor, nunca do browser)`, async () => {
+    it(`pack "${pack}": cria sessão Stripe com unit_amount=${cents} cêntimos (SEM IVA), automatic_tax ativo, e metadata.credits="${credits}" (verdade do servidor, nunca do browser)`, async () => {
       mockProfessional({ id: 'prof-1', email: 'p@example.com' })
       const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/session123' })
       mockStripe(sessionsCreate)
@@ -67,6 +69,7 @@ describe('POST /api/stripe/credits — P2 (2026-09-18): novos pacotes, todos com
       expect(call.metadata).toMatchObject({ professional_id: 'prof-1', credits: String(credits), type: 'credits' })
       expect(call.line_items[0].price_data.unit_amount).toBe(cents)
       expect(call.line_items[0].price_data.currency).toBe('eur')
+      expect(call.automatic_tax).toEqual({ enabled: true })
       expect(call.mode).toBe('payment')
     })
   }
@@ -84,6 +87,6 @@ describe('POST /api/stripe/credits — P2 (2026-09-18): novos pacotes, todos com
 
     const call = sessionsCreate.mock.calls[0][0]
     expect(call.metadata.credits).toBe('10') // nunca "999999"
-    expect(call.line_items[0].price_data.unit_amount).toBe(8910) // nunca 1
+    expect(call.line_items[0].price_data.unit_amount).toBe(17100) // nunca 1
   })
 })

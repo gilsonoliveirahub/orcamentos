@@ -11,12 +11,12 @@ export async function POST(req: NextRequest) {
   try {
     const { professional_id, pack } = await req.json()
 
-    // P2 (2026-09-18): pacotes e preços vêm de lib/marketplace-credits.ts
-    // (fonte única, com os 4 pacotes ditados por Gilson, todos já com IVA
-    // incluído) — nunca duplicados aqui. `price_data` inline (sem Price ID
-    // fixo do Stripe) porque são pagamentos únicos, não subscrições — o
-    // mesmo padrão já usado antes dos 20€/45€/75€ antigos, só os valores
-    // mudam.
+    // Preços 2026-10-17: pacotes vêm de lib/marketplace-credits.ts (fonte
+    // única). `price_data` inline (sem Price ID fixo do Stripe) porque são
+    // pagamentos únicos, não subscrições — mesmo padrão de sempre, só os
+    // valores mudam. `unit_amount` é agora o valor SEM IVA
+    // (creditPackAmountCents usa baseEur) — automatic_tax acrescenta o
+    // IVA real (23%) no checkout, uma única vez, nunca embutido no número.
     const selectedPack = getCreditPack(pack)
     if (!selectedPack) return NextResponse.json({ error: 'Pack inválido' }, { status: 400 })
 
@@ -35,9 +35,9 @@ export async function POST(req: NextRequest) {
       customer_email: prof.email,
       // MB WAY e Multibanco só existem para pagamentos únicos (nunca
       // subscrições — Stripe não permite) e cobrem toda a gama de valores
-      // dos pacotes de créditos (9,90€–371,25€): MB WAY vai até 5.000€,
-      // Multibanco até 99.999€ (confirmado em docs.stripe.com/payments/mb-way
-      // e /payments/multibanco, 2026-09-27) — nenhum pack fica de fora.
+      // dos pacotes de créditos (23,37€–876,38€, já com IVA): MB WAY vai
+      // até 5.000€, Multibanco até 99.999€ (docs.stripe.com/payments/mb-way
+      // e /payments/multibanco) — nenhum pack fica de fora.
       payment_method_types: ['card', 'multibanco', 'mb_way'],
       metadata: { professional_id: prof.id, credits: String(selectedPack.credits), type: 'credits' },
       line_items: [
@@ -45,13 +45,17 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: `${selectedPack.credits} crédito${selectedPack.credits > 1 ? 's' : ''} FaçoPorTi (IVA incluído)`,
+              name: `${selectedPack.credits} crédito${selectedPack.credits > 1 ? 's' : ''} FaçoPorTi`,
             },
             unit_amount: creditPackAmountCents(selectedPack),
           },
           quantity: 1,
         },
       ],
+      // Preço de cada pack (lib/marketplace-credits.ts, baseEur) já vem
+      // SEM IVA — automatic_tax acrescenta o valor real (23%) no checkout,
+      // uma única vez, nunca duplicado aqui.
+      automatic_tax: { enabled: true },
       success_url: `${appUrl}/dashboard?credits=ok`,
       cancel_url: `${appUrl}/dashboard`,
     })
