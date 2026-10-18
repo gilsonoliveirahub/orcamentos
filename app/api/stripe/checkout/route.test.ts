@@ -128,7 +128,13 @@ function sessionFixture(overrides: Partial<{ status: string; url: string | null;
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.resetModules()
-    process.env = { ...ORIGINAL_ENV, STRIPE_SECRET_KEY: 'sk_test_fake' }
+    // Preços novos (2026-10-18): mensal passou a vir de env var, tal como o
+    // anual — sem isto, resolvePriceId devolveria null e todos os testes
+    // deste ficheiro cairiam no 501 logo à entrada.
+    process.env = {
+      ...ORIGINAL_ENV, STRIPE_SECRET_KEY: 'sk_test_fake',
+      STRIPE_PRICE_STARTER_MONTHLY_2026: STARTER_PRICE_ID, STRIPE_PRICE_PRO_MONTHLY_2026: PRO_PRICE_ID,
+    }
     mockCheckoutLock()
     mockConflicts()
     // Por omissão, uma sessão autenticada válida — os testes de
@@ -238,8 +244,8 @@ describe('POST /api/stripe/checkout', () => {
 
     for (const { plan, cycle, priceId } of cases) {
       it(`plan=${plan} cycle=${cycle} -> usa ${priceId}, com automatic_tax ativo`, async () => {
-        process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
-        process.env.STRIPE_PRICE_PRO_ANNUAL = PRO_ANNUAL_PRICE_ID
+        process.env.STRIPE_PRICE_STARTER_ANNUAL_2026 = STARTER_ANNUAL_PRICE_ID
+        process.env.STRIPE_PRICE_PRO_ANNUAL_2026 = PRO_ANNUAL_PRICE_ID
         const sessionsCreate = vi.fn().mockResolvedValue({ url: `https://checkout.stripe.com/${plan}-${cycle}` })
         mockStripe({ sessionsCreate })
         mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
@@ -297,7 +303,7 @@ describe('POST /api/stripe/checkout', () => {
   })
 
   it('ciclo anual pedido sem a variável de ambiente configurada: erro claro (501), nunca cai no mensal', async () => {
-    delete process.env.STRIPE_PRICE_STARTER_ANNUAL
+    delete process.env.STRIPE_PRICE_STARTER_ANNUAL_2026
     const sessionsCreate = vi.fn()
     mockStripe({ sessionsCreate })
     mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
@@ -312,7 +318,7 @@ describe('POST /api/stripe/checkout', () => {
   })
 
   it('nunca aceita um Price ID (ou qualquer outro valor) enviado no corpo do pedido — só plan+cycle decidem o preço', async () => {
-    process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
+    process.env.STRIPE_PRICE_STARTER_ANNUAL_2026 = STARTER_ANNUAL_PRICE_ID
     const sessionsCreate = vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/safe' })
     mockStripe({ sessionsCreate })
     mockProfessional({ id: 'prof-1', email: 'prof@example.com', plan: null, stripe_customer_id: null, stripe_subscription_id: null })
@@ -364,7 +370,7 @@ describe('POST /api/stripe/checkout', () => {
   })
 
   it('P5 (2026-09-19): mesmo tier, ciclo diferente (Starter mensal -> Starter anual) NÃO é bloqueado como "já tens este plano" — decide pelo Price ID real, não só pelo tier', async () => {
-    process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL_PRICE_ID
+    process.env.STRIPE_PRICE_STARTER_ANNUAL_2026 = STARTER_ANNUAL_PRICE_ID
     const retrieve = vi.fn().mockResolvedValue({ items: { data: [{ id: 'si_1', price: { id: STARTER_PRICE_ID }, current_period_end: 1757980800 } ] }, schedule: null })
     const scheduleCreate = vi.fn().mockResolvedValue({ id: 'sub_sched_1', phases: [{ start_date: 1755302400, items: [{ price: STARTER_PRICE_ID }] }] })
     const scheduleUpdate = vi.fn().mockResolvedValue({ id: 'sub_sched_1' })
@@ -701,7 +707,7 @@ describe('POST /api/stripe/checkout', () => {
     })
 
     it('reserva obsoleta retomada era para um plano/ciclo DIFERENTE do pedido atual: completa a operação retomada, mas avisa que não é o que foi pedido agora', async () => {
-      process.env.STRIPE_PRICE_PRO_ANNUAL = PRO_ANNUAL_PRICE_ID
+      process.env.STRIPE_PRICE_PRO_ANNUAL_2026 = PRO_ANNUAL_PRICE_ID
       const staleLock = {
         professional_id: 'prof-1', idempotency_key: 'k-morta', plan: 'pro', cycle: 'annual',
         checkout_session_id: null, created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),

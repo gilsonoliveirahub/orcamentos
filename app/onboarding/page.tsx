@@ -236,7 +236,7 @@ export default function OnboardingPage() {
                     <Zap size={16} style={{ color: '#818cf8' }} />
                     <span className="font-black text-white">Starter</span>
                   </div>
-                  <span className="font-black text-white">€19<span className="text-gray-500 font-normal text-xs">/mês</span></span>
+                  <span className="font-black text-white">€29<span className="text-gray-500 font-normal text-xs">/mês</span></span>
                 </div>
                 <p className="text-xs text-gray-400">Até 10 leads/mês via link · Orçamentos automáticos · Dashboard kanban</p>
               </button>
@@ -252,7 +252,7 @@ export default function OnboardingPage() {
                     <Crown size={16} style={{ color: '#c9a84c' }} />
                     <span className="font-black text-white">Pro</span>
                   </div>
-                  <span className="font-black text-white">€39<span className="text-gray-500 font-normal text-xs">/mês</span></span>
+                  <span className="font-black text-white">€59<span className="text-gray-500 font-normal text-xs">/mês</span></span>
                 </div>
                 <p className="text-xs text-gray-400">Até 30 leads/mês · Follow-up automático · Estatísticas avançadas</p>
               </button>

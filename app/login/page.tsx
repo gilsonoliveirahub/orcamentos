@@ -112,7 +112,7 @@ export default function LoginPage() {
         {tab === 'register' && (
           <div className="text-center mb-6">
             <p className="text-white text-lg font-semibold">Estás a um passo de começar a receber clientes.</p>
-            <p className="text-gray-500 text-sm mt-1">A partir de 19€/mês</p>
+            <p className="text-gray-500 text-sm mt-1">A partir de 29€/mês</p>
           </div>
         )}
 

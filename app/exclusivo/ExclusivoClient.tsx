@@ -147,7 +147,7 @@ export default function ExclusivoClient() {
       <section className="py-20 max-w-2xl mx-auto px-6">
         <div className="space-y-4">
           {[
-            { q: 'Quanto custa?', a: 'A conta é grátis para sempre — dá para veres como funciona antes de decidires. Quando quiseres abrir os pedidos, o Starter é 19€/mês (10 pedidos/mês pelo teu link) e o Pro é 39€/mês (30 pedidos/mês, mais follow-up automático e notificações por WhatsApp).' },
+            { q: 'Quanto custa?', a: 'A conta é grátis para sempre — dá para veres como funciona antes de decidires. Quando quiseres abrir os pedidos, o Starter é 29€/mês (10 pedidos/mês pelo teu link) e o Pro é 59€/mês (30 pedidos/mês, mais follow-up automático e notificações por WhatsApp).' },
             { q: 'Os clientes que me contactam são só meus?', a: 'Sim — os pedidos feitos pelo teu link pessoal são encaminhados exclusivamente para ti, nunca para outro profissional ao mesmo tempo.' },
             { q: 'E se eu quiser mais pedidos do que o meu link me dá?', a: 'Há também um marketplace opcional, com pedidos avulsos desde 1,50€ cada — usas só quando quiseres mais volume, sem obrigação nenhuma.' },
             { q: 'Posso cancelar quando quiser?', a: 'Sim, sem compromissos. Cancelas no dashboard e o plano mantém-se ativo até ao fim do período já pago.' },

@@ -112,7 +112,7 @@ export default function MarketingPage() {
             </a>
           </div>
 
-          <p className="text-sm text-white/30 mt-6">Um único trabalho pode pagar o mês inteiro. Começa com 19€.</p>
+          <p className="text-sm text-white/30 mt-6">Um único trabalho pode pagar o mês inteiro. Começa com 29€.</p>
         </div>
       </section>
 
@@ -129,7 +129,7 @@ export default function MarketingPage() {
               <div className="text-sm text-white/50">Para gerar um orçamento</div>
             </div>
             <div>
-              <div className="text-4xl font-bold text-[#c9a84c] mb-2">€19</div>
+              <div className="text-4xl font-bold text-[#c9a84c] mb-2">€29</div>
               <div className="text-sm text-white/50">Para começar</div>
             </div>
             <div>
@@ -333,7 +333,7 @@ export default function MarketingPage() {
             <div className="bg-white/3 border border-white/8 rounded-3xl p-8">
               <h3 className="text-2xl font-bold mb-2">Starter</h3>
               <div className="text-4xl font-bold mb-1">
-                {pricingCycle === 'annual' ? '€193,80' : '€19'}
+                {pricingCycle === 'annual' ? '€295,80' : '€29'}
                 <span className="text-lg font-normal text-white/40">{pricingCycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
               </div>
               <p className="text-white/40 text-sm mb-8">Para começar</p>
@@ -361,7 +361,7 @@ export default function MarketingPage() {
               <span className="absolute top-4 right-4 text-xs bg-[#c9a84c] text-black font-semibold px-3 py-1 rounded-full">Mais popular</span>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
               <div className="text-4xl font-bold mb-1">
-                {pricingCycle === 'annual' ? '€397,80' : '€39'}
+                {pricingCycle === 'annual' ? '€601,80' : '€59'}
                 <span className="text-lg font-normal text-white/40">{pricingCycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
               </div>
               <p className="text-white/40 text-sm mb-8">Para profissionais a crescer</p>

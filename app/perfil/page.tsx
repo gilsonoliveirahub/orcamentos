@@ -884,11 +884,14 @@ export default function PerfilPage() {
             const planTier = subStatus?.plan
             const planLabel = planTier === 'pro' ? 'Pro' : planTier === 'starter' ? 'Starter' : 'Sem plano'
             const cycleLabel = subStatus?.cycle === 'annual' ? 'Anual' : subStatus?.cycle === 'monthly' ? 'Mensal' : null
-            const priceLabel = planTier === 'pro'
-              ? (subStatus?.cycle === 'annual' ? '€397,80/ano + IVA' : subStatus?.cycle === 'monthly' ? '€39/mês + IVA' : null)
-              : planTier === 'starter'
-                ? (subStatus?.cycle === 'annual' ? '€193,80/ano + IVA' : subStatus?.cycle === 'monthly' ? '€19/mês + IVA' : null)
-                : null
+            // 2026-10-18: já não mostra um valor fixo aqui — depois da
+            // revisão de preços há subscritores em DOIS valores possíveis
+            // em cada ciclo (quem já estava subscrito antes, ainda no
+            // preço antigo; quem assinou depois, no preço novo) e esta
+            // leitura (subStatus) não distingue os dois. Mostrar um número
+            // errado ao cliente é pior do que não mostrar nenhum — ver a
+            // fatura real no portal do Stripe ("Gerir subscrição" abaixo).
+            const priceLabel = null
             const isAdminAccess = subStatus?.status === 'admin_access'
             const statusMeta: Record<SimplifiedSubscriptionStatus, { label: string; color: string; bg: string; icon: React.ReactElement }> = {
               active:          { label: 'Ativo',                              color: '#34d399', bg: 'rgba(52,211,153,0.12)', icon: <CheckCircle size={14} /> },

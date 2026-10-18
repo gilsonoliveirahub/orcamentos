@@ -1,27 +1,49 @@
-// Planos anuais (2026-09-19): fonte única dos Price IDs Stripe e da
-// resolução plano+ciclo → Price ID, partilhada por app/api/stripe/checkout
-// e app/api/stripe/webhook — nunca duplicar estes IDs noutro sítio (mesmo
-// motivo já documentado antes só para o Pro mensal).
+// Fonte única dos Price IDs Stripe e da resolução plano+ciclo → Price ID,
+// partilhada por app/api/stripe/checkout e app/api/stripe/webhook — nunca
+// duplicar estes IDs noutro sítio.
 //
-// Os 2 Price IDs mensais continuam FIXOS no código (como sempre estiveram,
-// nunca vieram de env var) — já em produção, não inventados agora. Os 2
-// Price IDs anuais vêm de variáveis de ambiente (criados por Gilson
-// diretamente no Stripe, 2026-09-19) — nunca inventados aqui; sem a env
-// var, `resolvePriceId` devolve null (ver checkout/route.ts: erro claro,
-// nunca cai no mensal).
+// Preços novos (2026-10-18, aprovados pelo proprietário): Starter 29€+IVA
+// e Pro 59€+IVA por mês (antes 19€/39€); anual recalculado mantendo os
+// mesmos -15% sobre o mensal NOVO (antes era -15% sobre o mensal antigo) —
+// 295,80€/601,80€ por ano (antes 193,80€/397,80€). Os 4 Price IDs novos
+// vêm de variáveis de ambiente (criados por Gilson diretamente no Stripe,
+// 2026-10-18) — nunca inventados aqui; sem a env var, `resolvePriceId`
+// devolve `null` (ver checkout/route.ts: erro claro, nunca cai no preço
+// antigo nem inventa um ID).
+//
+// Os 4 Price IDs ANTIGOS (2 mensais, 2 anuais) ficam aqui só como
+// "legacy" — nunca usados para checkouts novos (ver resolvePriceId), só
+// para `classifyPriceId` continuar a reconhecer quem já tinha subscrição
+// nesses preços antes desta mudança (webhook/reconciliação — "compras
+// antigas pendentes são processadas segundo as condições da compra
+// original", subscrições existentes preservadas sem qualquer alteração).
 
 export type PlanTier = 'starter' | 'pro'
 export type BillingCycle = 'monthly' | 'annual'
 
-const MONTHLY_PRICE_IDS: Record<PlanTier, string> = {
+const LEGACY_MONTHLY_PRICE_IDS: Record<PlanTier, string> = {
   starter: 'price_1TPAO4LFTn4mze6d70qkDWAj',
   pro: 'price_1TPAOELFTn4mze6dDaYx6snk',
 }
 
-function annualPriceIds(): Record<PlanTier, string | undefined> {
+function legacyAnnualPriceIds(): Record<PlanTier, string | undefined> {
   return {
     starter: process.env.STRIPE_PRICE_STARTER_ANNUAL,
     pro: process.env.STRIPE_PRICE_PRO_ANNUAL,
+  }
+}
+
+function newMonthlyPriceIds(): Record<PlanTier, string | undefined> {
+  return {
+    starter: process.env.STRIPE_PRICE_STARTER_MONTHLY_2026,
+    pro: process.env.STRIPE_PRICE_PRO_MONTHLY_2026,
+  }
+}
+
+function newAnnualPriceIds(): Record<PlanTier, string | undefined> {
+  return {
+    starter: process.env.STRIPE_PRICE_STARTER_ANNUAL_2026,
+    pro: process.env.STRIPE_PRICE_PRO_ANNUAL_2026,
   }
 }
 
@@ -35,30 +57,41 @@ export function isBillingCycle(value: unknown): value is BillingCycle {
 
 /**
  * Único ponto que decide qual Price ID usar para um par (plano, ciclo) —
- * lista fechada, nunca aceita um Price ID vindo do pedido. Sem a variável
- * de ambiente do anual configurada, devolve `null` (o chamador tem de
- * tratar isso como erro explícito, nunca cair silenciosamente no mensal).
+ * lista fechada, nunca aceita um Price ID vindo do pedido. Só devolve
+ * preços NOVOS (2026-10-18) — os antigos nunca são oferecidos a uma
+ * contratação nova, só continuam reconhecidos por `classifyPriceId` para
+ * quem já estava subscrito. Sem a variável de ambiente configurada,
+ * devolve `null` (o chamador tem de tratar isso como erro explícito,
+ * nunca cair silenciosamente noutro preço).
  */
 export function resolvePriceId(plan: PlanTier, cycle: BillingCycle): string | null {
-  if (cycle === 'monthly') return MONTHLY_PRICE_IDS[plan]
-  return annualPriceIds()[plan] ?? null
+  if (cycle === 'monthly') return newMonthlyPriceIds()[plan] ?? null
+  return newAnnualPriceIds()[plan] ?? null
 }
 
 /**
  * Inverso de resolvePriceId — a partir de um Price ID real (vindo sempre do
  * Stripe, nunca do cliente), devolve a que plano+ciclo corresponde. Usado
- * pelo webhook para nunca depender de comparar só o Price ID do Pro mensal
- * (como acontecia antes de existir o anual) — cobre os 4 preços sempre a
- * partir da mesma fonte que o checkout usa para os criar.
+ * pelo webhook para classificar tanto subscrições NOVAS (preços
+ * 2026-10-18) como ANTIGAS (preços legacy, de quem já estava subscrito
+ * antes desta mudança).
  */
 export function classifyPriceId(priceId: string | null | undefined): { plan: PlanTier; cycle: BillingCycle } | null {
   if (!priceId) return null
   for (const plan of ['starter', 'pro'] as const) {
-    if (MONTHLY_PRICE_IDS[plan] === priceId) return { plan, cycle: 'monthly' }
+    if (LEGACY_MONTHLY_PRICE_IDS[plan] === priceId) return { plan, cycle: 'monthly' }
   }
-  const annual = annualPriceIds()
+  const newMonthly = newMonthlyPriceIds()
   for (const plan of ['starter', 'pro'] as const) {
-    if (annual[plan] && annual[plan] === priceId) return { plan, cycle: 'annual' }
+    if (newMonthly[plan] && newMonthly[plan] === priceId) return { plan, cycle: 'monthly' }
+  }
+  const legacyAnnual = legacyAnnualPriceIds()
+  for (const plan of ['starter', 'pro'] as const) {
+    if (legacyAnnual[plan] && legacyAnnual[plan] === priceId) return { plan, cycle: 'annual' }
+  }
+  const newAnnual = newAnnualPriceIds()
+  for (const plan of ['starter', 'pro'] as const) {
+    if (newAnnual[plan] && newAnnual[plan] === priceId) return { plan, cycle: 'annual' }
   }
   return null
 }

@@ -3,7 +3,7 @@ import JuntarClient from './JuntarClient'
 
 export const metadata: Metadata = {
   title: 'Junta-te ao FaçoPorTi | Profissionais Independentes',
-  description: 'Recebe pedidos de orçamento qualificados pelo teu link pessoal, sem concorrência com outros profissionais. Starter a €19/mês.',
+  description: 'Recebe pedidos de orçamento qualificados pelo teu link pessoal, sem concorrência com outros profissionais. Starter a €29/mês.',
   alternates: { canonical: '/juntar' },
 }
 

@@ -199,7 +199,7 @@ export async function emailTrialAExpirar({
         style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
         Escolher plano →
       </a>
-      <p style="color:#475569;font-size:12px;margin:20px 0 0">A partir de €19/mês · Sem compromisso · Cancela a qualquer momento</p>
+      <p style="color:#475569;font-size:12px;margin:20px 0 0">A partir de €29/mês · Sem compromisso · Cancela a qualquer momento</p>
     </div>
   `))
 }
@@ -499,7 +499,7 @@ export async function emailUpgradeNudge({
       </div>
       <a href="${APP_URL}/upgrade"
         style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px">
-        Escolher Starter ou Pro — a partir de €19/mês →
+        Escolher Starter ou Pro — a partir de €29/mês →
       </a>
       <p style="color:#475569;font-size:12px;margin:20px 0 0">Sem compromisso · Cancela a qualquer momento</p>
     </div>

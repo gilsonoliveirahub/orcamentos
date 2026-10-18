@@ -199,7 +199,7 @@ export default function UpgradePage() {
               )}
             </div>
             <div className="text-3xl font-black text-white mb-1">
-              {cycle === 'annual' ? '€193,80' : '€19'}
+              {cycle === 'annual' ? '€295,80' : '€29'}
               <span className="text-base font-normal text-gray-400">{cycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
             </div>
             <p className="text-xs text-gray-500 mb-5">Ideal para começar</p>
@@ -243,7 +243,7 @@ export default function UpgradePage() {
               )}
             </div>
             <div className="text-3xl font-black text-white mb-1">
-              {cycle === 'annual' ? '€397,80' : '€39'}
+              {cycle === 'annual' ? '€601,80' : '€59'}
               <span className="text-base font-normal text-gray-400">{cycle === 'annual' ? '/ano + IVA' : '/mês + IVA'}</span>
             </div>
             <p className="text-xs text-gray-500 mb-5">Para quem quer crescer a sério</p>

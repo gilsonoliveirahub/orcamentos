@@ -2,51 +2,71 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { resolvePriceId, classifyPriceId, isPlanTier, isBillingCycle, PLAN_RANK, isActivePlanCycle, simplifySubscriptionStatus, resolveUnbilledStatus, isNonTerminalSubscriptionStatus } from './stripe-plans'
 
 const ORIGINAL_ENV = { ...process.env }
-const STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
-const PRO_MONTHLY = 'price_1TPAOELFTn4mze6dDaYx6snk'
-const STARTER_ANNUAL = 'price_1UHAsXLFTn4mze6dU5uk5YkJ'
-const PRO_ANNUAL = 'price_1UHAuTLFTn4mze6d29nsPNiC'
+const LEGACY_STARTER_MONTHLY = 'price_1TPAO4LFTn4mze6d70qkDWAj'
+const LEGACY_PRO_MONTHLY = 'price_1TPAOELFTn4mze6dDaYx6snk'
+const LEGACY_STARTER_ANNUAL = 'price_1UHAsXLFTn4mze6dU5uk5YkJ'
+const LEGACY_PRO_ANNUAL = 'price_1UHAuTLFTn4mze6d29nsPNiC'
+// Novos preços (2026-10-18) — fictícios, só para os testes; os reais vêm
+// das env vars criadas por Gilson no Stripe.
+const STARTER_MONTHLY_2026 = 'price_novo_starter_mensal'
+const PRO_MONTHLY_2026 = 'price_novo_pro_mensal'
+const STARTER_ANNUAL_2026 = 'price_novo_starter_anual'
+const PRO_ANNUAL_2026 = 'price_novo_pro_anual'
 
-describe('resolvePriceId — lista fechada, 4 pares plano/ciclo', () => {
+describe('resolvePriceId — sempre os preços novos (2026-10-18), nunca os antigos', () => {
   beforeEach(() => { process.env = { ...ORIGINAL_ENV } })
   afterEach(() => { process.env = { ...ORIGINAL_ENV } })
 
-  it('mensal: sempre os Price IDs fixos, independente de env vars', () => {
-    expect(resolvePriceId('starter', 'monthly')).toBe(STARTER_MONTHLY)
-    expect(resolvePriceId('pro', 'monthly')).toBe(PRO_MONTHLY)
+  it('mensal: lê da env var nova quando configurada', () => {
+    process.env.STRIPE_PRICE_STARTER_MONTHLY_2026 = STARTER_MONTHLY_2026
+    process.env.STRIPE_PRICE_PRO_MONTHLY_2026 = PRO_MONTHLY_2026
+    expect(resolvePriceId('starter', 'monthly')).toBe(STARTER_MONTHLY_2026)
+    expect(resolvePriceId('pro', 'monthly')).toBe(PRO_MONTHLY_2026)
   })
 
-  it('anual: lê da env var quando configurada', () => {
-    process.env.STRIPE_PRICE_STARTER_ANNUAL = STARTER_ANNUAL
-    process.env.STRIPE_PRICE_PRO_ANNUAL = PRO_ANNUAL
-    expect(resolvePriceId('starter', 'annual')).toBe(STARTER_ANNUAL)
-    expect(resolvePriceId('pro', 'annual')).toBe(PRO_ANNUAL)
+  it('anual: lê da env var nova quando configurada', () => {
+    process.env.STRIPE_PRICE_STARTER_ANNUAL_2026 = STARTER_ANNUAL_2026
+    process.env.STRIPE_PRICE_PRO_ANNUAL_2026 = PRO_ANNUAL_2026
+    expect(resolvePriceId('starter', 'annual')).toBe(STARTER_ANNUAL_2026)
+    expect(resolvePriceId('pro', 'annual')).toBe(PRO_ANNUAL_2026)
   })
 
-  it('anual sem env var configurada: devolve null, nunca cai no mensal nem inventa um ID', () => {
-    delete process.env.STRIPE_PRICE_STARTER_ANNUAL
-    delete process.env.STRIPE_PRICE_PRO_ANNUAL
+  it('sem a env var nova configurada: devolve null, nunca cai no preço antigo nem inventa um ID', () => {
+    delete process.env.STRIPE_PRICE_STARTER_MONTHLY_2026
+    delete process.env.STRIPE_PRICE_STARTER_ANNUAL_2026
+    expect(resolvePriceId('starter', 'monthly')).toBeNull()
     expect(resolvePriceId('starter', 'annual')).toBeNull()
-    expect(resolvePriceId('pro', 'annual')).toBeNull()
   })
 })
 
-describe('classifyPriceId — inverso, usado pelo webhook', () => {
+describe('classifyPriceId — inverso, usado pelo webhook (reconhece preços novos E antigos)', () => {
   beforeEach(() => {
-    process.env = { ...ORIGINAL_ENV, STRIPE_PRICE_STARTER_ANNUAL: STARTER_ANNUAL, STRIPE_PRICE_PRO_ANNUAL: PRO_ANNUAL }
+    process.env = {
+      ...ORIGINAL_ENV,
+      STRIPE_PRICE_STARTER_ANNUAL: LEGACY_STARTER_ANNUAL, STRIPE_PRICE_PRO_ANNUAL: LEGACY_PRO_ANNUAL,
+      STRIPE_PRICE_STARTER_MONTHLY_2026: STARTER_MONTHLY_2026, STRIPE_PRICE_PRO_MONTHLY_2026: PRO_MONTHLY_2026,
+      STRIPE_PRICE_STARTER_ANNUAL_2026: STARTER_ANNUAL_2026, STRIPE_PRICE_PRO_ANNUAL_2026: PRO_ANNUAL_2026,
+    }
   })
   afterEach(() => { process.env = { ...ORIGINAL_ENV } })
 
-  it('classifica corretamente os 4 preços reais', () => {
-    expect(classifyPriceId(STARTER_MONTHLY)).toEqual({ plan: 'starter', cycle: 'monthly' })
-    expect(classifyPriceId(PRO_MONTHLY)).toEqual({ plan: 'pro', cycle: 'monthly' })
-    expect(classifyPriceId(STARTER_ANNUAL)).toEqual({ plan: 'starter', cycle: 'annual' })
-    expect(classifyPriceId(PRO_ANNUAL)).toEqual({ plan: 'pro', cycle: 'annual' })
+  it('classifica corretamente os 4 preços novos', () => {
+    expect(classifyPriceId(STARTER_MONTHLY_2026)).toEqual({ plan: 'starter', cycle: 'monthly' })
+    expect(classifyPriceId(PRO_MONTHLY_2026)).toEqual({ plan: 'pro', cycle: 'monthly' })
+    expect(classifyPriceId(STARTER_ANNUAL_2026)).toEqual({ plan: 'starter', cycle: 'annual' })
+    expect(classifyPriceId(PRO_ANNUAL_2026)).toEqual({ plan: 'pro', cycle: 'annual' })
+  })
+
+  it('continua a classificar os 4 preços ANTIGOS (legacy) — "compras antigas pendentes são processadas segundo as condições da compra original"', () => {
+    expect(classifyPriceId(LEGACY_STARTER_MONTHLY)).toEqual({ plan: 'starter', cycle: 'monthly' })
+    expect(classifyPriceId(LEGACY_PRO_MONTHLY)).toEqual({ plan: 'pro', cycle: 'monthly' })
+    expect(classifyPriceId(LEGACY_STARTER_ANNUAL)).toEqual({ plan: 'starter', cycle: 'annual' })
+    expect(classifyPriceId(LEGACY_PRO_ANNUAL)).toEqual({ plan: 'pro', cycle: 'annual' })
   })
 
   it('nunca troca Starter por Pro nem mensal por anual', () => {
-    expect(classifyPriceId(STARTER_MONTHLY)?.plan).not.toBe('pro')
-    expect(classifyPriceId(PRO_ANNUAL)?.cycle).not.toBe('monthly')
+    expect(classifyPriceId(LEGACY_STARTER_MONTHLY)?.plan).not.toBe('pro')
+    expect(classifyPriceId(PRO_ANNUAL_2026)?.cycle).not.toBe('monthly')
   })
 
   it('Price ID desconhecido ou nulo: devolve null, nunca adivinha', () => {
@@ -55,9 +75,11 @@ describe('classifyPriceId — inverso, usado pelo webhook', () => {
     expect(classifyPriceId(undefined)).toBeNull()
   })
 
-  it('sem as env vars anuais configuradas, um Price ID anual real deixa de ser reconhecido (nunca inventa a correspondência)', () => {
+  it('sem as env vars configuradas, um Price ID real deixa de ser reconhecido (nunca inventa a correspondência)', () => {
     delete process.env.STRIPE_PRICE_STARTER_ANNUAL
-    expect(classifyPriceId(STARTER_ANNUAL)).toBeNull()
+    delete process.env.STRIPE_PRICE_STARTER_MONTHLY_2026
+    expect(classifyPriceId(LEGACY_STARTER_ANNUAL)).toBeNull()
+    expect(classifyPriceId(STARTER_MONTHLY_2026)).toBeNull()
   })
 })
 

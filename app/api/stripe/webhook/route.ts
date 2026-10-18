@@ -161,8 +161,8 @@ export async function POST(req: NextRequest) {
           const plan = classified?.plan || session.metadata?.plan || 'starter'
           const cycle = classified?.cycle || session.metadata?.cycle || 'monthly'
           const valorEur = cycle === 'annual'
-            ? (plan === 'pro' ? '€397,80/ano + IVA' : '€193,80/ano + IVA')
-            : (plan === 'pro' ? '€39/mês + IVA' : '€19/mês + IVA')
+            ? (plan === 'pro' ? '€601,80/ano + IVA' : '€295,80/ano + IVA')
+            : (plan === 'pro' ? '€59/mês + IVA' : '€29/mês + IVA')
           await supabaseAdmin
             .from('professionals')
             .update({

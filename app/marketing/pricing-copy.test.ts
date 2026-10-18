@@ -54,11 +54,10 @@ describe('coerência do preço mínimo do marketplace na homepage (preços 2026-
 // sai. Fica aqui e não em checkout/route.test.ts porque é especificamente
 // sobre a apresentação pública, não sobre a API.
 //
-// Preços 2026-10-17: Starter/Pro mensais (29€/59€) ainda NÃO entraram
-// nesta publicação — bloqueados por falta dos novos Price IDs no Stripe
-// (ver relatório). O anual antigo (193,80€/397,80€, -15% do mensal 19€/39€
-// ainda em vigor) continua coerente enquanto o mensal não mudar — por
-// isso este bloco fica tal como estava, sem alterações.
+// Preços 2026-10-18: Starter 29€/mês e Pro 59€/mês (antes 19€/39€); anual
+// recalculado mantendo os mesmos -15% sobre o mensal NOVO — 295,80€/
+// 601,80€ por ano (antes 193,80€/397,80€, calculado sobre o mensal
+// antigo). Ver lib/stripe-plans.ts para os Price IDs.
 describe('planos anuais — seletor funcional, "Em breve" removido (P5, 2026-09-19)', () => {
   it('existe um seletor Mensal/Anual (estado pricingCycle + os dois botões)', () => {
     expect(marketingSource).toMatch(/pricingCycle/)
@@ -71,8 +70,8 @@ describe('planos anuais — seletor funcional, "Em breve" removido (P5, 2026-09-
   })
 
   it('mostra os dois valores anuais exatos, com "+ IVA"', () => {
-    expect(marketingSource).toMatch(/€193,80/)
-    expect(marketingSource).toMatch(/€397,80/)
+    expect(marketingSource).toMatch(/€295,80/)
+    expect(marketingSource).toMatch(/€601,80/)
     expect(marketingSource).toMatch(/\/ano \+ IVA/)
     expect(marketingSource).toMatch(/\/mês \+ IVA/)
   })
