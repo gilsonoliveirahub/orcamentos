@@ -43,6 +43,120 @@ function isExpired(action: AquilesAction) {
   return action.status === 'approved' && !!action.expires_at && new Date(action.expires_at) <= new Date()
 }
 
+type CapabilityPreview = {
+  capability_id: string
+  found: boolean
+  not_found_reason?: string
+  target_summary: string
+  changes: Array<{ field: string; before: unknown; after: unknown }>
+  effects: Array<{ label: string }>
+  blocked: boolean
+  blocked_reason?: string
+}
+
+// Recalculado no servidor a partir do payload gravado (nunca o texto livre
+// do Aquiles) — ver app/api/admin/aquiles-actions/[id]/preview/route.ts.
+function usePreview(actionId: string) {
+  const [preview, setPreview] = useState<CapabilityPreview | null>(null)
+  const [reason, setReason] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`/api/admin/aquiles-actions/${actionId}/preview`)
+      .then(async res => {
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Falha ao calcular preview')
+        setPreview(json.preview)
+        setReason(json.reason || null)
+      })
+      .catch(() => setReason('Falha ao calcular preview'))
+      .finally(() => setLoading(false))
+  }, [actionId])
+
+  return { preview, reason, loading }
+}
+
+function PreviewBlock({ preview, reason, loading }: { preview: CapabilityPreview | null; reason: string | null; loading: boolean }) {
+  if (loading) return <p className="text-xs text-gray-500 mt-2">A calcular preview…</p>
+  if (!preview) return reason ? <p className="text-xs text-gray-500 mt-2">{reason}</p> : null
+
+  return (
+    <div className="mt-3 p-3 rounded" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <p className="text-sm text-gray-200 font-medium">{preview.target_summary}</p>
+      {preview.changes.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {preview.changes.map((c, i) => (
+            <p key={i} className="text-xs text-gray-400">
+              <span className="text-gray-500">{c.field}:</span> {JSON.stringify(c.before)} → <span className="text-indigo-300">{JSON.stringify(c.after)}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      {preview.effects.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {preview.effects.map((e, i) => (
+            <li key={i} className="text-xs text-gray-400">• {e.label}</li>
+          ))}
+        </ul>
+      )}
+      {preview.blocked && (
+        <p className="mt-2 text-xs font-medium" style={{ color: '#f87171' }}>⚠ Bloqueado: {preview.blocked_reason || preview.not_found_reason}</p>
+      )}
+    </div>
+  )
+}
+
+function PendingActionCard({ action, deciding, onDecide }: { action: AquilesAction; deciding: boolean; onDecide: (id: string, decision: 'approved' | 'rejected') => void }) {
+  const isCapabilityBased = typeof action.payload?.capability_id === 'string'
+  const { preview, reason, loading } = usePreview(action.id)
+  // Sem capability_id no payload (ex: o teste genérico sem capacidade real
+  // ligada) não há preview para calcular — nunca bloqueia a aprovação só
+  // por isso, é um pedido válido de um tipo diferente.
+  const blockedByPreview = isCapabilityBased && !!preview?.blocked
+
+  return (
+    <div className="p-4 rounded" style={cardStyle}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.15)', color: STATUS_COLOR.pending }}>
+            {ACTION_TYPE_LABELS[action.action_type]}
+          </span>
+          <p className="text-white mt-2">{action.summary}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Pedido por {action.requested_by} em {new Date(action.requested_at).toLocaleString('pt-PT')}
+          </p>
+          {isCapabilityBased ? (
+            <PreviewBlock preview={preview} reason={reason} loading={loading} />
+          ) : (
+            Object.keys(action.payload || {}).length > 0 && (
+              <pre className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">{JSON.stringify(action.payload, null, 2)}</pre>
+            )
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => onDecide(action.id, 'approved')}
+            disabled={deciding || blockedByPreview}
+            title={blockedByPreview ? preview?.blocked_reason : undefined}
+            className="flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: '#16a34a' }}
+          >
+            <Check size={14} /> Aprovar
+          </button>
+          <button
+            onClick={() => onDecide(action.id, 'rejected')}
+            disabled={deciding}
+            className="flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: '#dc2626' }}
+          >
+            <X size={14} /> Rejeitar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Única superfície humana de aprovação de todo o sistema — ver
 // app/api/admin/aquiles-actions/[id]/decide/route.ts. O token do Aquiles
 // nunca chega aqui; esta página só funciona com a mesma sessão admin usada
@@ -128,40 +242,7 @@ export default function AdminAquilesPage() {
         <div className="space-y-3 mb-8">
           {pending.length === 0 && <p className="text-sm text-gray-500">Sem pedidos pendentes.</p>}
           {pending.map(action => (
-            <div key={action.id} className="p-4 rounded" style={cardStyle}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="text-xs font-medium px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.15)', color: STATUS_COLOR.pending }}>
-                    {ACTION_TYPE_LABELS[action.action_type]}
-                  </span>
-                  <p className="text-white mt-2">{action.summary}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Pedido por {action.requested_by} em {new Date(action.requested_at).toLocaleString('pt-PT')}
-                  </p>
-                  {Object.keys(action.payload || {}).length > 0 && (
-                    <pre className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">{JSON.stringify(action.payload, null, 2)}</pre>
-                  )}
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => decide(action.id, 'approved')}
-                    disabled={deciding === action.id}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: '#16a34a' }}
-                  >
-                    <Check size={14} /> Aprovar
-                  </button>
-                  <button
-                    onClick={() => decide(action.id, 'rejected')}
-                    disabled={deciding === action.id}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50"
-                    style={{ background: '#dc2626' }}
-                  >
-                    <X size={14} /> Rejeitar
-                  </button>
-                </div>
-              </div>
-            </div>
+            <PendingActionCard key={action.id} action={action} deciding={deciding === action.id} onDecide={decide} />
           ))}
         </div>
 

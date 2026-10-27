@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 import { verifyInviteToken } from '@/lib/review-token'
-import { sendInviteMessage } from '@/lib/send-review-invite'
+import {
+  REVIEW_INVITE_PATCH_ACTIONS as PATCH_ACTIONS,
+  applyReviewInviteAction,
+  isInviteDeletable,
+  type ReviewInvitePatchAction as PatchAction,
+} from '@/lib/review-invite-actions'
 
 export const runtime = 'nodejs'
 
@@ -138,9 +143,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-const PATCH_ACTIONS = ['confirm', 'reject', 'resend', 'cancel'] as const
-type PatchAction = typeof PATCH_ACTIONS[number]
-
 // PATCH — todas as ações do profissional sobre UM convite/pedido seu.
 // Cada ação só é aceite a partir do estado certo (nunca confia só no
 // pedido, volta sempre a confirmar o estado atual em BD antes de agir) e só
@@ -184,69 +186,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Pedido não encontrado.' }, { status: 404 })
     }
 
-    return handlePatchAction(action as PatchAction, invite, professional)
+    const result = await applyReviewInviteAction(action as PatchAction, invite, professional)
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
+    return NextResponse.json({ ok: true, status: result.status, send_error: result.send_error })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
-}
-
-type InviteRow = { id: string; professional_id: string; client_name: string; channel: string; client_email: string | null; client_phone: string | null; status: string; send_status: string | null }
-
-async function handlePatchAction(action: PatchAction, invite: InviteRow, professional: { id: string; name: string }) {
-  if (action === 'confirm' || action === 'reject') {
-    if (invite.status !== 'requested') {
-      return NextResponse.json({ error: 'Este pedido já foi tratado.' }, { status: 409 })
-    }
-    if (action === 'reject') {
-      await supabaseAdmin.from('review_invites').update({ status: 'rejected' }).eq('id', invite.id)
-      return NextResponse.json({ ok: true, status: 'rejected' })
-    }
-    const { error: updateError } = await supabaseAdmin.from('review_invites').update({ status: 'pending' }).eq('id', invite.id)
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
-    const sendError = await sendInviteMessage(invite, professional)
-    return NextResponse.json({ ok: true, status: 'pending', send_error: sendError })
-  }
-
-  if (action === 'resend') {
-    if (invite.status !== 'pending') {
-      return NextResponse.json({ error: 'Só é possível reenviar um convite pendente.' }, { status: 409 })
-    }
-    // Lock atómico — só quem conseguir esta UPDATE (0 ou 1 linha) segue
-    // para enviar; impede dois reenvios em simultâneo do mesmo convite.
-    // Nunca fica preso em 'sending': sendInviteMessage grava sempre 'sent'
-    // ou 'failed' antes de devolver, mesmo quando o envio falha.
-    const { data: lockedRows, error: lockError } = await supabaseAdmin
-      .from('review_invites')
-      .update({ send_status: 'sending' })
-      .eq('id', invite.id)
-      .eq('status', 'pending')
-      .or('send_status.is.null,send_status.neq.sending')
-      .select('id')
-    if (lockError) return NextResponse.json({ error: lockError.message }, { status: 500 })
-    if (!lockedRows || lockedRows.length === 0) {
-      return NextResponse.json({ error: 'Já há um reenvio em curso para este convite.' }, { status: 409 })
-    }
-    const sendError = await sendInviteMessage(invite, professional)
-    return NextResponse.json({ ok: true, status: 'pending', send_error: sendError })
-  }
-
-  // cancel
-  if (invite.status !== 'pending') {
-    return NextResponse.json({ error: 'Só é possível cancelar um convite pendente.' }, { status: 409 })
-  }
-  const { error } = await supabaseAdmin.from('review_invites').update({ status: 'cancelled' }).eq('id', invite.id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, status: 'cancelled' })
-}
-
-// Convites que já não vão a lado nenhum: rejeitados, cancelados, ou um
-// pendente cujo envio falhou de vez (o profissional desiste e liberta o
-// contacto para tentar de outra forma). Nunca 'requested'/'completed'
-// reais — e nunca a avaliação em si, que não pode ser apagada por aqui.
-function isInviteDeletable(invite: { status: string; send_status: string | null }): boolean {
-  if (invite.status === 'rejected' || invite.status === 'cancelled') return true
-  if (invite.status === 'pending' && invite.send_status === 'failed') return true
-  return false
 }
 
 // DELETE — remove o registo do convite em si. Nunca uma avaliação: não há

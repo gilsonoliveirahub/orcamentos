@@ -8,12 +8,7 @@ import { computeReliabilityScore, isAbandonedLead } from '@/lib/reliability'
 import { computeConversionRate, computeAvgResponseHours } from '@/lib/conversion'
 import { countActiveLeads } from '@/lib/capacity'
 import { calcFaturacaoReal } from '@/lib/closed-value-stats'
-
-// Campos que um admin tem permissão para alterar no perfil de outro
-// profissional. Nunca inclui email (login), password, user_id, nem
-// nada relacionado com Stripe/subscrições.
-const EDITABLE_FIELDS = ['name', 'phone', 'specialties', 'zone', 'description', 'active'] as const
-type EditableField = typeof EDITABLE_FIELDS[number]
+import { EDITABLE_PROFESSIONAL_FIELDS as EDITABLE_FIELDS, type EditableProfessionalField as EditableField } from '@/lib/professional-editable-fields'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAuthenticatedAdmin()
