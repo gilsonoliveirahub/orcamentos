@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { LayoutDashboard, Users, UserRound, FileText, CreditCard, Store, Euro, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Users, UserRound, FileText, CreditCard, Store, Euro, BarChart3, Shield } from 'lucide-react'
 import AdminGlobalSearch from './AdminGlobalSearch'
 
-// Navegação partilhada do CRM administrativo — as 8 áreas aprovadas.
+// Navegação partilhada do CRM administrativo — as 9 áreas aprovadas.
 // Só entra aqui uma área que já tem página funcional (nunca link morto).
 const TABS = [
   { key: 'visao-geral', label: 'Visão geral', href: '/admin', icon: LayoutDashboard },
@@ -15,6 +15,7 @@ const TABS = [
   { key: 'marketplace', label: 'Marketplace', href: '/admin/marketplace', icon: Store },
   { key: 'financeiro', label: 'Financeiro', href: '/admin/financeiro', icon: Euro },
   { key: 'metricas', label: 'Métricas', href: '/admin/metricas', icon: BarChart3 },
+  { key: 'aquiles', label: 'Aquiles', href: '/admin/aquiles', icon: Shield },
 ] as const
 
 export type AdminNavKey = typeof TABS[number]['key']
